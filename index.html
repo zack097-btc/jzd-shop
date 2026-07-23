@@ -90,6 +90,7 @@
     <button data-view="orders">Work Orders</button>
     <button data-view="customers">Customers</button>
     <button data-view="vehicles">Vehicles</button>
+    <button data-view="catalog">Catalog</button>
     <button data-view="settings">Settings</button>
   </nav>
   <div class="grow"></div>
@@ -112,9 +113,9 @@ const money=n=>"$"+(Number(n)||0).toFixed(2);
 const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 /* ---------- data ---------- */
-const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:120,taxRate:8.25,taxLabor:false,nextInvoice:1001,terms:"Thank you for your business. Payment due on receipt."},customers:{},vehicles:{},orders:{}};
+const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:120,taxRate:8.25,taxLabor:false,nextInvoice:1001,terms:"Thank you for your business. Payment due on receipt."},customers:{},vehicles:{},orders:{},catalog:{labor:{},parts:{}}};
 let db=load();
-function load(){try{const d=JSON.parse(localStorage.getItem("jzd.shop.db"));if(d&&d.settings)return Object.assign({},DEFAULT,d,{settings:Object.assign({},DEFAULT.settings,d.settings)});}catch(e){}return JSON.parse(JSON.stringify(DEFAULT));}
+function load(){try{const d=JSON.parse(localStorage.getItem("jzd.shop.db"));if(d&&d.settings)return Object.assign({},DEFAULT,d,{settings:Object.assign({},DEFAULT.settings,d.settings),catalog:Object.assign({labor:{},parts:{}},d.catalog||{})});}catch(e){}return JSON.parse(JSON.stringify(DEFAULT));}
 function save(){try{localStorage.setItem("jzd.shop.db",JSON.stringify(db));}catch(e){alert("Couldn't save (browser storage full or blocked).");}}
 function vals(o){return Object.values(o||{});}
 
@@ -124,14 +125,14 @@ function vehLabel(id){const v=db.vehicles[id];return v?`${v.year||""} ${v.make||
 function orderTotals(o){const labor=(o.labor||[]).reduce((s,l)=>s+(Number(l.hours)||0)*(Number(l.rate)||0),0);const parts=(o.parts||[]).reduce((s,p)=>s+(Number(p.qty)||0)*(Number(p.price)||0),0);const taxable=parts+(db.settings.taxLabor?labor:0);const tax=taxable*(Number(db.settings.taxRate)||0)/100;return {labor,parts,tax,total:labor+parts+tax};}
 
 /* ---------- router ---------- */
-let view="dash";
+let view="dash",detailVeh=null;
 $("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;go(b.dataset.view);});
-function go(v){view=v;document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v));render();}
+function go(v){view=v;document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v||(v==="vehDetail"&&b.dataset.view==="vehicles")));render();}
 $("#newWO").onclick=()=>editOrder(null);
 $("#brandTop").onclick=()=>go("dash");
 
 function render(){$("#brandTop").innerHTML=esc(db.settings.shopName).replace(/(Inc\.?)$/i,'<span> $1</span>')||"JZD<span> Inc.</span>";
-  if(view==="dash")renderDash();else if(view==="orders")renderOrders();else if(view==="customers")renderCustomers();else if(view==="vehicles")renderVehicles();else renderSettings();}
+  if(view==="dash")renderDash();else if(view==="orders")renderOrders();else if(view==="customers")renderCustomers();else if(view==="vehicles")renderVehicles();else if(view==="vehDetail")renderVehicleDetail(detailVeh);else if(view==="catalog")renderCatalog();else renderSettings();}
 
 /* ---------- dashboard ---------- */
 function renderDash(){const os=vals(db.orders).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
@@ -175,10 +176,47 @@ function renderVehicles(){const vs=vals(db.vehicles);const f=vehFilter.toLowerCa
   const list=vs.filter(v=>!f||(vehLabel(v.id)+" "+(v.vin||"")+" "+(v.plate||"")+" "+custName(v.customerId)).toLowerCase().includes(f));
   $("#app").innerHTML=`<div class="card"><div class="toolbar"><h2 style="margin:0">Vehicles</h2><input class="search" id="vf" placeholder="Search make, VIN, plate…" value="${esc(vehFilter)}"><div class="grow"></div><button class="primary" onclick="editVehicle(null)">+ Add Vehicle</button></div>
   ${list.length?`<table><thead><tr><th>Vehicle</th><th>Owner</th><th>VIN</th><th>Plate</th><th>Mileage</th><th></th></tr></thead><tbody>
-  ${list.map(v=>`<tr><td><b>${esc(vehLabel(v.id))}</b>${v.color?' · '+esc(v.color):''}</td><td>${esc(custName(v.customerId))}</td><td class="muted">${esc(v.vin||"")}</td><td>${esc(v.plate||"")}</td><td>${esc(v.mileage||"")}</td><td class="right"><button class="sm" onclick="editVehicle('${v.id}')">Edit</button></td></tr>`).join("")}
+  ${list.map(v=>`<tr class="clk" onclick="openVehicle('${v.id}')"><td><b>${esc(vehLabel(v.id))}</b>${v.color?' · '+esc(v.color):''}</td><td>${esc(custName(v.customerId))}</td><td class="muted">${esc(v.vin||"")}</td><td>${esc(v.plate||"")}</td><td>${esc(v.mileage||"")}</td><td class="right"><button class="sm" onclick="event.stopPropagation();openVehicle('${v.id}')">History</button></td></tr>`).join("")}
   </tbody></table>`:`<div class="empty">No vehicles yet. Add a customer first, then their car.</div>`}</div>`;
   $("#vf").oninput=e=>{vehFilter=e.target.value;const s=e.target.selectionStart;renderVehicles();const el=$("#vf");el.focus();el.setSelectionRange(s,s);};
 }
+function openVehicle(id){detailVeh=id;go("vehDetail");}
+function renderVehicleDetail(id){const v=db.vehicles[id];if(!v){go("vehicles");return;}const c=db.customers[v.customerId]||{};
+  const hist=vals(db.orders).filter(o=>o.vehicleId===id).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const spent=hist.reduce((s,o)=>s+orderTotals(o).total,0);
+  $("#app").innerHTML=`
+  <div class="toolbar"><button onclick="go('vehicles')">← Vehicles</button><h2 style="margin:0">${esc(vehLabel(id))}</h2>${v.plate?`<span class="muted">${esc(v.plate)}</span>`:""}<div class="grow"></div><button onclick="editVehicle('${id}')">Edit Vehicle</button><button class="primary" onclick="editOrder(null,{customerId:'${v.customerId}',vehicleId:'${id}'})">+ New Work Order</button></div>
+  <div class="card"><div class="row">
+    <div><h3>Vehicle</h3>${esc(v.year||"")} ${esc(v.make||"")} ${esc(v.model||"")}<br>Color: ${esc(v.color||"—")}<br>Plate: ${esc(v.plate||"—")}<br>VIN: ${esc(v.vin||"—")}<br>Current mileage: ${esc(v.mileage||"—")}</div>
+    <div><h3>Owner</h3>${esc(custName(v.customerId))}<br>${esc(c.phone||"")}<br>${esc(c.email||"")}</div>
+    <div><h3>History</h3>${hist.length} visit${hist.length===1?"":"s"}<br>Total billed: <b>${money(spent)}</b></div>
+    ${v.notes?`<div><h3>Notes</h3>${esc(v.notes)}</div>`:""}
+  </div></div>
+  <div class="card"><h2 style="margin-top:0">Service History</h2>
+  ${hist.length?`<table><thead><tr><th>#</th><th>Date</th><th>Mileage</th><th>Work performed</th><th>Status</th><th class="right">Total</th></tr></thead><tbody>
+  ${hist.map(o=>{const t=orderTotals(o);const work=o.complaint||(o.labor||[]).map(l=>l.desc).filter(Boolean).join(", ")||"—";return `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${o.invoiceNo||"—"}</b></td><td>${esc(o.date||"")}</td><td>${esc(o.mileageOut||o.mileageIn||"")}</td><td>${esc(work).slice(0,70)}</td><td><span class="pill st-${(o.status||"Estimate").replace(/\s/g,"")}">${esc((o.status||"").replace("InProgress","In Progress"))}</span></td><td class="right">${money(t.total)}</td></tr>`;}).join("")}
+  </tbody></table>`:`<div class="empty">No service history yet. Click <b>+ New Work Order</b> to log the first visit for this vehicle.</div>`}</div>`;
+}
+/* ---------- catalog ---------- */
+function renderCatalog(){const lab=vals(db.catalog.labor).sort((a,b)=>(a.desc||"").localeCompare(b.desc||""));const par=vals(db.catalog.parts).sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  $("#app").innerHTML=`
+  <div class="card"><div class="toolbar"><h2 style="margin:0">Labor Catalog</h2><div class="grow"></div><button class="primary" onclick="editCatItem('labor',null)">+ Add labor</button></div>
+  ${lab.length?`<table><thead><tr><th>Description</th><th>Default hours</th><th>Rate/hr</th><th></th></tr></thead><tbody>${lab.map(l=>`<tr><td><b>${esc(l.desc)}</b></td><td>${esc(l.hours||"")}</td><td>${money(l.rate)}</td><td class="right"><button class="sm" onclick="editCatItem('labor','${l.id}')">Edit</button></td></tr>`).join("")}</tbody></table>`:`<div class="empty">No saved labor yet. Add common jobs (Oil change, Brake job, Diagnostic…) for one-click entry on work orders.</div>`}</div>
+  <div class="card"><div class="toolbar"><h2 style="margin:0">Parts Catalog</h2><div class="grow"></div><button class="primary" onclick="editCatItem('parts',null)">+ Add part</button></div>
+  ${par.length?`<table><thead><tr><th>Part</th><th>Price</th><th></th></tr></thead><tbody>${par.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${money(p.price)}</td><td class="right"><button class="sm" onclick="editCatItem('parts','${p.id}')">Edit</button></td></tr>`).join("")}</tbody></table>`:`<div class="empty">No saved parts yet. Add parts you use often (oil filter, brake pads…) so they drop into work orders instantly.</div>`}</div>
+  <div class="card"><p class="muted" style="margin:0">Tip: on any work order you can also click <b>Save lines to catalog</b> to add whatever you just entered.</p></div>`;
+}
+function editCatItem(kind,id){const store=db.catalog[kind];const it=id?store[id]:(kind==="labor"?{id:uid("cl"),desc:"",hours:"",rate:db.settings.laborRate}:{id:uid("cp"),name:"",price:""});
+  $("#recSheet").innerHTML=`<div class="sheet-head"><h2>${id?"Edit":"Add"} ${kind==="labor"?"Labor":"Part"}</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+  ${kind==="labor"?`<label>Description</label><input id="ci_desc" value="${esc(it.desc)}"><div class="row"><div><label>Default hours</label><input id="ci_hours" value="${esc(it.hours)}"></div><div><label>Rate/hr</label><input id="ci_rate" value="${esc(it.rate)}"></div></div>`:`<label>Part name</label><input id="ci_name" value="${esc(it.name)}"><label>Price</label><input id="ci_price" value="${esc(it.price)}">`}
+  <div class="toolbar" style="margin-top:14px"><button class="green" id="ci_save">Save</button>${id?`<button class="danger" onclick="delCatItem('${kind}','${id}')">Delete</button>`:""}</div>`;
+  $("#ci_save").onclick=()=>{if(kind==="labor"){const d=$("#ci_desc").value.trim();if(!d){alert("Enter a description.");return;}it.desc=d;it.hours=$("#ci_hours").value;it.rate=$("#ci_rate").value;}else{const n=$("#ci_name").value.trim();if(!n){alert("Enter a part name.");return;}it.name=n;it.price=$("#ci_price").value;}store[it.id]=it;save();closeRec();render();};
+  $("#recOverlay").classList.add("on");
+}
+function delCatItem(kind,id){if(!confirm("Delete this catalog item?"))return;delete db.catalog[kind][id];save();closeRec();render();}
+function catSelect(kind){const items=vals(db.catalog[kind]);if(!items.length)return "";const opts=items.map(it=>`<option value="${it.id}">${esc(kind==="labor"?it.desc:it.name)}</option>`).join("");return `<select class="sm" style="max-width:230px" onchange="insertCat('${kind}',this.value);this.selectedIndex=0"><option value="">Insert saved ${kind}…</option>${opts}</select>`;}
+function insertCat(kind,id){if(!id)return;pullWO();const it=db.catalog[kind][id];if(!it)return;if(kind==="labor")cur.labor.push({desc:it.desc,hours:it.hours||"",rate:it.rate||db.settings.laborRate});else cur.parts.push({desc:it.name,qty:"1",price:it.price||""});renderLines();updateTotals();}
+function saveLinesToCatalog(kind){pullWO();const store=db.catalog[kind];let n=0;if(kind==="labor"){cur.labor.forEach(l=>{if(!l.desc)return;const ex=vals(store).find(x=>(x.desc||"").toLowerCase()===l.desc.toLowerCase());if(ex){ex.hours=l.hours;ex.rate=l.rate;}else{const id=uid("cl");store[id]={id,desc:l.desc,hours:l.hours,rate:l.rate};}n++;});}else{cur.parts.forEach(p=>{if(!p.desc)return;const ex=vals(store).find(x=>(x.name||"").toLowerCase()===p.desc.toLowerCase());if(ex){ex.price=p.price;}else{const id=uid("cp");store[id]={id,name:p.desc,price:p.price};}n++;});}save();alert(n?`Saved ${n} ${kind} item(s) to the catalog.`:"Nothing to save — add a line first.");drawWO();}
 
 /* ---------- settings ---------- */
 function renderSettings(){const s=db.settings;
@@ -229,8 +267,9 @@ function delVehicle(id){if(!confirm("Delete this vehicle?"))return;delete db.veh
 
 /* ---------- work order editor ---------- */
 let cur=null;
-function editOrder(id){
+function editOrder(id,preset){
   cur=id?JSON.parse(JSON.stringify(db.orders[id])):{id:uid("o"),invoiceNo:null,customerId:"",vehicleId:"",date:todayStr(),status:"Estimate",complaint:"",mileageIn:"",mileageOut:"",labor:[{desc:"",hours:"",rate:db.settings.laborRate}],parts:[{desc:"",qty:"1",price:""}],notes:""};
+  if(!id&&preset){cur.customerId=preset.customerId||"";cur.vehicleId=preset.vehicleId||"";const pv=db.vehicles[cur.vehicleId];if(pv&&pv.mileage)cur.mileageIn=pv.mileage;}
   drawWO();$("#woOverlay").classList.add("on");
 }
 function todayStr(){const p=n=>String(n).padStart(2,"0");const dt=new Date();return dt.getFullYear()+"-"+p(dt.getMonth()+1)+"-"+p(dt.getDate());}
@@ -256,12 +295,12 @@ function drawWO(){const o=cur;
   <h3 style="margin-top:16px">Labor</h3>
   <div class="linerow"><div class="lbl">Description</div><div class="lbl">Hours</div><div class="lbl">Rate/hr</div><div class="lbl right">Amount</div><div></div></div>
   <div id="laborRows"></div>
-  <button class="sm" onclick="addLine('labor')">+ Labor line</button>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><button class="sm" onclick="addLine('labor')">+ Labor line</button>${catSelect('labor')}<button class="sm" onclick="saveLinesToCatalog('labor')">Save lines to catalog</button></div>
 
   <h3 style="margin-top:16px">Parts</h3>
   <div class="linerow"><div class="lbl">Part / Description</div><div class="lbl">Qty</div><div class="lbl">Price</div><div class="lbl right">Amount</div><div></div></div>
   <div id="partsRows"></div>
-  <button class="sm" onclick="addLine('parts')">+ Parts line</button>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><button class="sm" onclick="addLine('parts')">+ Parts line</button>${catSelect('parts')}<button class="sm" onclick="saveLinesToCatalog('parts')">Save lines to catalog</button></div>
 
   <label style="margin-top:14px">Tech notes / cause &amp; correction</label><textarea id="o_notes">${esc(o.notes)}</textarea>
 
