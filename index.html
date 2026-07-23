@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JZD Inc. — Shop Manager</title>
+<style>
+  :root{--bg:#f4f6f9;--card:#fff;--line:#dde3ea;--ink:#1c2530;--muted:#6b7684;--accent:#1f6feb;--accent2:#187a4b;--warn:#c9770a;--bad:#c0392b;--steel:#2b3949}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI",-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  header{background:var(--steel);color:#fff;display:flex;align-items:center;gap:16px;padding:0 18px;height:54px;position:sticky;top:0;z-index:20}
+  .logo{font-weight:800;font-size:18px;letter-spacing:.02em}
+  .logo span{color:#7fc3ff}
+  nav{display:flex;gap:4px;margin-left:14px}
+  nav button{background:transparent;border:none;color:#cdd6e0;padding:8px 13px;border-radius:7px;cursor:pointer;font:inherit}
+  nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+  nav button.on{background:#fff;color:var(--steel);font-weight:700}
+  .grow{flex:1}
+  header .hbtn{background:#3a4a5c;border:1px solid #4a5c70;color:#fff;padding:7px 12px;border-radius:7px;cursor:pointer;font:inherit}
+  header .hbtn:hover{background:#465a70}
+  .wrap{max-width:1080px;margin:0 auto;padding:20px 18px 60px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  h2{margin:0 0 14px;font-size:19px}
+  h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  button{font:inherit;color:var(--ink);background:#f2f4f7;border:1px solid var(--line);border-radius:8px;padding:8px 13px;cursor:pointer}
+  button:hover{background:#e9edf2;border-color:#b9c4d0}
+  button.primary{background:var(--accent);border-color:#1559c8;color:#fff;font-weight:700}
+  button.green{background:var(--accent2);border-color:#146a40;color:#fff;font-weight:700}
+  button.ghost{background:transparent}
+  button.danger{color:var(--bad);border-color:#e5b4ad}
+  button.sm{padding:4px 9px;font-size:12.5px}
+  input,select,textarea{width:100%;background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit}
+  textarea{resize:vertical;min-height:56px}
+  label{display:block;font-size:12px;color:var(--muted);margin:9px 0 3px}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>*{flex:1;min-width:120px}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+  th{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
+  tr.clk{cursor:pointer}
+  tr.clk:hover td{background:#f7f9fc}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:700}
+  .st-Estimate{background:#eef1f5;color:#55606e}
+  .st-Approved{background:#e6f0ff;color:#1f6feb}
+  .st-InProgress{background:#fff2da;color:#a86a00}
+  .st-Completed{background:#e3f5ea;color:#187a4b}
+  .st-Invoiced{background:#e9e4ff;color:#5b3fd6}
+  .st-Paid{background:#dff3e6;color:#0f6b3a}
+  .muted{color:var(--muted)}
+  .right{text-align:right}
+  .search{max-width:260px}
+  .empty{color:var(--muted);padding:22px;text-align:center}
+  /* overlay editor */
+  .overlay{position:fixed;inset:0;background:rgba(20,28,38,.5);z-index:40;display:none;overflow:auto;padding:24px}
+  .overlay.on{display:block}
+  .sheet{max-width:900px;margin:0 auto;background:var(--card);border-radius:14px;padding:20px}
+  .sheet-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .sheet-head h2{margin:0}
+  .linerow{display:grid;grid-template-columns:1fr 90px 110px 110px 34px;gap:8px;align-items:center;margin-bottom:7px}
+  .linerow .lbl{font-size:11px;color:var(--muted)}
+  .totbox{margin-left:auto;min-width:280px}
+  .totrow{display:flex;justify-content:space-between;padding:4px 0}
+  .totrow.grand{border-top:2px solid var(--line);margin-top:6px;padding-top:8px;font-size:18px;font-weight:800}
+  .x{background:#fbeaea;border:1px solid #eec7c7;color:#b23;border-radius:7px;cursor:pointer;height:34px}
+  /* print */
+  #printArea{display:none}
+  @media print{
+    header,.wrap,.overlay{display:none!important}
+    #printArea{display:block!important;padding:0;margin:0}
+    body{background:#fff}
+  }
+  .inv{max-width:760px;margin:0 auto;color:#111;font-size:13px}
+  .inv .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--steel);padding-bottom:12px;margin-bottom:14px}
+  .inv .shop{font-size:24px;font-weight:800;color:var(--steel)}
+  .inv .doctype{font-size:26px;font-weight:800;text-transform:uppercase;color:var(--steel);text-align:right}
+  .inv .meta{display:flex;justify-content:space-between;gap:20px;margin-bottom:14px}
+  .inv table{width:100%;border-collapse:collapse;margin:10px 0}
+  .inv th,.inv td{border-bottom:1px solid #ccc;padding:7px 8px;font-size:12.5px}
+  .inv .tot{width:280px;margin-left:auto}
+  .inv .foot{margin-top:24px;color:#555;font-size:12px;border-top:1px solid #ccc;padding-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo" id="brandTop">JZD<span> Inc.</span></div>
+  <nav id="nav">
+    <button data-view="dash" class="on">Dashboard</button>
+    <button data-view="orders">Work Orders</button>
+    <button data-view="customers">Customers</button>
+    <button data-view="vehicles">Vehicles</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+  <div class="grow"></div>
+  <button class="hbtn" id="newWO">+ New Work Order</button>
+</header>
+
+<div class="wrap" id="app"></div>
+
+<!-- WORK ORDER EDITOR -->
+<div class="overlay" id="woOverlay"><div class="sheet" id="woSheet"></div></div>
+<!-- CUSTOMER / VEHICLE EDITOR -->
+<div class="overlay" id="recOverlay"><div class="sheet" id="recSheet" style="max-width:560px"></div></div>
+<!-- PRINT -->
+<div id="printArea"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const uid=(p)=>p+"_"+(Date.now().toString(36))+Math.floor(Math.random()*1e5).toString(36); // only at runtime
+const money=n=>"$"+(Number(n)||0).toFixed(2);
+const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- data ---------- */
+const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:120,taxRate:8.25,taxLabor:false,nextInvoice:1001,terms:"Thank you for your business. Payment due on receipt."},customers:{},vehicles:{},orders:{}};
+let db=load();
+function load(){try{const d=JSON.parse(localStorage.getItem("jzd.shop.db"));if(d&&d.settings)return Object.assign({},DEFAULT,d,{settings:Object.assign({},DEFAULT.settings,d.settings)});}catch(e){}return JSON.parse(JSON.stringify(DEFAULT));}
+function save(){try{localStorage.setItem("jzd.shop.db",JSON.stringify(db));}catch(e){alert("Couldn't save (browser storage full or blocked).");}}
+function vals(o){return Object.values(o||{});}
+
+/* ---------- helpers ---------- */
+function custName(id){const c=db.customers[id];return c?c.name:"—";}
+function vehLabel(id){const v=db.vehicles[id];return v?`${v.year||""} ${v.make||""} ${v.model||""}`.trim()||"Vehicle":"—";}
+function orderTotals(o){const labor=(o.labor||[]).reduce((s,l)=>s+(Number(l.hours)||0)*(Number(l.rate)||0),0);const parts=(o.parts||[]).reduce((s,p)=>s+(Number(p.qty)||0)*(Number(p.price)||0),0);const taxable=parts+(db.settings.taxLabor?labor:0);const tax=taxable*(Number(db.settings.taxRate)||0)/100;return {labor,parts,tax,total:labor+parts+tax};}
+
+/* ---------- router ---------- */
+let view="dash";
+$("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;go(b.dataset.view);});
+function go(v){view=v;document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v));render();}
+$("#newWO").onclick=()=>editOrder(null);
+$("#brandTop").onclick=()=>go("dash");
+
+function render(){$("#brandTop").innerHTML=esc(db.settings.shopName).replace(/(Inc\.?)$/i,'<span> $1</span>')||"JZD<span> Inc.</span>";
+  if(view==="dash")renderDash();else if(view==="orders")renderOrders();else if(view==="customers")renderCustomers();else if(view==="vehicles")renderVehicles();else renderSettings();}
+
+/* ---------- dashboard ---------- */
+function renderDash(){const os=vals(db.orders).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const open=os.filter(o=>o.status!=="Paid"&&o.status!=="Invoiced");
+  const cards=[["Open work orders",open.length],["Customers",vals(db.customers).length],["Vehicles",vals(db.vehicles).length]];
+  $("#app").innerHTML=`
+  <div class="row" style="margin-bottom:6px">${cards.map(c=>`<div class="card" style="text-align:center"><div style="font-size:30px;font-weight:800">${c[1]}</div><div class="muted">${c[0]}</div></div>`).join("")}</div>
+  <div class="card">
+    <div class="toolbar"><h2 style="margin:0">Recent Work Orders</h2><div class="grow"></div><button class="primary" onclick="editOrder(null)">+ New Work Order</button></div>
+    ${tableOrders(os.slice(0,25))}
+  </div>`;
+}
+function tableOrders(list){if(!list.length)return `<div class="empty">No work orders yet. Click <b>+ New Work Order</b> to start.</div>`;
+  return `<table><thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Vehicle</th><th>Status</th><th class="right">Total</th></tr></thead><tbody>
+  ${list.map(o=>{const t=orderTotals(o);return `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${o.invoiceNo||"—"}</b></td><td>${esc(o.date||"")}</td><td>${esc(custName(o.customerId))}</td><td>${esc(vehLabel(o.vehicleId))}</td><td><span class="pill st-${(o.status||"Estimate").replace(/\\s/g,"")}">${esc(o.status||"Estimate")}</span></td><td class="right">${money(t.total)}</td></tr>`;}).join("")}
+  </tbody></table>`;}
+
+/* ---------- orders list ---------- */
+let ordFilter="";
+function renderOrders(){const os=vals(db.orders).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const f=ordFilter.toLowerCase();
+  const list=os.filter(o=>!f||(custName(o.customerId)+" "+vehLabel(o.vehicleId)+" "+(o.invoiceNo||"")+" "+(o.complaint||"")).toLowerCase().includes(f));
+  $("#app").innerHTML=`<div class="card"><div class="toolbar"><h2 style="margin:0">Work Orders</h2><input class="search" id="of" placeholder="Search customer, vehicle, #…" value="${esc(ordFilter)}"><div class="grow"></div><button class="primary" onclick="editOrder(null)">+ New</button></div>${tableOrders(list)}</div>`;
+  $("#of").oninput=e=>{ordFilter=e.target.value;const s=e.target.selectionStart;renderOrders();const el=$("#of");el.focus();el.setSelectionRange(s,s);};
+}
+
+/* ---------- customers ---------- */
+let custFilter="";
+function renderCustomers(){const cs=vals(db.customers).sort((a,b)=>(a.name||"").localeCompare(b.name||""));const f=custFilter.toLowerCase();
+  const list=cs.filter(c=>!f||(c.name+" "+(c.phone||"")+" "+(c.email||"")).toLowerCase().includes(f));
+  $("#app").innerHTML=`<div class="card"><div class="toolbar"><h2 style="margin:0">Customers</h2><input class="search" id="cf" placeholder="Search…" value="${esc(custFilter)}"><div class="grow"></div><button class="primary" onclick="editCustomer(null)">+ Add Customer</button></div>
+  ${list.length?`<table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Vehicles</th><th></th></tr></thead><tbody>
+  ${list.map(c=>`<tr><td><b>${esc(c.name)}</b></td><td>${esc(c.phone||"")}</td><td>${esc(c.email||"")}</td><td>${vals(db.vehicles).filter(v=>v.customerId===c.id).length}</td><td class="right"><button class="sm" onclick="editCustomer('${c.id}')">Edit</button></td></tr>`).join("")}
+  </tbody></table>`:`<div class="empty">No customers yet.</div>`}</div>`;
+  $("#cf").oninput=e=>{custFilter=e.target.value;const s=e.target.selectionStart;renderCustomers();const el=$("#cf");el.focus();el.setSelectionRange(s,s);};
+}
+
+/* ---------- vehicles ---------- */
+let vehFilter="";
+function renderVehicles(){const vs=vals(db.vehicles);const f=vehFilter.toLowerCase();
+  const list=vs.filter(v=>!f||(vehLabel(v.id)+" "+(v.vin||"")+" "+(v.plate||"")+" "+custName(v.customerId)).toLowerCase().includes(f));
+  $("#app").innerHTML=`<div class="card"><div class="toolbar"><h2 style="margin:0">Vehicles</h2><input class="search" id="vf" placeholder="Search make, VIN, plate…" value="${esc(vehFilter)}"><div class="grow"></div><button class="primary" onclick="editVehicle(null)">+ Add Vehicle</button></div>
+  ${list.length?`<table><thead><tr><th>Vehicle</th><th>Owner</th><th>VIN</th><th>Plate</th><th>Mileage</th><th></th></tr></thead><tbody>
+  ${list.map(v=>`<tr><td><b>${esc(vehLabel(v.id))}</b>${v.color?' · '+esc(v.color):''}</td><td>${esc(custName(v.customerId))}</td><td class="muted">${esc(v.vin||"")}</td><td>${esc(v.plate||"")}</td><td>${esc(v.mileage||"")}</td><td class="right"><button class="sm" onclick="editVehicle('${v.id}')">Edit</button></td></tr>`).join("")}
+  </tbody></table>`:`<div class="empty">No vehicles yet. Add a customer first, then their car.</div>`}</div>`;
+  $("#vf").oninput=e=>{vehFilter=e.target.value;const s=e.target.selectionStart;renderVehicles();const el=$("#vf");el.focus();el.setSelectionRange(s,s);};
+}
+
+/* ---------- settings ---------- */
+function renderSettings(){const s=db.settings;
+  $("#app").innerHTML=`<div class="card"><h2>Shop Settings</h2>
+  <div class="row"><div><label>Shop name</label><input id="s_shopName" value="${esc(s.shopName)}"></div><div><label>Tagline</label><input id="s_tagline" value="${esc(s.tagline)}"></div></div>
+  <div class="row"><div><label>Address</label><input id="s_addr" value="${esc(s.addr)}"></div><div><label>Phone</label><input id="s_phone" value="${esc(s.phone)}"></div><div><label>Email</label><input id="s_email" value="${esc(s.email)}"></div></div>
+  <div class="row"><div><label>Default labor rate ($/hr)</label><input id="s_laborRate" type="number" step="1" value="${s.laborRate}"></div><div><label>Sales tax rate (%)</label><input id="s_taxRate" type="number" step="0.01" value="${s.taxRate}"></div><div><label>Next invoice #</label><input id="s_nextInvoice" type="number" step="1" value="${s.nextInvoice}"></div></div>
+  <div class="chk" style="margin-top:10px"><label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="s_taxLabor" ${s.taxLabor?"checked":""} style="width:auto"> Charge sales tax on labor too (default: parts only)</label></div>
+  <label>Invoice footer / terms</label><textarea id="s_terms">${esc(s.terms)}</textarea>
+  <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveSettings()">Save Settings</button></div>
+  </div>
+  <div class="card"><h3>Backup</h3><p class="muted" style="margin-top:0">Your data lives in this browser. Export a backup regularly, or to move to another computer.</p>
+  <div class="toolbar"><button onclick="exportData()">Export backup (.json)</button><button onclick="document.getElementById('impFile').click()">Import backup</button><input type="file" id="impFile" accept=".json" style="display:none"></div></div>`;
+  $("#impFile").onchange=importData;
+}
+function saveSettings(){const g=id=>$("#"+id).value;db.settings.shopName=g("s_shopName")||"JZD Inc.";db.settings.tagline=g("s_tagline");db.settings.addr=g("s_addr");db.settings.phone=g("s_phone");db.settings.email=g("s_email");db.settings.laborRate=Number(g("s_laborRate"))||0;db.settings.taxRate=Number(g("s_taxRate"))||0;db.settings.nextInvoice=parseInt(g("s_nextInvoice"))||1001;db.settings.taxLabor=$("#s_taxLabor").checked;db.settings.terms=g("s_terms");save();render();alert("Settings saved.");}
+function exportData(){const b=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="jzd-shop-backup.json";a.click();}
+function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.settings)throw 0;db=Object.assign({},DEFAULT,d,{settings:Object.assign({},DEFAULT.settings,d.settings)});save();render();alert("Backup imported.");}catch(err){alert("That isn't a valid JZD Shop backup file.");}};r.readAsText(f);}
+
+/* ---------- customer editor ---------- */
+function editCustomer(id,then){const c=id?db.customers[id]:{id:uid("c"),name:"",phone:"",email:"",address:"",notes:""};
+  $("#recSheet").innerHTML=`<div class="sheet-head"><h2>${id?"Edit":"Add"} Customer</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+  <label>Name</label><input id="c_name" value="${esc(c.name)}">
+  <div class="row"><div><label>Phone</label><input id="c_phone" value="${esc(c.phone)}"></div><div><label>Email</label><input id="c_email" value="${esc(c.email)}"></div></div>
+  <label>Address</label><input id="c_address" value="${esc(c.address)}">
+  <label>Notes</label><textarea id="c_notes">${esc(c.notes)}</textarea>
+  <div class="toolbar" style="margin-top:14px"><button class="green" id="c_save">Save Customer</button>${id?`<button class="danger" onclick="delCustomer('${id}')">Delete</button>`:""}</div>`;
+  $("#c_save").onclick=()=>{const name=$("#c_name").value.trim();if(!name){alert("Enter a name.");return;}c.name=name;c.phone=$("#c_phone").value;c.email=$("#c_email").value;c.address=$("#c_address").value;c.notes=$("#c_notes").value;db.customers[c.id]=c;save();closeRec();if(then)then(c.id);else render();};
+  $("#recOverlay").classList.add("on");
+}
+function delCustomer(id){if(!confirm("Delete this customer? Their vehicles stay but become unassigned."))return;delete db.customers[id];save();closeRec();render();}
+function closeRec(){$("#recOverlay").classList.remove("on");}
+
+/* ---------- vehicle editor ---------- */
+function editVehicle(id,presetCustomer,then){const v=id?db.vehicles[id]:{id:uid("v"),customerId:presetCustomer||"",year:"",make:"",model:"",vin:"",plate:"",color:"",mileage:"",notes:""};
+  const custOpts=vals(db.customers).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${c.id===v.customerId?"selected":""}>${esc(c.name)}</option>`).join("");
+  $("#recSheet").innerHTML=`<div class="sheet-head"><h2>${id?"Edit":"Add"} Vehicle</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+  <label>Owner</label><select id="v_cust"><option value="">— select customer —</option>${custOpts}</select>
+  <div class="row"><div><label>Year</label><input id="v_year" value="${esc(v.year)}"></div><div><label>Make</label><input id="v_make" value="${esc(v.make)}"></div><div><label>Model</label><input id="v_model" value="${esc(v.model)}"></div></div>
+  <div class="row"><div><label>Color</label><input id="v_color" value="${esc(v.color)}"></div><div><label>Plate</label><input id="v_plate" value="${esc(v.plate)}"></div><div><label>Mileage</label><input id="v_mileage" value="${esc(v.mileage)}"></div></div>
+  <label>VIN</label><input id="v_vin" value="${esc(v.vin)}">
+  <label>Notes</label><textarea id="v_notes">${esc(v.notes)}</textarea>
+  <div class="toolbar" style="margin-top:14px"><button class="green" id="v_save">Save Vehicle</button>${id?`<button class="danger" onclick="delVehicle('${id}')">Delete</button>`:""}</div>`;
+  $("#v_save").onclick=()=>{v.customerId=$("#v_cust").value;v.year=$("#v_year").value;v.make=$("#v_make").value;v.model=$("#v_model").value;v.color=$("#v_color").value;v.plate=$("#v_plate").value;v.mileage=$("#v_mileage").value;v.vin=$("#v_vin").value;v.notes=$("#v_notes").value;if(!v.make&&!v.model){alert("Enter at least a make or model.");return;}db.vehicles[v.id]=v;save();closeRec();if(then)then(v.id);else render();};
+  $("#recOverlay").classList.add("on");
+}
+function delVehicle(id){if(!confirm("Delete this vehicle?"))return;delete db.vehicles[id];save();closeRec();render();}
+
+/* ---------- work order editor ---------- */
+let cur=null;
+function editOrder(id){
+  cur=id?JSON.parse(JSON.stringify(db.orders[id])):{id:uid("o"),invoiceNo:null,customerId:"",vehicleId:"",date:todayStr(),status:"Estimate",complaint:"",mileageIn:"",mileageOut:"",labor:[{desc:"",hours:"",rate:db.settings.laborRate}],parts:[{desc:"",qty:"1",price:""}],notes:""};
+  drawWO();$("#woOverlay").classList.add("on");
+}
+function todayStr(){const p=n=>String(n).padStart(2,"0");const dt=new Date();return dt.getFullYear()+"-"+p(dt.getMonth()+1)+"-"+p(dt.getDate());}
+function drawWO(){const o=cur;
+  const custOpts=vals(db.customers).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${c.id===o.customerId?"selected":""}>${esc(c.name)}</option>`).join("");
+  const vehOpts=vals(db.vehicles).filter(v=>!o.customerId||v.customerId===o.customerId).map(v=>`<option value="${v.id}" ${v.id===o.vehicleId?"selected":""}>${esc(vehLabel(v.id))}${v.plate?" · "+esc(v.plate):""}</option>`).join("");
+  const statuses=["Estimate","Approved","InProgress","Completed","Invoiced","Paid"];
+  const t=orderTotals(o);
+  $("#woSheet").innerHTML=`
+  <div class="sheet-head"><h2>${o.invoiceNo?"#"+o.invoiceNo+" — ":""}Work Order</h2><span class="pill st-${o.status}">${o.status.replace("InProgress","In Progress")}</span><div class="grow"></div><button onclick="closeWO()">Close</button></div>
+  <div class="row">
+    <div><label>Customer</label><div style="display:flex;gap:6px"><select id="o_cust" style="flex:1"><option value="">— select —</option>${custOpts}</select><button class="sm" onclick="quickCustomer()">+ New</button></div></div>
+    <div><label>Vehicle</label><div style="display:flex;gap:6px"><select id="o_veh" style="flex:1"><option value="">— select —</option>${vehOpts}</select><button class="sm" onclick="quickVehicle()">+ New</button></div></div>
+  </div>
+  <div class="row">
+    <div><label>Date</label><input id="o_date" type="date" value="${esc(o.date)}"></div>
+    <div><label>Status</label><select id="o_status">${statuses.map(s=>`<option value="${s}" ${s===o.status?"selected":""}>${s.replace("InProgress","In Progress")}</option>`).join("")}</select></div>
+    <div><label>Mileage In</label><input id="o_mIn" value="${esc(o.mileageIn)}"></div>
+    <div><label>Mileage Out</label><input id="o_mOut" value="${esc(o.mileageOut)}"></div>
+  </div>
+  <label>Complaint / Work requested</label><textarea id="o_complaint">${esc(o.complaint)}</textarea>
+
+  <h3 style="margin-top:16px">Labor</h3>
+  <div class="linerow"><div class="lbl">Description</div><div class="lbl">Hours</div><div class="lbl">Rate/hr</div><div class="lbl right">Amount</div><div></div></div>
+  <div id="laborRows"></div>
+  <button class="sm" onclick="addLine('labor')">+ Labor line</button>
+
+  <h3 style="margin-top:16px">Parts</h3>
+  <div class="linerow"><div class="lbl">Part / Description</div><div class="lbl">Qty</div><div class="lbl">Price</div><div class="lbl right">Amount</div><div></div></div>
+  <div id="partsRows"></div>
+  <button class="sm" onclick="addLine('parts')">+ Parts line</button>
+
+  <label style="margin-top:14px">Tech notes / cause &amp; correction</label><textarea id="o_notes">${esc(o.notes)}</textarea>
+
+  <div style="display:flex;align-items:flex-start;margin-top:16px">
+    <div class="totbox">
+      <div class="totrow"><span>Labor</span><b id="tLabor">${money(t.labor)}</b></div>
+      <div class="totrow"><span>Parts</span><b id="tParts">${money(t.parts)}</b></div>
+      <div class="totrow"><span>Tax (${db.settings.taxRate}%${db.settings.taxLabor?"":" parts"})</span><b id="tTax">${money(t.tax)}</b></div>
+      <div class="totrow grand"><span>Total</span><b id="tTotal">${money(t.total)}</b></div>
+    </div>
+  </div>
+
+  <div class="toolbar" style="margin-top:16px">
+    <button class="green" onclick="saveOrder()">Save</button>
+    <button class="primary" onclick="printDoc('Invoice')">Print Invoice</button>
+    <button onclick="printDoc('Estimate')">Print Estimate</button>
+    <div class="grow"></div>
+    ${db.orders[o.id]?`<button class="danger" onclick="delOrder('${o.id}')">Delete</button>`:""}
+  </div>`;
+  renderLines();
+  $("#o_cust").onchange=e=>{pullWO();cur.customerId=e.target.value;cur.vehicleId="";drawWO();};
+  ["o_veh","o_date","o_status","o_mIn","o_mOut","o_complaint","o_notes"].forEach(id=>{const el=$("#"+id);if(el)el.onchange=pullWO;});
+}
+function renderLines(){const o=cur;
+  $("#laborRows").innerHTML=(o.labor||[]).map((l,i)=>`<div class="linerow"><input data-k="labor" data-i="${i}" data-f="desc" value="${esc(l.desc)}" placeholder="e.g. Replace front brakes"><input data-k="labor" data-i="${i}" data-f="hours" value="${esc(l.hours)}" inputmode="decimal"><input data-k="labor" data-i="${i}" data-f="rate" value="${esc(l.rate)}" inputmode="decimal"><div class="right">${money((Number(l.hours)||0)*(Number(l.rate)||0))}</div><button class="x" onclick="delLine('labor',${i})">✕</button></div>`).join("");
+  $("#partsRows").innerHTML=(o.parts||[]).map((p,i)=>`<div class="linerow"><input data-k="parts" data-i="${i}" data-f="desc" value="${esc(p.desc)}" placeholder="e.g. Brake pads (front)"><input data-k="parts" data-i="${i}" data-f="qty" value="${esc(p.qty)}" inputmode="decimal"><input data-k="parts" data-i="${i}" data-f="price" value="${esc(p.price)}" inputmode="decimal"><div class="right">${money((Number(p.qty)||0)*(Number(p.price)||0))}</div><button class="x" onclick="delLine('parts',${i})">✕</button></div>`).join("");
+  $("#woSheet").querySelectorAll("input[data-k]").forEach(inp=>inp.oninput=()=>{const k=inp.dataset.k,i=+inp.dataset.i,f=inp.dataset.f;cur[k][i][f]=inp.value;updateTotals();});
+}
+function updateTotals(){const t=orderTotals(cur);$("#tLabor").textContent=money(t.labor);$("#tParts").textContent=money(t.parts);$("#tTax").textContent=money(t.tax);$("#tTotal").textContent=money(t.total);
+  // update per-line amount displays
+  cur.labor.forEach((l,i)=>{const row=$("#laborRows").children[i];if(row)row.children[3].textContent=money((Number(l.hours)||0)*(Number(l.rate)||0));});
+  cur.parts.forEach((p,i)=>{const row=$("#partsRows").children[i];if(row)row.children[3].textContent=money((Number(p.qty)||0)*(Number(p.price)||0));});}
+function addLine(k){pullWO();if(k==="labor")cur.labor.push({desc:"",hours:"",rate:db.settings.laborRate});else cur.parts.push({desc:"",qty:"1",price:""});renderLines();updateTotals();}
+function delLine(k,i){pullWO();cur[k].splice(i,1);renderLines();updateTotals();}
+function pullWO(){const g=id=>{const el=$("#"+id);return el?el.value:undefined;};if(g("o_cust")!==undefined)cur.customerId=g("o_cust");if(g("o_veh")!==undefined)cur.vehicleId=g("o_veh");if(g("o_date")!==undefined)cur.date=g("o_date");if(g("o_status")!==undefined)cur.status=g("o_status");if(g("o_mIn")!==undefined)cur.mileageIn=g("o_mIn");if(g("o_mOut")!==undefined)cur.mileageOut=g("o_mOut");if(g("o_complaint")!==undefined)cur.complaint=g("o_complaint");if(g("o_notes")!==undefined)cur.notes=g("o_notes");}
+function quickCustomer(){pullWO();editCustomer(null,cid=>{cur.customerId=cid;cur.vehicleId="";drawWO();});}
+function quickVehicle(){pullWO();editVehicle(null,cur.customerId,vid=>{const v=db.vehicles[vid];if(v&&!cur.customerId)cur.customerId=v.customerId;cur.vehicleId=vid;drawWO();});}
+function saveOrder(){pullWO();if(!cur.customerId){alert("Select a customer.");return;}if(!cur.invoiceNo){cur.invoiceNo=db.settings.nextInvoice++;}db.orders[cur.id]=JSON.parse(JSON.stringify(cur));save();closeWO();render();}
+function delOrder(id){if(!confirm("Delete this work order?"))return;delete db.orders[id];save();closeWO();render();}
+function closeWO(){$("#woOverlay").classList.remove("on");cur=null;}
+
+/* ---------- print invoice / estimate ---------- */
+function printDoc(kind){pullWO();const o=cur,s=db.settings,c=db.customers[o.customerId]||{},v=db.vehicles[o.vehicleId]||{},t=orderTotals(o);
+  if(!o.invoiceNo&&kind==="Invoice"){o.invoiceNo=db.settings.nextInvoice++;db.orders[o.id]=JSON.parse(JSON.stringify(o));save();}
+  const num=o.invoiceNo||"(draft)";
+  const laborRows=(o.labor||[]).filter(l=>l.desc||l.hours||l.rate).map(l=>`<tr><td>${esc(l.desc)||"Labor"}</td><td>${esc(l.hours)||0} hr</td><td>${money(l.rate)}</td><td style="text-align:right">${money((Number(l.hours)||0)*(Number(l.rate)||0))}</td></tr>`).join("");
+  const partsRows=(o.parts||[]).filter(p=>p.desc||p.price).map(p=>`<tr><td>${esc(p.desc)||"Part"}</td><td>${esc(p.qty)||1}</td><td>${money(p.price)}</td><td style="text-align:right">${money((Number(p.qty)||0)*(Number(p.price)||0))}</td></tr>`).join("");
+  $("#printArea").innerHTML=`<div class="inv">
+    <div class="top"><div><div class="shop">${esc(s.shopName)}</div><div>${esc(s.tagline||"")}</div><div class="muted">${esc(s.addr||"")}${s.phone?" · "+esc(s.phone):""}${s.email?" · "+esc(s.email):""}</div></div>
+      <div><div class="doctype">${kind}</div><div style="text-align:right">#${num}<br>${esc(o.date||"")}</div></div></div>
+    <div class="meta"><div><b>Bill To</b><br>${esc(c.name||"")}<br>${esc(c.phone||"")}<br>${esc(c.email||"")}<br>${esc(c.address||"")}</div>
+      <div><b>Vehicle</b><br>${esc(vehLabel(o.vehicleId))}${v.color?" · "+esc(v.color):""}<br>VIN: ${esc(v.vin||"—")}<br>Plate: ${esc(v.plate||"—")}<br>Mileage: ${esc(o.mileageIn||v.mileage||"—")}${o.mileageOut?" → "+esc(o.mileageOut):""}</div></div>
+    ${o.complaint?`<div style="margin-bottom:8px"><b>Work requested:</b> ${esc(o.complaint)}</div>`:""}
+    ${laborRows?`<table><thead><tr><th>Labor</th><th>Hours</th><th>Rate</th><th style="text-align:right">Amount</th></tr></thead><tbody>${laborRows}</tbody></table>`:""}
+    ${partsRows?`<table><thead><tr><th>Parts</th><th>Qty</th><th>Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>${partsRows}</tbody></table>`:""}
+    <table class="tot"><tbody>
+      <tr><td>Labor</td><td style="text-align:right">${money(t.labor)}</td></tr>
+      <tr><td>Parts</td><td style="text-align:right">${money(t.parts)}</td></tr>
+      <tr><td>Tax (${s.taxRate}%)</td><td style="text-align:right">${money(t.tax)}</td></tr>
+      <tr><td><b>Total</b></td><td style="text-align:right"><b>${money(t.total)}</b></td></tr>
+    </tbody></table>
+    ${o.notes?`<div style="margin-top:14px"><b>Notes:</b> ${esc(o.notes)}</div>`:""}
+    <div class="foot">${esc(s.terms||"")}</div>
+  </div>`;
+  window.print();
+}
+
+/* close overlays on backdrop click */
+$("#woOverlay").addEventListener("mousedown",e=>{if(e.target===$("#woOverlay"))closeWO();});
+$("#recOverlay").addEventListener("mousedown",e=>{if(e.target===$("#recOverlay"))closeRec();});
+
+render();
+</script>
+</body>
+</html>
