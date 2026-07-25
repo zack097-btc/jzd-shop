@@ -1,0 +1,16 @@
+{
+  "name": "JZD Inc. — Shop Manager",
+  "short_name": "JZD Shop",
+  "description": "Work orders, customers, vehicles, estimates and invoices for JZD Inc. — runs fully offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6f9",
+  "theme_color": "#2b3949",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
