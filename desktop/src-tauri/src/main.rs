@@ -17,7 +17,9 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use serde::Serialize;
+mod hub;
+
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -42,6 +44,17 @@ const ALLOWED_EXT: &[&str] = &["jpg", "jpeg", "png", "webp", "gif", "pdf", "txt"
 /// Bumped for every attachment saved in this run, so two photographs taken in
 /// the same second cannot collide.
 static ATT_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// A counter for temporary file names used by the provider hub.
+static HUB_SEQ: AtomicU64 = AtomicU64::new(0);
+pub(crate) fn next_seq() -> u64 {
+    HUB_SEQ.fetch_add(1, Ordering::Relaxed)
+}
+
+/// The largest API response the page will be handed as text.
+const MAX_API_BYTES: u64 = 25 * 1024 * 1024;
+/// The largest public dataset file we will download.
+const MAX_DATASET_BYTES: u64 = 400 * 1024 * 1024;
 
 #[derive(Serialize)]
 struct Loaded {
@@ -400,6 +413,299 @@ fn att_delete(app: tauri::AppHandle, id: String) -> Result<(), String> {
     fs::remove_file(&p).map_err(|e| format!("cannot remove attachment: {e}"))
 }
 
+// ---------------------------------------------------------------- provider hub
+
+#[derive(Deserialize)]
+struct NetReq {
+    method: Option<String>,
+    url: String,
+    headers: Option<Vec<(String, String)>>,
+    body: Option<String>,
+    timeout: Option<u64>,
+    /// Keep a login token from the response, on this side only: a response
+    /// header by name, or a top-level JSON field (removed from what the page gets).
+    capture_header: Option<String>,
+    capture_json: Option<String>,
+}
+
+#[derive(Serialize)]
+struct NetRes {
+    status: u16,
+    body: String,
+    bytes: u64,
+}
+
+fn scratch_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let d = data_dir(app)?.join("hub-tmp");
+    fs::create_dir_all(&d).map_err(|e| format!("cannot create {}: {e}", d.display()))?;
+    Ok(d)
+}
+
+/// Run a request and hand back its body as text, removing the temporary file
+/// whatever happens.
+fn fetch_to_text(app: &tauri::AppHandle, req: hub::Request) -> Result<NetRes, String> {
+    let scratch = scratch_dir(app)?;
+    let out = scratch.join(format!("resp-{}-{}.tmp", stamp(), next_seq()));
+    let status = hub::run_request(&req, &out, &scratch);
+    let body = fs::read(&out).unwrap_or_default();
+    let _ = fs::remove_file(&out);
+    let status = status?;
+    Ok(NetRes { status, bytes: body.len() as u64, body: String::from_utf8_lossy(&body).to_string() })
+}
+
+/// Public data only: NHTSA. No placeholders are expanded, so no credential can
+/// travel through this path.
+#[tauri::command(async)]
+fn net_fetch(app: tauri::AppHandle, req: NetReq) -> Result<NetRes, String> {
+    let host = hub::https_host(&req.url).ok_or_else(|| "only https addresses can be fetched".to_string())?;
+    if !hub::host_allowed(&host, hub::PUBLIC_HOSTS) {
+        return Err(format!("{host} is not a public data source this program fetches from"));
+    }
+    if req.url.contains("{{") || req.headers.as_ref().map(|h| h.iter().any(|(_, v)| v.contains("{{"))).unwrap_or(false) {
+        return Err("public requests cannot carry credential placeholders".into());
+    }
+    fetch_to_text(
+        &app,
+        hub::Request {
+            method: req.method.unwrap_or_else(|| "GET".into()),
+            url: req.url,
+            headers: req.headers.unwrap_or_default(),
+            body: req.body,
+            timeout_secs: req.timeout.unwrap_or(20),
+            max_bytes: MAX_API_BYTES,
+            follow_redirects: true,
+            header_file: None,
+        },
+    )
+}
+
+/// A licensed provider's request. Credentials are filled in here from Windows
+/// Credential Manager and may only go to that provider's own hosts.
+#[tauri::command(async)]
+fn provider_fetch(app: tauri::AppHandle, provider: String, req: NetReq) -> Result<NetRes, String> {
+    if !hub::safe_token(&provider, 40) {
+        return Err("bad provider id".into());
+    }
+    let host = hub::https_host(&req.url).ok_or_else(|| "only https addresses can be fetched".to_string())?;
+    if !hub::host_allowed(&host, hub::provider_hosts(&provider)) {
+        return Err(format!("{host} is not a host that {provider} credentials may be sent to"));
+    }
+    let mut lookup = |field: &str| hub::secret_get(&provider, field);
+    let mut session = |name: &str| hub::session_get(&provider, name);
+    let (url, _) = hub::expand_template_with(&req.url, &mut lookup, &mut session)?;
+    // The expanded address must still be the same host.
+    if hub::https_host(&url).as_deref() != Some(host.as_str()) {
+        return Err("the request address changed host after expansion".into());
+    }
+    let mut headers = vec![];
+    for (name, value) in req.headers.unwrap_or_default() {
+        let (v, _) = hub::expand_template_with(&value, &mut lookup, &mut session)?;
+        headers.push((name, v));
+    }
+    let body = match req.body {
+        Some(b) => Some(hub::expand_template_with(&b, &mut lookup, &mut session)?.0),
+        None => None,
+    };
+    let scratch = scratch_dir(&app)?;
+    let header_file = scratch.join(format!("hdr-{}-{}.tmp", stamp(), next_seq()));
+    let capture_header = req.capture_header.clone();
+    let capture_json = req.capture_json.clone();
+    let result = fetch_to_text(
+        &app,
+        hub::Request {
+            method: req.method.unwrap_or_else(|| "GET".into()),
+            url,
+            headers,
+            body,
+            timeout_secs: req.timeout.unwrap_or(30),
+            max_bytes: MAX_API_BYTES,
+            // a redirect could carry an Authorization header somewhere else
+            follow_redirects: false,
+            header_file: Some(header_file.clone()),
+        },
+    );
+    let dump = fs::read_to_string(&header_file).unwrap_or_default();
+    let _ = fs::remove_file(&header_file);
+    let mut res = result?;
+    if res.status >= 200 && res.status < 300 {
+        if let Some(h) = capture_header {
+            if hub::safe_token(&h, 60) {
+                if let Some(v) = hub::header_value(&dump, &h) {
+                    hub::session_put(&provider, &h, &v);
+                }
+            }
+        }
+        if let Some(key) = capture_json {
+            if hub::safe_token(&key, 60) {
+                if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&res.body) {
+                    let mut captured = false;
+                    if let Some(obj) = v.as_object_mut() {
+                        if let Some(tok) = obj.remove(&key) {
+                            if let Some(t) = tok.as_str() {
+                                hub::session_put(&provider, &key, t);
+                            }
+                            captured = true;
+                        }
+                    }
+                    if captured {
+                        res.body = serde_json::to_string(&v).unwrap_or_default();
+                    }
+                }
+            }
+        }
+    }
+    Ok(res)
+}
+
+#[tauri::command]
+fn provider_session_clear(provider: String) -> Result<(), String> {
+    if !hub::safe_token(&provider, 40) {
+        return Err("bad provider id".into());
+    }
+    hub::session_clear(&provider);
+    Ok(())
+}
+
+#[tauri::command(async)]
+fn dataset_download(app: tauri::AppHandle, name: String, url: String) -> Result<NetRes, String> {
+    let host = hub::https_host(&url).ok_or_else(|| "only https addresses can be fetched".to_string())?;
+    if host != "static.nhtsa.gov" {
+        return Err("datasets are only downloaded from static.nhtsa.gov".into());
+    }
+    let base = data_dir(&app)?;
+    let dest = hub::ds_incoming(&base, &name)?;
+    let part = dest.with_extension("part");
+    let _ = fs::remove_file(&part);
+    let scratch = scratch_dir(&app)?;
+    let status = hub::run_request(
+        &hub::Request {
+            method: "GET".into(),
+            url,
+            headers: vec![],
+            body: None,
+            timeout_secs: 900,
+            max_bytes: MAX_DATASET_BYTES,
+            follow_redirects: true,
+            header_file: None,
+        },
+        &part,
+        &scratch,
+    );
+    let status = match status {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = fs::remove_file(&part);
+            return Err(e);
+        }
+    };
+    if status != 200 {
+        let _ = fs::remove_file(&part);
+        return Ok(NetRes { status, body: String::new(), bytes: 0 });
+    }
+    let mut head = [0u8; 4];
+    let ok_zip = fs::File::open(&part)
+        .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut head))
+        .map(|_| head == [0x50, 0x4b, 0x03, 0x04])
+        .unwrap_or(false);
+    if !ok_zip {
+        let _ = fs::remove_file(&part);
+        return Err("the download is not a ZIP file; nothing was changed".into());
+    }
+    let bytes = fs::metadata(&part).map(|m| m.len()).unwrap_or(0);
+    fs::rename(&part, &dest).map_err(|e| format!("cannot keep the download: {e}"))?;
+    Ok(NetRes { status, body: String::new(), bytes })
+}
+
+#[tauri::command(async)]
+fn dataset_zip_bytes(app: tauri::AppHandle, name: String) -> Result<tauri::ipc::Response, String> {
+    let base = data_dir(&app)?;
+    let p = hub::ds_incoming(&base, &name)?;
+    let bytes = fs::read(&p).map_err(|e| format!("cannot read the downloaded file: {e}"))?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+#[tauri::command]
+fn dataset_drop_download(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    let base = data_dir(&app)?;
+    let p = hub::ds_incoming(&base, &name)?;
+    if p.exists() {
+        fs::remove_file(&p).map_err(|e| format!("cannot remove the downloaded file: {e}"))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn dataset_begin(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    hub::ds_begin(&data_dir(&app)?, &name)
+}
+
+#[tauri::command(async)]
+fn dataset_write(app: tauri::AppHandle, name: String, shard: String, text: String, append: bool) -> Result<(), String> {
+    hub::ds_write(&data_dir(&app)?, &name, &shard, &text, append)
+}
+
+#[tauri::command]
+fn dataset_commit(app: tauri::AppHandle, name: String, meta: String) -> Result<(), String> {
+    hub::ds_commit(&data_dir(&app)?, &name, &meta)
+}
+
+#[tauri::command]
+fn dataset_abort(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    hub::ds_abort(&data_dir(&app)?, &name)
+}
+
+#[tauri::command(async)]
+fn dataset_read(app: tauri::AppHandle, name: String, shard: String) -> Result<Option<String>, String> {
+    hub::ds_read(&data_dir(&app)?, &name, &shard)
+}
+
+#[tauri::command]
+fn dataset_meta(app: tauri::AppHandle, name: String) -> Result<Option<String>, String> {
+    hub::ds_meta(&data_dir(&app)?, &name)
+}
+
+/// Put a credential in Windows Credential Manager. There is deliberately no
+/// command that reads one back.
+#[tauri::command]
+fn secret_set(provider: String, field: String, value: String) -> Result<(), String> {
+    hub::secret_put(&provider, &field, &value)
+}
+
+#[tauri::command]
+fn secret_has(provider: String, field: String) -> Result<bool, String> {
+    Ok(hub::secret_get(&provider, &field)?.map(|v| !v.is_empty()).unwrap_or(false))
+}
+
+#[tauri::command]
+fn secret_clear(provider: String, field: String) -> Result<bool, String> {
+    hub::secret_delete(&provider, &field)
+}
+
+/// Open a subscription portal in the shop's normal browser, where the shop logs
+/// in itself. This program never sees or types a portal password.
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+    if !hub::safe_external_url(&url) {
+        return Err("that address cannot be opened".into());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("rundll32.exe")
+            .arg("url.dll,FileProtocolHandler")
+            .arg(&url)
+            .creation_flags(0x0800_0000)
+            .spawn()
+            .map_err(|e| format!("could not open the browser: {e}"))?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = url;
+        Err("opening a browser is only supported on Windows".into())
+    }
+}
+
 #[tauri::command]
 fn db_where(app: tauri::AppHandle) -> Result<String, String> {
     Ok(data_dir(&app)?.display().to_string())
@@ -429,7 +735,23 @@ fn main() {
             att_save,
             att_read,
             att_exists,
-            att_delete
+            att_delete,
+            net_fetch,
+            provider_fetch,
+            provider_session_clear,
+            dataset_download,
+            dataset_zip_bytes,
+            dataset_drop_download,
+            dataset_begin,
+            dataset_write,
+            dataset_commit,
+            dataset_abort,
+            dataset_read,
+            dataset_meta,
+            secret_set,
+            secret_has,
+            secret_clear,
+            open_external
         ])
         .run(tauri::generate_context!())
         .expect("JZD Shop Manager could not start");

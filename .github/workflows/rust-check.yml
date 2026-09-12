@@ -1,0 +1,45 @@
+# Compiles and tests the desktop shell on a work branch, without building an
+# installer or publishing anything. Push to a branch named ci/<anything>.
+#
+# Failures are also written out as annotations, which are visible on the
+# public run page without signing in.
+name: Desktop shell check
+
+on:
+  push:
+    branches: ['ci/**']
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Reuse compiled crates
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - name: Stage the page
+        shell: pwsh
+        run: python build.py
+      - name: Test the desktop shell
+        shell: pwsh
+        working-directory: desktop/src-tauri
+        run: |
+          cargo test 2>&1 | Tee-Object -FilePath test.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $lines = Get-Content test.log
+            $hits = @()
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+              if ($lines[$i] -match '^(error|warning: unused)|panicked at|^test .* FAILED|^failures:') {
+                if ($lines[$i] -match '^warning') { continue }
+                $end = [Math]::Min($i + 14, $lines.Count - 1)
+                $hits += ,(($lines[$i..$end] -join '%0A') -replace '::', ': :')
+              }
+            }
+            $hits | Select-Object -First 9 | ForEach-Object { Write-Output "::error::$_" }
+            exit $code
+          }

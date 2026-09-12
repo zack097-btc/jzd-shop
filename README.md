@@ -105,6 +105,30 @@ subscription. Settings ▸ **Where is my data?** shows the folder.
 - **A customer inspection report** — what needs attention now, what to keep an
   eye on, and everything checked and sound, with the measurements. Statuses
   print with words as well as colour so a grayscale copy still reads.
+- **A Data Provider Hub that never blurs its sources** — every piece of
+  technical data says where it came from, when, for which vehicle, and how
+  specifically it applies. Screens read one normalized shape; providers are
+  adapters behind it.
+  - **Free and live now:** NHTSA vPIC, NHTSA recalls (shown as *potentially
+    applicable* year/make/model matches — never as open on a VIN), NHTSA
+    consumer complaints (informational, never a diagnosis), NHTSA crash ratings,
+    and NHTSA's public Manufacturer Communications and defect-investigation flat
+    files, downloaded and indexed on this computer and swapped in only when a
+    refresh finishes cleanly.
+  - **Licensed APIs, one credential step from use:** MOTOR DaaS (sandbox and
+    production, from MOTOR's published Swagger), DataOne (trial and production),
+    TecAlliance TecRMI (from its published REST Swagger) and Autodata (OAuth).
+    Sandbox results are watermarked and can never be saved or printed on a
+    customer document.
+  - **Portals, opened in the shop's own browser:** ALLDATA, ProDemand,
+    Direct-Hit, MOTOR TruTech and FleetCross, PartsTech, BMW / MINI /
+    Rolls-Royce TechInfo, Toyota/Lexus TIS, Nissan/Infiniti and the other major
+    OEM sites, with the VIN and vehicle details ready to copy. Nothing is
+    scraped and no portal login is automated.
+  - **Credentials live in Windows Credential Manager.** The page can store one
+    and ask whether it exists, never read it back; the desktop shell fills keys
+    into requests itself and only for that provider's own hosts. The book and
+    every backup hold configuration, never secrets.
 - **The shop floor, live** — one board with every car in the building in the
   column it is actually in: checked in, diagnosis, awaiting approval, waiting on
   parts, ready to work, in progress, quality control, ready for pickup. Each card
@@ -227,6 +251,7 @@ node testphoto.cjs     # photographs, visibility, and a real backup round trip
 node testfront.cjs     # customers, duplicates, appointments, arrival, search
 node testparts.cjs     # stock, vendors, purchase orders, receiving, cores
 node testfloor.cjs     # bays, job clock, efficiency, QC, diagnosis, comebacks, maintenance
+node testdata.cjs      # provider hub: NHTSA, datasets, routing, provenance, sandbox, secrets
 cd desktop/src-tauri && cargo test    # the storage layer
 ```
 
@@ -257,5 +282,9 @@ what the customer was charged for, and what the job actually took. Timers write
 only time sessions; nothing on the floor can change a labor line's hours or an
 invoice.
 
-Tag a version (`git tag v2.7.0 && git push origin v2.7.0`) and CI runs all nine
+External data is supplemental. With the internet off, NHTSA down, or every
+provider disabled, customers, vehicles, inspections, repair orders, the SHOP SEED
+labor catalog, parts and the floor all keep working from this computer.
+
+Tag a version (`git tag v2.8.0 && git push origin v2.8.0`) and CI runs all ten
 suites, then builds and publishes the installer.
