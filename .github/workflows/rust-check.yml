@@ -1,0 +1,26 @@
+# Compiles and tests the desktop shell on a work branch, without building an
+# installer or publishing anything. Push to a branch named ci/<anything>.
+name: Desktop shell check
+
+on:
+  push:
+    branches: ['ci/**']
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Reuse compiled crates
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - name: Stage the page
+        shell: pwsh
+        run: python build.py
+      - name: Test the desktop shell
+        working-directory: desktop/src-tauri
+        run: cargo test --verbose
