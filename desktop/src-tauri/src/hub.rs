@@ -357,12 +357,48 @@ pub fn host_allowed(host: &str, rules: &[&str]) -> bool {
 
 // ---------------------------------------------------------------- templates
 
-/// Fill in {{secret:FIELD}} and {{hmac_sha256_b64:FIELD:MESSAGE}} placeholders.
-/// The lookup is asked for a field's value; the page never is. Returns the
-/// expanded text and whether any secret was used.
+/// Fill in placeholders:
+///   {{secret:FIELD}}                  a credential from the credential store
+///   {{session:NAME}}                  a token this side captured earlier
+///   {{hmac_sha256_b64:FIELD:MESSAGE}} a signature keyed by a credential, where
+///                                     MESSAGE may itself contain [[secret:FIELD]]
+/// The lookups are asked for values; the page never is. Returns the expanded
+/// text and whether anything secret was used.
 pub fn expand_template(
     template: &str,
     lookup: &mut dyn FnMut(&str) -> Result<Option<String>, String>,
+) -> Result<(String, bool), String> {
+    let mut no_session = |_: &str| -> Option<String> { None };
+    expand_template_with(template, lookup, &mut no_session)
+}
+
+/// Replace [[secret:FIELD]] inside a message that is about to be signed.
+fn expand_inner(message: &str, lookup: &mut dyn FnMut(&str) -> Result<Option<String>, String>) -> Result<String, String> {
+    let mut out = String::with_capacity(message.len());
+    let mut rest = message;
+    while let Some(start) = rest.find("[[") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 2..];
+        let end = after.find("]]").ok_or_else(|| "unterminated inner placeholder".to_string())?;
+        let inner = &after[..end];
+        let field = inner
+            .strip_prefix("secret:")
+            .ok_or_else(|| "only [[secret:FIELD]] may appear in a signed message".to_string())?;
+        if !safe_token(field, 40) {
+            return Err("bad credential field in signed message".into());
+        }
+        let v = lookup(field)?.ok_or_else(|| format!("MISSING_CREDENTIAL:{}", field))?;
+        out.push_str(&v);
+        rest = &after[end + 2..];
+    }
+    out.push_str(rest);
+    Ok(out)
+}
+
+pub fn expand_template_with(
+    template: &str,
+    lookup: &mut dyn FnMut(&str) -> Result<Option<String>, String>,
+    session: &mut dyn FnMut(&str) -> Option<String>,
 ) -> Result<(String, bool), String> {
     let mut out = String::with_capacity(template.len());
     let mut rest = template;
@@ -379,6 +415,13 @@ pub fn expand_template(
             let v = lookup(field)?.ok_or_else(|| format!("MISSING_CREDENTIAL:{}", field))?;
             out.push_str(&v);
             used = true;
+        } else if let Some(name) = inner.strip_prefix("session:") {
+            if !safe_token(name, 60) {
+                return Err("bad session placeholder".into());
+            }
+            let v = session(name).ok_or_else(|| format!("MISSING_SESSION:{}", name))?;
+            out.push_str(&v);
+            used = true;
         } else if let Some(spec) = inner.strip_prefix("hmac_sha256_b64:") {
             let colon = spec.find(':').ok_or_else(|| "bad signature placeholder".to_string())?;
             let field = &spec[..colon];
@@ -387,6 +430,7 @@ pub fn expand_template(
                 return Err("bad credential field in signature placeholder".into());
             }
             let key = lookup(field)?.ok_or_else(|| format!("MISSING_CREDENTIAL:{}", field))?;
+            let message = expand_inner(message, lookup)?;
             let mac = hmac_sha256(key.as_bytes(), message.as_bytes());
             out.push_str(&crate::b64_encode(&mac));
             used = true;
@@ -397,6 +441,52 @@ pub fn expand_template(
     }
     out.push_str(rest);
     Ok((out, used))
+}
+
+// ---------------------------------------------------------------- sessions
+
+/// Tokens a provider hands back after logging in (TecRMI's X-AuthToken, an
+/// OAuth access token). Kept in memory for this run only and never returned to
+/// the page; a restart simply logs in again.
+fn sessions() -> &'static std::sync::Mutex<std::collections::HashMap<String, String>> {
+    static S: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, String>>> =
+        std::sync::OnceLock::new();
+    S.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+pub fn session_put(provider: &str, name: &str, value: &str) {
+    if let Ok(mut m) = sessions().lock() {
+        m.insert(format!("{}/{}", provider, name), value.to_string());
+    }
+}
+
+pub fn session_get(provider: &str, name: &str) -> Option<String> {
+    sessions().lock().ok().and_then(|m| m.get(&format!("{}/{}", provider, name)).cloned())
+}
+
+pub fn session_clear(provider: &str) {
+    if let Ok(mut m) = sessions().lock() {
+        let prefix = format!("{}/", provider);
+        m.retain(|k, _| !k.starts_with(&prefix));
+    }
+}
+
+/// Find one header's value in a curl header dump. The last response wins, so a
+/// redirect's headers are never mistaken for the final answer's.
+pub fn header_value(dump: &str, name: &str) -> Option<String> {
+    let mut found = None;
+    for line in dump.lines() {
+        if line.starts_with("HTTP/") {
+            found = None;
+            continue;
+        }
+        if let Some(i) = line.find(':') {
+            if line[..i].trim().eq_ignore_ascii_case(name) {
+                found = Some(line[i + 1..].trim().to_string());
+            }
+        }
+    }
+    found
 }
 
 // ---------------------------------------------------------------- curl
@@ -411,6 +501,7 @@ pub struct Request {
     pub timeout_secs: u64,
     pub max_bytes: u64,
     pub follow_redirects: bool,
+    pub header_file: Option<PathBuf>,
 }
 
 /// Quote a value for a curl config file.
@@ -457,6 +548,9 @@ pub fn curl_config(req: &Request, out: &Path, body_file: Option<&Path>) -> Resul
         c.push_str(&format!("data-binary = {}\n", curl_quote(&format!("@{}", bf.display()))));
     }
     c.push_str(&format!("output = {}\n", curl_quote(&out.display().to_string())));
+    if let Some(hf) = &req.header_file {
+        c.push_str(&format!("dump-header = {}\n", curl_quote(&hf.display().to_string())));
+    }
     c.push_str(&format!("max-time = {}\n", req.timeout_secs.clamp(3, 900)));
     c.push_str("connect-timeout = 15\n");
     c.push_str(&format!("max-filesize = {}\n", req.max_bytes.max(1024)));
@@ -806,6 +900,39 @@ mod tests {
     }
 
     #[test]
+    fn a_signed_message_can_include_a_credential_it_does_not_reveal() {
+        let mut lookup = |f: &str| -> Result<Option<String>, String> {
+            Ok(match f {
+                "publicKey" => Some("PUB".to_string()),
+                "privateKey" => Some("key".to_string()),
+                _ => None,
+            })
+        };
+        let (a, _) = expand_template("{{hmac_sha256_b64:privateKey:[[secret:publicKey]]:message}}", &mut lookup).unwrap();
+        let expected = crate::b64_encode(&hmac_sha256(b"key", b"PUB:message"));
+        assert_eq!(a, expected);
+        assert!(expand_template("{{hmac_sha256_b64:privateKey:[[session:x]]}}", &mut lookup).is_err());
+        let mut sess = |n: &str| if n == "X-AuthToken" { Some("TOK".to_string()) } else { None };
+        let (b, used) = expand_template_with("TecRMI {{session:X-AuthToken}}", &mut lookup, &mut sess).unwrap();
+        assert_eq!(b, "TecRMI TOK");
+        assert!(used);
+        assert!(expand_template_with("{{session:Other}}", &mut lookup, &mut sess)
+            .unwrap_err()
+            .starts_with("MISSING_SESSION"));
+        session_put("tecrmitest", "X-AuthToken", "abc");
+        assert_eq!(session_get("tecrmitest", "X-AuthToken").as_deref(), Some("abc"));
+        session_clear("tecrmitest");
+        assert_eq!(session_get("tecrmitest", "X-AuthToken"), None);
+    }
+
+    #[test]
+    fn the_final_response_header_is_the_one_captured() {
+        let dump = "HTTP/1.1 302 Found\r\nX-AuthToken: wrong\r\n\r\nHTTP/1.1 200 OK\r\nContent-Type: application/json\r\nx-authtoken:  right \r\n\r\n";
+        assert_eq!(header_value(dump, "X-AuthToken").as_deref(), Some("right"));
+        assert_eq!(header_value("HTTP/1.1 200 OK\r\n\r\n", "X-AuthToken"), None);
+    }
+
+    #[test]
     fn curl_config_is_quoted_and_refuses_injection() {
         let req = Request {
             method: "GET".into(),
@@ -815,6 +942,7 @@ mod tests {
             timeout_secs: 20,
             max_bytes: 1_000_000,
             follow_redirects: false,
+            header_file: None,
         };
         let cfg = curl_config(&req, Path::new("C:\\out\\x.tmp"), None).unwrap();
         assert!(cfg.contains("url = \"https://api.nhtsa.gov/recalls/recallsByVehicle?make=BMW&model=M3&modelYear=2018\""));

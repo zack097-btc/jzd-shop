@@ -422,6 +422,10 @@ struct NetReq {
     headers: Option<Vec<(String, String)>>,
     body: Option<String>,
     timeout: Option<u64>,
+    /// Keep a login token from the response, on this side only: a response
+    /// header by name, or a top-level JSON field (removed from what the page gets).
+    capture_header: Option<String>,
+    capture_json: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -470,6 +474,7 @@ fn net_fetch(app: tauri::AppHandle, req: NetReq) -> Result<NetRes, String> {
             timeout_secs: req.timeout.unwrap_or(20),
             max_bytes: MAX_API_BYTES,
             follow_redirects: true,
+            header_file: None,
         },
     )
 }
@@ -486,21 +491,26 @@ fn provider_fetch(app: tauri::AppHandle, provider: String, req: NetReq) -> Resul
         return Err(format!("{host} is not a host that {provider} credentials may be sent to"));
     }
     let mut lookup = |field: &str| hub::secret_get(&provider, field);
-    let (url, _) = hub::expand_template(&req.url, &mut lookup)?;
+    let mut session = |name: &str| hub::session_get(&provider, name);
+    let (url, _) = hub::expand_template_with(&req.url, &mut lookup, &mut session)?;
     // The expanded address must still be the same host.
     if hub::https_host(&url).as_deref() != Some(host.as_str()) {
         return Err("the request address changed host after expansion".into());
     }
     let mut headers = vec![];
     for (name, value) in req.headers.unwrap_or_default() {
-        let (v, _) = hub::expand_template(&value, &mut lookup)?;
+        let (v, _) = hub::expand_template_with(&value, &mut lookup, &mut session)?;
         headers.push((name, v));
     }
     let body = match req.body {
-        Some(b) => Some(hub::expand_template(&b, &mut lookup)?.0),
+        Some(b) => Some(hub::expand_template_with(&b, &mut lookup, &mut session)?.0),
         None => None,
     };
-    fetch_to_text(
+    let scratch = scratch_dir(&app)?;
+    let header_file = scratch.join(format!("hdr-{}-{}.tmp", stamp(), next_seq()));
+    let capture_header = req.capture_header.clone();
+    let capture_json = req.capture_json.clone();
+    let result = fetch_to_text(
         &app,
         hub::Request {
             method: req.method.unwrap_or_else(|| "GET".into()),
@@ -511,8 +521,49 @@ fn provider_fetch(app: tauri::AppHandle, provider: String, req: NetReq) -> Resul
             max_bytes: MAX_API_BYTES,
             // a redirect could carry an Authorization header somewhere else
             follow_redirects: false,
+            header_file: Some(header_file.clone()),
         },
-    )
+    );
+    let dump = fs::read_to_string(&header_file).unwrap_or_default();
+    let _ = fs::remove_file(&header_file);
+    let mut res = result?;
+    if res.status >= 200 && res.status < 300 {
+        if let Some(h) = capture_header {
+            if hub::safe_token(&h, 60) {
+                if let Some(v) = hub::header_value(&dump, &h) {
+                    hub::session_put(&provider, &h, &v);
+                }
+            }
+        }
+        if let Some(key) = capture_json {
+            if hub::safe_token(&key, 60) {
+                if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&res.body) {
+                    let mut captured = false;
+                    if let Some(obj) = v.as_object_mut() {
+                        if let Some(tok) = obj.remove(&key) {
+                            if let Some(t) = tok.as_str() {
+                                hub::session_put(&provider, &key, t);
+                            }
+                            captured = true;
+                        }
+                    }
+                    if captured {
+                        res.body = serde_json::to_string(&v).unwrap_or_default();
+                    }
+                }
+            }
+        }
+    }
+    Ok(res)
+}
+
+#[tauri::command]
+fn provider_session_clear(provider: String) -> Result<(), String> {
+    if !hub::safe_token(&provider, 40) {
+        return Err("bad provider id".into());
+    }
+    hub::session_clear(&provider);
+    Ok(())
 }
 
 #[tauri::command(async)]
@@ -535,6 +586,7 @@ fn dataset_download(app: tauri::AppHandle, name: String, url: String) -> Result<
             timeout_secs: 900,
             max_bytes: MAX_DATASET_BYTES,
             follow_redirects: true,
+            header_file: None,
         },
         &part,
         &scratch,
@@ -686,6 +738,7 @@ fn main() {
             att_delete,
             net_fetch,
             provider_fetch,
+            provider_session_clear,
             dataset_download,
             dataset_zip_bytes,
             dataset_drop_download,
