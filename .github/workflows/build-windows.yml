@@ -51,10 +51,10 @@ jobs:
         working-directory: desktop/src-tauri
         run: cargo test --verbose
 
-      # Both suites drive the real page in a real browser. Neither touches the
-      # network - the VIN suite stubs fetch - so a release is never blocked by
-      # NHTSA being down, and a green run means the page itself works, not just
-      # that it parsed.
+      # These suites drive the real page in a real browser. None touches the
+      # network - NHTSA and the licensed providers are answered by fixtures - so
+      # a release is never blocked by NHTSA being down, and a green run means the
+      # page itself works, not just that it parsed.
       - name: Test persistence, VIN, pricing, invoicing, the front office, parts, floor operations and data providers
         run: |
           npm install --no-save playwright
@@ -68,6 +68,28 @@ jobs:
           node testparts.cjs
           node testfloor.cjs
           node testdata.cjs
+
+      # The one release check that leaves the machine: a real request to MOTOR's
+      # public DaaS sandbox, through the desktop shell's own Rust signing code and
+      # through the page's adapters. The keys are the ones MOTOR publishes for
+      # developers; they are read from MOTOR's page here and never stored.
+      - name: Live MOTOR sandbox call
+        shell: pwsh
+        run: |
+          $page = (Invoke-WebRequest -UseBasicParsing -Uri 'https://www.motor.com/daas-sandbox/').Content
+          $pub = [regex]::Match($page, 'Public Key:\s*</b>\s*([A-Za-z0-9_\-]+)').Groups[1].Value
+          $priv = [regex]::Match($page, 'Private Key:\s*</b>\s*([A-Za-z0-9_\-]+)').Groups[1].Value
+          if (-not $pub -or -not $priv) { Write-Output "::error title=MOTOR sandbox::Could not read the published sandbox keys"; exit 1 }
+          Write-Output "::add-mask::$priv"
+          $env:MOTOR_SANDBOX_PUBLIC = $pub
+          $env:MOTOR_SANDBOX_PRIVATE = $priv
+          Push-Location desktop/src-tauri
+          cargo test motor_sandbox_live -- --ignored --nocapture 2>&1 | Tee-Object -FilePath live.log
+          $rust = $LASTEXITCODE
+          Get-Content live.log | Where-Object { $_ -match '^LIVE:' } | ForEach-Object { Write-Output ("::notice title=MOTOR sandbox::" + ($_ -replace '::', ': :')) }
+          Pop-Location
+          if ($rust -ne 0) { exit $rust }
+          node testmotorlive.cjs
 
       - name: Build the installers
         uses: tauri-apps/tauri-action@v0

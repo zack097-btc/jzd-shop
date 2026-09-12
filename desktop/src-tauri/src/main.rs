@@ -426,6 +426,8 @@ struct NetReq {
     /// header by name, or a top-level JSON field (removed from what the page gets).
     capture_header: Option<String>,
     capture_json: Option<String>,
+    /// A provider signing scheme applied on this side ("motor_shared").
+    auth: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -479,63 +481,40 @@ fn net_fetch(app: tauri::AppHandle, req: NetReq) -> Result<NetRes, String> {
     )
 }
 
-/// A licensed provider's request. Credentials are filled in here from Windows
-/// Credential Manager and may only go to that provider's own hosts.
+/// A licensed provider's request. Credentials are filled in and signatures made
+/// here, from Windows Credential Manager, and only for that provider's own hosts.
 #[tauri::command(async)]
 fn provider_fetch(app: tauri::AppHandle, provider: String, req: NetReq) -> Result<NetRes, String> {
-    if !hub::safe_token(&provider, 40) {
-        return Err("bad provider id".into());
-    }
-    let host = hub::https_host(&req.url).ok_or_else(|| "only https addresses can be fetched".to_string())?;
-    if !hub::host_allowed(&host, hub::provider_hosts(&provider)) {
-        return Err(format!("{host} is not a host that {provider} credentials may be sent to"));
-    }
+    let spec = hub::ProviderSpec {
+        method: req.method.clone().unwrap_or_else(|| "GET".into()),
+        url: req.url.clone(),
+        headers: req.headers.clone().unwrap_or_default(),
+        body: req.body.clone(),
+        timeout_secs: req.timeout.unwrap_or(30),
+        auth: req.auth.clone(),
+    };
     let mut lookup = |field: &str| hub::secret_get(&provider, field);
     let mut session = |name: &str| hub::session_get(&provider, name);
-    let (url, _) = hub::expand_template_with(&req.url, &mut lookup, &mut session)?;
-    // The expanded address must still be the same host.
-    if hub::https_host(&url).as_deref() != Some(host.as_str()) {
-        return Err("the request address changed host after expansion".into());
-    }
-    let mut headers = vec![];
-    for (name, value) in req.headers.unwrap_or_default() {
-        let (v, _) = hub::expand_template_with(&value, &mut lookup, &mut session)?;
-        headers.push((name, v));
-    }
-    let body = match req.body {
-        Some(b) => Some(hub::expand_template_with(&b, &mut lookup, &mut session)?.0),
-        None => None,
-    };
+    let mut request = hub::prepare_provider_request(&provider, &spec, &mut lookup, &mut session, hub::now_epoch(), MAX_API_BYTES)?;
     let scratch = scratch_dir(&app)?;
     let header_file = scratch.join(format!("hdr-{}-{}.tmp", stamp(), next_seq()));
-    let capture_header = req.capture_header.clone();
-    let capture_json = req.capture_json.clone();
-    let result = fetch_to_text(
-        &app,
-        hub::Request {
-            method: req.method.unwrap_or_else(|| "GET".into()),
-            url,
-            headers,
-            body,
-            timeout_secs: req.timeout.unwrap_or(30),
-            max_bytes: MAX_API_BYTES,
-            // a redirect could carry an Authorization header somewhere else
-            follow_redirects: false,
-            header_file: Some(header_file.clone()),
-        },
-    );
+    request.header_file = Some(header_file.clone());
+    let result = fetch_to_text(&app, request);
     let dump = fs::read_to_string(&header_file).unwrap_or_default();
     let _ = fs::remove_file(&header_file);
     let mut res = result?;
+    if let Some(refusal) = hub::redirect_refusal(res.status, &dump) {
+        return Err(refusal);
+    }
     if res.status >= 200 && res.status < 300 {
-        if let Some(h) = capture_header {
+        if let Some(h) = req.capture_header {
             if hub::safe_token(&h, 60) {
                 if let Some(v) = hub::header_value(&dump, &h) {
                     hub::session_put(&provider, &h, &v);
                 }
             }
         }
-        if let Some(key) = capture_json {
+        if let Some(key) = req.capture_json {
             if hub::safe_token(&key, 60) {
                 if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&res.body) {
                     let mut captured = false;
@@ -566,17 +545,66 @@ fn provider_session_clear(provider: String) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command(async)]
-fn dataset_download(app: tauri::AppHandle, name: String, url: String) -> Result<NetRes, String> {
-    let host = hub::https_host(&url).ok_or_else(|| "only https addresses can be fetched".to_string())?;
+#[derive(Serialize)]
+struct DatasetHead {
+    status: u16,
+    etag: String,
+    last_modified: String,
+    length: u64,
+}
+
+fn nhtsa_dataset_url(url: &str) -> Result<(), String> {
+    let host = hub::https_host(url).ok_or_else(|| "only https addresses can be fetched".to_string())?;
     if host != "static.nhtsa.gov" {
         return Err("datasets are only downloaded from static.nhtsa.gov".into());
     }
+    Ok(())
+}
+
+/// Ask NHTSA whether a file has changed, without downloading it.
+#[tauri::command(async)]
+fn dataset_check(app: tauri::AppHandle, url: String) -> Result<DatasetHead, String> {
+    nhtsa_dataset_url(&url)?;
+    let scratch = scratch_dir(&app)?;
+    let out = scratch.join(format!("head-{}-{}.tmp", stamp(), next_seq()));
+    let hdr = scratch.join(format!("headers-{}-{}.tmp", stamp(), next_seq()));
+    let status = hub::run_request(
+        &hub::Request {
+            method: "HEAD".into(),
+            url,
+            headers: vec![],
+            body: None,
+            timeout_secs: 30,
+            max_bytes: 64 * 1024,
+            follow_redirects: true,
+            header_file: Some(hdr.clone()),
+        },
+        &out,
+        &scratch,
+    );
+    let dump = fs::read_to_string(&hdr).unwrap_or_default();
+    let _ = fs::remove_file(&out);
+    let _ = fs::remove_file(&hdr);
+    let status = status?;
+    Ok(DatasetHead {
+        status,
+        etag: hub::header_value(&dump, "ETag").unwrap_or_default(),
+        last_modified: hub::header_value(&dump, "Last-Modified").unwrap_or_default(),
+        length: hub::header_value(&dump, "Content-Length").and_then(|v| v.parse().ok()).unwrap_or(0),
+    })
+}
+
+/// Download one NHTSA file beside the one in use. It is kept only when the
+/// transfer finished and the file is a whole ZIP archive.
+#[tauri::command(async)]
+fn dataset_download(app: tauri::AppHandle, name: String, file: String, url: String) -> Result<DatasetHead, String> {
+    nhtsa_dataset_url(&url)?;
     let base = data_dir(&app)?;
-    let dest = hub::ds_incoming(&base, &name)?;
-    let part = dest.with_extension("part");
+    let fresh = hub::ds_source_path(&base, &name, &file, true)?;
+    let part = fresh.with_extension("part");
     let _ = fs::remove_file(&part);
     let scratch = scratch_dir(&app)?;
+    let hdr = scratch.join(format!("dlhdr-{}-{}.tmp", stamp(), next_seq()));
     let status = hub::run_request(
         &hub::Request {
             method: "GET".into(),
@@ -586,11 +614,13 @@ fn dataset_download(app: tauri::AppHandle, name: String, url: String) -> Result<
             timeout_secs: 900,
             max_bytes: MAX_DATASET_BYTES,
             follow_redirects: true,
-            header_file: None,
+            header_file: Some(hdr.clone()),
         },
         &part,
         &scratch,
     );
+    let dump = fs::read_to_string(&hdr).unwrap_or_default();
+    let _ = fs::remove_file(&hdr);
     let status = match status {
         Ok(s) => s,
         Err(e) => {
@@ -598,40 +628,57 @@ fn dataset_download(app: tauri::AppHandle, name: String, url: String) -> Result<
             return Err(e);
         }
     };
+    let head = |length| DatasetHead {
+        status,
+        etag: hub::header_value(&dump, "ETag").unwrap_or_default(),
+        last_modified: hub::header_value(&dump, "Last-Modified").unwrap_or_default(),
+        length,
+    };
     if status != 200 {
         let _ = fs::remove_file(&part);
-        return Ok(NetRes { status, body: String::new(), bytes: 0 });
+        return Ok(head(0));
     }
-    let mut head = [0u8; 4];
-    let ok_zip = fs::File::open(&part)
-        .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut head))
-        .map(|_| head == [0x50, 0x4b, 0x03, 0x04])
-        .unwrap_or(false);
-    if !ok_zip {
-        let _ = fs::remove_file(&part);
-        return Err("the download is not a ZIP file; nothing was changed".into());
+    match hub::ds_stage_source(&base, &name, &file, &part) {
+        Ok(bytes) => Ok(head(bytes)),
+        Err(e) => {
+            let _ = fs::remove_file(&part);
+            Err(format!("{e}; nothing was changed"))
+        }
     }
-    let bytes = fs::metadata(&part).map(|m| m.len()).unwrap_or(0);
-    fs::rename(&part, &dest).map_err(|e| format!("cannot keep the download: {e}"))?;
-    Ok(NetRes { status, body: String::new(), bytes })
 }
 
+/// The bytes of a kept NHTSA file, for the page to read row by row.
 #[tauri::command(async)]
-fn dataset_zip_bytes(app: tauri::AppHandle, name: String) -> Result<tauri::ipc::Response, String> {
+fn dataset_zip_bytes(app: tauri::AppHandle, name: String, file: String) -> Result<tauri::ipc::Response, String> {
     let base = data_dir(&app)?;
-    let p = hub::ds_incoming(&base, &name)?;
+    let p = hub::ds_source_for_reading(&base, &name, &file)?.ok_or_else(|| format!("{file} has not been downloaded"))?;
     let bytes = fs::read(&p).map_err(|e| format!("cannot read the downloaded file: {e}"))?;
     Ok(tauri::ipc::Response::new(bytes))
 }
 
 #[tauri::command]
-fn dataset_drop_download(app: tauri::AppHandle, name: String) -> Result<(), String> {
-    let base = data_dir(&app)?;
-    let p = hub::ds_incoming(&base, &name)?;
-    if p.exists() {
-        fs::remove_file(&p).map_err(|e| format!("cannot remove the downloaded file: {e}"))?;
-    }
-    Ok(())
+fn dataset_has_source(app: tauri::AppHandle, name: String, file: String) -> Result<bool, String> {
+    Ok(hub::ds_source_for_reading(&data_dir(&app)?, &name, &file)?.is_some())
+}
+
+#[tauri::command]
+fn dataset_adopt_sources(app: tauri::AppHandle, name: String, files: Vec<String>) -> Result<(), String> {
+    hub::ds_adopt_sources(&data_dir(&app)?, &name, &files)
+}
+
+#[tauri::command]
+fn dataset_discard_sources(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    hub::ds_discard_fresh_sources(&data_dir(&app)?, &name)
+}
+
+#[tauri::command]
+fn dataset_status_get(app: tauri::AppHandle, name: String) -> Result<Option<String>, String> {
+    hub::ds_status_read(&data_dir(&app)?, &name)
+}
+
+#[tauri::command]
+fn dataset_status_set(app: tauri::AppHandle, name: String, json: String) -> Result<(), String> {
+    hub::ds_status_write(&data_dir(&app)?, &name, &json)
 }
 
 #[tauri::command]
@@ -661,7 +708,10 @@ fn dataset_read(app: tauri::AppHandle, name: String, shard: String) -> Result<Op
 
 #[tauri::command]
 fn dataset_meta(app: tauri::AppHandle, name: String) -> Result<Option<String>, String> {
-    hub::ds_meta(&data_dir(&app)?, &name)
+    let base = data_dir(&app)?;
+    // a swap cut off by a crash or power loss is finished or undone first
+    hub::ds_recover(&base, &name)?;
+    hub::ds_meta(&base, &name)
 }
 
 /// Put a credential in Windows Credential Manager. There is deliberately no
@@ -739,9 +789,14 @@ fn main() {
             net_fetch,
             provider_fetch,
             provider_session_clear,
+            dataset_check,
             dataset_download,
             dataset_zip_bytes,
-            dataset_drop_download,
+            dataset_has_source,
+            dataset_adopt_sources,
+            dataset_discard_sources,
+            dataset_status_get,
+            dataset_status_set,
             dataset_begin,
             dataset_write,
             dataset_commit,

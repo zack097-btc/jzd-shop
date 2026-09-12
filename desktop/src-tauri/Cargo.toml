@@ -1,6 +1,6 @@
 [package]
 name = "jzd-shop"
-version = "2.8.0"
+version = "2.8.1"
 description = "JZD Shop Manager — customers, vehicles, work orders"
 authors = ["JZac Designs"]
 edition = "2021"
@@ -16,6 +16,11 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Request signing for licensed data providers. The RustCrypto crates, not our
+# own code; sha2 and base64 are already in the build through Tauri itself.
+sha2 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
 # MIT/Apache-2.0 — permissive, so it does not affect what we may charge for this
 
 [profile.release]

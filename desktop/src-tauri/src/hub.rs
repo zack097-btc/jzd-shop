@@ -9,8 +9,9 @@
 //
 //   * NETWORK. Requests that carry a secret are built here. The page describes a
 //     request with placeholders such as {{secret:apiKey}}; this side fills them
-//     in, signs where a provider needs a signature, and refuses to send a secret
-//     to any host that provider does not own.
+//     in, signs the request itself where a provider needs a signature (the page
+//     can never ask for a signature over text of its own choosing), and refuses
+//     to send a secret to any host that provider does not own.
 //
 //   * DATASETS. NHTSA publishes its manufacturer communications and defect
 //     investigations as large public ZIP files. They are downloaded here, and
@@ -25,99 +26,94 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-// ---------------------------------------------------------------- SHA-256
+// ---------------------------------------------------------------- signing
 
-const K256: [u32; 64] = [
-    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-];
+use base64::Engine as _;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
-/// SHA-256 by hand, for the same reason base64 is by hand: it is small, it is
-/// fully specified, and the test vectors below prove it.
-pub fn sha256(data: &[u8]) -> [u8; 32] {
-    let mut h: [u32; 8] = [
-        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-    ];
-    let bit_len = (data.len() as u64).wrapping_mul(8);
-    let mut msg = data.to_vec();
-    msg.push(0x80);
-    while msg.len() % 64 != 56 {
-        msg.push(0);
-    }
-    msg.extend_from_slice(&bit_len.to_be_bytes());
-    for block in msg.chunks(64) {
-        let mut w = [0u32; 64];
-        for i in 0..16 {
-            w[i] = u32::from_be_bytes([block[i * 4], block[i * 4 + 1], block[i * 4 + 2], block[i * 4 + 3]]);
-        }
-        for i in 16..64 {
-            let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
-            let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
-            w[i] = w[i - 16].wrapping_add(s0).wrapping_add(w[i - 7]).wrapping_add(s1);
-        }
-        let (mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh) =
-            (h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7]);
-        for i in 0..64 {
-            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
-            let ch = (e & f) ^ (!e & g);
-            let t1 = hh.wrapping_add(s1).wrapping_add(ch).wrapping_add(K256[i]).wrapping_add(w[i]);
-            let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
-            let maj = (a & b) ^ (a & c) ^ (b & c);
-            let t2 = s0.wrapping_add(maj);
-            hh = g;
-            g = f;
-            f = e;
-            e = d.wrapping_add(t1);
-            d = c;
-            c = b;
-            b = a;
-            a = t1.wrapping_add(t2);
-        }
-        h[0] = h[0].wrapping_add(a);
-        h[1] = h[1].wrapping_add(b);
-        h[2] = h[2].wrapping_add(c);
-        h[3] = h[3].wrapping_add(d);
-        h[4] = h[4].wrapping_add(e);
-        h[5] = h[5].wrapping_add(f);
-        h[6] = h[6].wrapping_add(g);
-        h[7] = h[7].wrapping_add(hh);
-    }
-    let mut out = [0u8; 32];
-    for (i, v) in h.iter().enumerate() {
-        out[i * 4..i * 4 + 4].copy_from_slice(&v.to_be_bytes());
-    }
-    out
+/// HMAC-SHA-256 from the RustCrypto crates. No cryptography is written here.
+pub fn hmac_sha256(key: &[u8], msg: &[u8]) -> [u8; 32] {
+    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(key).expect("HMAC accepts a key of any length");
+    mac.update(msg);
+    mac.finalize().into_bytes().into()
 }
 
-/// HMAC-SHA-256 (RFC 2104).
-pub fn hmac_sha256(key: &[u8], msg: &[u8]) -> [u8; 32] {
-    let mut k = [0u8; 64];
-    if key.len() > 64 {
-        let d = sha256(key);
-        k[..32].copy_from_slice(&d);
-    } else {
-        k[..key.len()].copy_from_slice(key);
-    }
-    let mut inner = Vec::with_capacity(64 + msg.len());
-    let mut outer = Vec::with_capacity(96);
-    for b in k.iter() {
-        inner.push(b ^ 0x36);
-        outer.push(b ^ 0x5c);
-    }
-    inner.extend_from_slice(msg);
-    let ih = sha256(&inner);
-    outer.extend_from_slice(&ih);
-    sha256(&outer)
+pub fn b64(bytes: &[u8]) -> String {
+    base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
 pub fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+// ---------------------------------------------------------------- MOTOR "Shared" signing
+//
+// From MOTOR's DaaS Development Handbook, "Signing a Request":
+//
+//   Authorization = "Shared" + " " + PublicKey + ":" + Signature
+//   Signature     = Base64(HMAC-SHA256(PrivateKey, SignatureData))
+//   SignatureData = PublicKey + "\n" + HTTP verb + "\n" + UNIX epoch + "\n" + URI path
+//
+// The URI path starts with "/", keeps its case and leaves out the query string.
+// The time stamp travels in the X-Date header and must be the same second that
+// was signed; MOTOR refuses anything more than 15 minutes from its own clock.
+// The retired "MWS" scheme is not implemented.
+
+/// The path part of an https URL: from the first "/" after the host up to, and
+/// not including, any "?" or "#". An address with no path signs as "/".
+pub fn uri_path(url: &str) -> Option<String> {
+    let rest = url.strip_prefix("https://")?;
+    let start = rest.find(|c: char| c == '/' || c == '?' || c == '#').unwrap_or(rest.len());
+    let tail = &rest[start..];
+    let end = tail.find(|c: char| c == '?' || c == '#').unwrap_or(tail.len());
+    let path = &tail[..end];
+    Some(if path.is_empty() { "/".to_string() } else { path.to_string() })
+}
+
+pub fn motor_signature_data(public_key: &str, verb: &str, epoch: u64, path: &str) -> String {
+    format!("{}\n{}\n{}\n{}", public_key, verb, epoch, path)
+}
+
+pub fn motor_authorization(public_key: &str, private_key: &str, verb: &str, epoch: u64, path: &str) -> String {
+    let data = motor_signature_data(public_key, verb, epoch, path);
+    format!("Shared {}:{}", public_key, b64(&hmac_sha256(private_key.as_bytes(), data.as_bytes())))
+}
+
+/// An RFC 1123 date ("Thu, 16 Apr 2015 16:12:01 GMT") for a UNIX epoch second,
+/// which is one of the formats MOTOR's handbook lists for X-Date.
+pub fn http_date(epoch: u64) -> String {
+    let days = (epoch / 86_400) as i64;
+    let secs = epoch % 86_400;
+    // civil-from-days (Howard Hinnant), valid for every date this program will see
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let mut year = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    if month <= 2 {
+        year += 1;
+    }
+    const WD: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
+    const MO: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    format!(
+        "{}, {:02} {} {} {:02}:{:02}:{:02} GMT",
+        WD[(days.rem_euclid(7)) as usize],
+        day,
+        MO[(month - 1) as usize],
+        year,
+        secs / 3_600,
+        (secs / 60) % 60,
+        secs % 60
+    )
+}
+
+pub fn now_epoch() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
 // ---------------------------------------------------------------- names
@@ -358,47 +354,18 @@ pub fn host_allowed(host: &str, rules: &[&str]) -> bool {
 // ---------------------------------------------------------------- templates
 
 /// Fill in placeholders:
-///   {{secret:FIELD}}                  a credential from the credential store
-///   {{session:NAME}}                  a token this side captured earlier
-///   {{hmac_sha256_b64:FIELD:MESSAGE}} a signature keyed by a credential, where
-///                                     MESSAGE may itself contain [[secret:FIELD]]
+///   {{secret:FIELD}}   a credential from the credential store
+///   {{session:NAME}}   a token this side captured earlier
 /// The lookups are asked for values; the page never is. Returns the expanded
-/// text and whether anything secret was used.
+/// text and whether anything secret was used. There is deliberately no
+/// placeholder that signs: a signature is made only by a provider's own signing
+/// scheme below, over the request actually being sent.
 pub fn expand_template(
     template: &str,
     lookup: &mut dyn FnMut(&str) -> Result<Option<String>, String>,
 ) -> Result<(String, bool), String> {
     let mut no_session = |_: &str| -> Option<String> { None };
     expand_template_with(template, lookup, &mut no_session)
-}
-
-/// Replace [[secret:FIELD]] inside a message that is about to be signed.
-fn expand_inner(message: &str, lookup: &mut dyn FnMut(&str) -> Result<Option<String>, String>) -> Result<String, String> {
-    let mut out = String::with_capacity(message.len());
-    let mut rest = message;
-    while let Some(start) = rest.find("[[") {
-        out.push_str(&rest[..start]);
-        let after = &rest[start + 2..];
-        let end = after.find("]]").ok_or_else(|| "unterminated inner placeholder".to_string())?;
-        let inner = &after[..end];
-        if inner == "nl" {
-            // a line break, which cannot travel inside a URL or header template
-            out.push('\n');
-            rest = &after[end + 2..];
-            continue;
-        }
-        let field = inner
-            .strip_prefix("secret:")
-            .ok_or_else(|| "only [[secret:FIELD]] or [[nl]] may appear in a signed message".to_string())?;
-        if !safe_token(field, 40) {
-            return Err("bad credential field in signed message".into());
-        }
-        let v = lookup(field)?.ok_or_else(|| format!("MISSING_CREDENTIAL:{}", field))?;
-        out.push_str(&v);
-        rest = &after[end + 2..];
-    }
-    out.push_str(rest);
-    Ok(out)
 }
 
 pub fn expand_template_with(
@@ -428,28 +395,6 @@ pub fn expand_template_with(
             let v = session(name).ok_or_else(|| format!("MISSING_SESSION:{}", name))?;
             out.push_str(&v);
             used = true;
-        } else if let Some((spec, url_safe)) = inner
-            .strip_prefix("hmac_sha256_b64url:")
-            .map(|x| (x, true))
-            .or_else(|| inner.strip_prefix("hmac_sha256_b64:").map(|x| (x, false)))
-        {
-            let colon = spec.find(':').ok_or_else(|| "bad signature placeholder".to_string())?;
-            let field = &spec[..colon];
-            let message = &spec[colon + 1..];
-            if !safe_token(field, 40) {
-                return Err("bad credential field in signature placeholder".into());
-            }
-            let key = lookup(field)?.ok_or_else(|| format!("MISSING_CREDENTIAL:{}", field))?;
-            let message = expand_inner(message, lookup)?;
-            let mac = hmac_sha256(key.as_bytes(), message.as_bytes());
-            let sig = crate::b64_encode(&mac);
-            if url_safe {
-                // percent-encoded for use as a query-string value
-                out.push_str(&sig.replace('+', "%2B").replace('/', "%2F").replace('=', "%3D"));
-            } else {
-                out.push_str(&sig);
-            }
-            used = true;
         } else {
             return Err(format!("unknown placeholder {{{{{}}}}}", inner.split(':').next().unwrap_or("")));
         }
@@ -457,6 +402,97 @@ pub fn expand_template_with(
     }
     out.push_str(rest);
     Ok((out, used))
+}
+
+// ---------------------------------------------------------------- provider requests
+
+/// A request as the page describes it for a licensed provider.
+#[derive(Clone, Debug, Default)]
+pub struct ProviderSpec {
+    pub method: String,
+    pub url: String,
+    pub headers: Vec<(String, String)>,
+    pub body: Option<String>,
+    pub timeout_secs: u64,
+    /// "motor_shared" asks for MOTOR's documented Shared signature. Nothing else
+    /// is accepted, and only for MOTOR.
+    pub auth: Option<String>,
+}
+
+/// Headers a signing scheme sets itself. The page may not supply them, so the
+/// time stamp that is signed is always the one that is sent.
+const SIGNED_HEADERS: &[&str] = &["authorization", "x-date", "date"];
+
+/// Turn the page's description into the request that will actually go out:
+/// check the host, fill in credentials and session tokens, and sign. Pure apart
+/// from the lookups, so every rule here is tested without a network.
+pub fn prepare_provider_request(
+    provider: &str,
+    spec: &ProviderSpec,
+    lookup: &mut dyn FnMut(&str) -> Result<Option<String>, String>,
+    session: &mut dyn FnMut(&str) -> Option<String>,
+    epoch: u64,
+    max_bytes: u64,
+) -> Result<Request, String> {
+    if !safe_token(provider, 40) {
+        return Err("bad provider id".into());
+    }
+    let host = https_host(&spec.url).ok_or_else(|| "only plain https addresses can be requested".to_string())?;
+    if !host_allowed(&host, provider_hosts(provider)) {
+        return Err(format!("{host} is not a host that {provider} credentials may be sent to"));
+    }
+    let method = if spec.method.is_empty() { "GET".to_string() } else { spec.method.to_ascii_uppercase() };
+    let (url, _) = expand_template_with(&spec.url, lookup, session)?;
+    // The expanded address must still be the same host.
+    if https_host(&url).as_deref() != Some(host.as_str()) {
+        return Err("the request address changed host after expansion".into());
+    }
+    let signing = match spec.auth.as_deref() {
+        None | Some("") => None,
+        Some("motor_shared") if provider == "motor_daas" => Some("motor_shared"),
+        Some(other) => return Err(format!("{provider} has no signing scheme called {other}")),
+    };
+    let mut headers = vec![];
+    for (name, value) in &spec.headers {
+        if signing.is_some() && SIGNED_HEADERS.contains(&name.to_ascii_lowercase().as_str()) {
+            return Err(format!("the {name} header is set by the signing step, not by the page"));
+        }
+        let (v, _) = expand_template_with(value, lookup, session)?;
+        headers.push((name.clone(), v));
+    }
+    let body = match &spec.body {
+        Some(b) => Some(expand_template_with(b, lookup, session)?.0),
+        None => None,
+    };
+    if signing == Some("motor_shared") {
+        let public_key = lookup("publicKey")?.ok_or_else(|| "MISSING_CREDENTIAL:publicKey".to_string())?;
+        let private_key = lookup("privateKey")?.ok_or_else(|| "MISSING_CREDENTIAL:privateKey".to_string())?;
+        let path = uri_path(&url).ok_or_else(|| "cannot read the request path".to_string())?;
+        headers.push(("X-Date".into(), http_date(epoch)));
+        headers.push(("Authorization".into(), motor_authorization(&public_key, &private_key, &method, epoch, &path)));
+    }
+    Ok(Request {
+        method,
+        url,
+        headers,
+        body,
+        timeout_secs: if spec.timeout_secs == 0 { 30 } else { spec.timeout_secs },
+        max_bytes,
+        // a redirect could carry an Authorization header somewhere else
+        follow_redirects: false,
+        header_file: None,
+    })
+}
+
+/// Redirects are never followed for a licensed provider. When one comes back,
+/// say where it pointed instead of passing on an empty body.
+pub fn redirect_refusal(status: u16, dump: &str) -> Option<String> {
+    if (300..400).contains(&status) {
+        let to = header_value(dump, "Location").unwrap_or_default();
+        let where_to = https_host(&to).unwrap_or_else(|| if to.is_empty() { "an unstated address".into() } else { to.clone() });
+        return Some(format!("REDIRECT_REFUSED: the provider answered {status} pointing to {where_to}; credentials are never forwarded"));
+    }
+    None
 }
 
 // ---------------------------------------------------------------- sessions
@@ -542,7 +578,7 @@ pub fn curl_quote(s: &str) -> String {
 /// least of all a credential — appears in the process list.
 pub fn curl_config(req: &Request, out: &Path, body_file: Option<&Path>) -> Result<String, String> {
     let method = req.method.to_ascii_uppercase();
-    if !["GET", "POST", "PUT"].contains(&method.as_str()) {
+    if !["GET", "POST", "PUT", "HEAD"].contains(&method.as_str()) {
         return Err("unsupported request method".into());
     }
     if https_host(&req.url).is_none() {
@@ -550,7 +586,11 @@ pub fn curl_config(req: &Request, out: &Path, body_file: Option<&Path>) -> Resul
     }
     let mut c = String::new();
     c.push_str(&format!("url = {}\n", curl_quote(&req.url)));
-    c.push_str(&format!("request = {}\n", curl_quote(&method)));
+    if method == "HEAD" {
+        c.push_str("head\n");
+    } else {
+        c.push_str(&format!("request = {}\n", curl_quote(&method)));
+    }
     for (name, value) in &req.headers {
         if name.is_empty() || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
             return Err("bad header name".into());
@@ -655,6 +695,15 @@ pub fn run_request(req: &Request, out: &Path, scratch: &Path) -> Result<u16, Str
 }
 
 // ---------------------------------------------------------------- datasets
+//
+// datasets/
+//   <name>/                 the index in use: <MAKE>.ndjson shards + meta.json
+//   <name>.building/        a refresh in progress
+//   <name>.previous/        the old index, only for the instant of the swap
+//   <name>.status.json      last check, last success, last failure — kept even
+//                           when an update fails, and never part of the index
+//   _sources/<name>/<file>.zip       the NHTSA file the index was built from
+//   _sources/<name>/<file>.new.zip   a newer download, adopted only on commit
 
 pub fn ds_root(base: &Path) -> PathBuf {
     base.join("datasets")
@@ -668,11 +717,108 @@ fn check_ds(name: &str) -> Result<(), String> {
     }
 }
 
-pub fn ds_incoming(base: &Path, name: &str) -> Result<PathBuf, String> {
+fn sources_dir(base: &Path, name: &str) -> Result<PathBuf, String> {
     check_ds(name)?;
-    let dir = ds_root(base).join("_incoming");
+    let dir = ds_root(base).join("_sources").join(name);
     fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
-    Ok(dir.join(format!("{}.zip", name)))
+    Ok(dir)
+}
+
+/// Where a downloaded NHTSA file is kept. `fresh` is a new download that has
+/// not been adopted yet.
+pub fn ds_source_path(base: &Path, name: &str, file: &str, fresh: bool) -> Result<PathBuf, String> {
+    if !safe_token(file, 60) {
+        return Err("bad source file name".into());
+    }
+    let dir = sources_dir(base, name)?;
+    Ok(dir.join(if fresh { format!("{}.new.zip", file) } else { format!("{}.zip", file) }))
+}
+
+/// The file to read a source from: a fresh download if there is one, otherwise
+/// the one the current index was built from.
+pub fn ds_source_for_reading(base: &Path, name: &str, file: &str) -> Result<Option<PathBuf>, String> {
+    let fresh = ds_source_path(base, name, file, true)?;
+    if fresh.is_file() {
+        return Ok(Some(fresh));
+    }
+    let kept = ds_source_path(base, name, file, false)?;
+    Ok(if kept.is_file() { Some(kept) } else { None })
+}
+
+/// A download is only kept if it is a whole ZIP archive: a local file header at
+/// the start and an end-of-central-directory record in the last 65,557 bytes
+/// (the largest distance the ZIP format allows). A truncated transfer fails the
+/// second check.
+pub fn zip_is_complete(path: &Path) -> Result<(), String> {
+    let mut f = fs::File::open(path).map_err(|e| format!("cannot open the download: {e}"))?;
+    let len = f.metadata().map_err(|e| format!("cannot read the download: {e}"))?.len();
+    if len < 22 {
+        return Err("the download is too small to be a ZIP archive".into());
+    }
+    let mut head = [0u8; 4];
+    f.read_exact(&mut head).map_err(|e| format!("cannot read the download: {e}"))?;
+    if head != [0x50, 0x4b, 0x03, 0x04] {
+        return Err("the download is not a ZIP archive".into());
+    }
+    use std::io::{Seek, SeekFrom};
+    let tail_len = len.min(65_557);
+    f.seek(SeekFrom::Start(len - tail_len)).map_err(|e| format!("cannot read the download: {e}"))?;
+    let mut tail = vec![0u8; tail_len as usize];
+    f.read_exact(&mut tail).map_err(|e| format!("cannot read the download: {e}"))?;
+    // the record is 22 bytes, so its signature can be no nearer the end than that
+    let found = (0..=tail.len() - 22).rev().any(|i| tail[i..i + 4] == [0x50, 0x4b, 0x05, 0x06]);
+    if !found {
+        return Err("the download is incomplete (the ZIP directory is missing)".into());
+    }
+    Ok(())
+}
+
+/// Keep a finished download beside the file in use. Called after the transfer
+/// has been written to `part` and has passed `zip_is_complete`.
+pub fn ds_stage_source(base: &Path, name: &str, file: &str, part: &Path) -> Result<u64, String> {
+    zip_is_complete(part)?;
+    {
+        let f = fs::OpenOptions::new().write(true).open(part).map_err(|e| format!("cannot finish the download: {e}"))?;
+        f.sync_all().map_err(|e| format!("cannot flush the download: {e}"))?;
+    }
+    let dest = ds_source_path(base, name, file, true)?;
+    let _ = fs::remove_file(&dest);
+    fs::rename(part, &dest).map_err(|e| format!("cannot keep the download: {e}"))?;
+    Ok(fs::metadata(&dest).map(|m| m.len()).unwrap_or(0))
+}
+
+/// After a successful commit: fresh downloads replace the files they update,
+/// and files the index no longer uses are removed.
+pub fn ds_adopt_sources(base: &Path, name: &str, keep: &[String]) -> Result<(), String> {
+    let dir = sources_dir(base, name)?;
+    for file in keep {
+        let fresh = ds_source_path(base, name, file, true)?;
+        if fresh.is_file() {
+            let kept = ds_source_path(base, name, file, false)?;
+            let _ = fs::remove_file(&kept);
+            fs::rename(&fresh, &kept).map_err(|e| format!("cannot adopt {file}: {e}"))?;
+        }
+    }
+    for entry in fs::read_dir(&dir).map_err(|e| format!("cannot read {}: {e}", dir.display()))?.flatten() {
+        let n = entry.file_name().to_string_lossy().to_string();
+        let stem = n.strip_suffix(".new.zip").or_else(|| n.strip_suffix(".zip")).unwrap_or(&n).to_string();
+        if !keep.contains(&stem) {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+    Ok(())
+}
+
+/// After a failed refresh: downloads that were never used are thrown away and
+/// the files the working index came from stay exactly as they were.
+pub fn ds_discard_fresh_sources(base: &Path, name: &str) -> Result<(), String> {
+    let dir = sources_dir(base, name)?;
+    for entry in fs::read_dir(&dir).map_err(|e| format!("cannot read {}: {e}", dir.display()))?.flatten() {
+        if entry.file_name().to_string_lossy().ends_with(".new.zip") {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+    Ok(())
 }
 
 pub fn ds_begin(base: &Path, name: &str) -> Result<(), String> {
@@ -705,9 +851,9 @@ pub fn ds_write(base: &Path, name: &str, shard: &str, text: &str, append: bool) 
     f.flush().map_err(|e| format!("cannot flush {}: {e}", p.display()))
 }
 
-/// Swap a finished refresh into place. The old index is moved aside first and
-/// only removed once the new one is in; if anything fails the old one is put
-/// back exactly as it was.
+/// Swap a finished refresh into place. Every file of the new index is flushed to
+/// disk first. The old index is moved aside and only removed once the new one
+/// is in; if anything fails the old one is put back exactly as it was.
 pub fn ds_commit(base: &Path, name: &str, meta: &str) -> Result<(), String> {
     check_ds(name)?;
     let root = ds_root(base);
@@ -717,16 +863,24 @@ pub fn ds_commit(base: &Path, name: &str, meta: &str) -> Result<(), String> {
     if !building.is_dir() {
         return Err("no refresh is in progress for this dataset".into());
     }
-    let shards = fs::read_dir(&building)
+    let shards: Vec<PathBuf> = fs::read_dir(&building)
         .map_err(|e| format!("cannot read the new index: {e}"))?
         .filter_map(|e| e.ok())
         .filter(|e| e.file_name().to_string_lossy().ends_with(".ndjson"))
-        .count();
-    if shards == 0 {
+        .map(|e| e.path())
+        .collect();
+    if shards.is_empty() {
         return Err("the new index is empty; the existing index was left in place".into());
     }
-    if meta.trim().is_empty() {
-        return Err("the new index has no description; the existing index was left in place".into());
+    if meta.trim().is_empty() || serde_json::from_str::<serde_json::Value>(meta).is_err() {
+        return Err("the new index has no readable description; the existing index was left in place".into());
+    }
+    for shard in &shards {
+        let f = fs::OpenOptions::new()
+            .write(true)
+            .open(shard)
+            .map_err(|e| format!("cannot reopen {}: {e}", shard.display()))?;
+        f.sync_all().map_err(|e| format!("cannot flush {} to disk: {e}", shard.display()))?;
     }
     {
         let mp = building.join("meta.json");
@@ -762,6 +916,26 @@ pub fn ds_abort(base: &Path, name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// If the program stopped in the middle of a swap, finish or undo it so the
+/// shop always starts with one whole index.
+pub fn ds_recover(base: &Path, name: &str) -> Result<(), String> {
+    check_ds(name)?;
+    let root = ds_root(base);
+    let live = root.join(name);
+    let previous = root.join(format!("{}.previous", name));
+    if previous.exists() {
+        if live.join("meta.json").is_file() {
+            fs::remove_dir_all(&previous).map_err(|e| format!("cannot tidy an old copy: {e}"))?;
+        } else {
+            if live.exists() {
+                fs::remove_dir_all(&live).map_err(|e| format!("cannot tidy a half-placed index: {e}"))?;
+            }
+            fs::rename(&previous, &live).map_err(|e| format!("cannot restore the previous index: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
 pub fn ds_read(base: &Path, name: &str, shard: &str) -> Result<Option<String>, String> {
     check_ds(name)?;
     if !safe_token(shard, 60) {
@@ -783,6 +957,34 @@ pub fn ds_meta(base: &Path, name: &str) -> Result<Option<String>, String> {
     fs::read_to_string(&p).map(Some).map_err(|e| format!("cannot read {}: {e}", p.display()))
 }
 
+/// Record how the last check or update went. Written to a temporary file,
+/// flushed and renamed, so it is never half written.
+pub fn ds_status_write(base: &Path, name: &str, json: &str) -> Result<(), String> {
+    check_ds(name)?;
+    if serde_json::from_str::<serde_json::Value>(json).is_err() {
+        return Err("status is not valid JSON".into());
+    }
+    let root = ds_root(base);
+    fs::create_dir_all(&root).map_err(|e| format!("cannot create {}: {e}", root.display()))?;
+    let tmp = root.join(format!("{}.status.tmp", name));
+    let dest = root.join(format!("{}.status.json", name));
+    {
+        let mut f = fs::File::create(&tmp).map_err(|e| format!("cannot write status: {e}"))?;
+        f.write_all(json.as_bytes()).map_err(|e| format!("cannot write status: {e}"))?;
+        f.sync_all().map_err(|e| format!("cannot flush status: {e}"))?;
+    }
+    fs::rename(&tmp, &dest).map_err(|e| format!("cannot keep status: {e}"))
+}
+
+pub fn ds_status_read(base: &Path, name: &str) -> Result<Option<String>, String> {
+    check_ds(name)?;
+    let p = ds_root(base).join(format!("{}.status.json", name));
+    if !p.exists() {
+        return Ok(None);
+    }
+    fs::read_to_string(&p).map(Some).map_err(|e| format!("cannot read {}: {e}", p.display()))
+}
+
 // ---------------------------------------------------------------- opening a portal
 
 /// A portal opens in the shop's own browser. Only a plain https address with no
@@ -796,18 +998,6 @@ pub fn safe_external_url(url: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn sha256_matches_the_published_vectors() {
-        assert_eq!(hex(&sha256(b"")), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-        assert_eq!(hex(&sha256(b"abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-        assert_eq!(
-            hex(&sha256(b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")),
-            "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
-        );
-        let million = vec![b'a'; 1_000_000];
-        assert_eq!(hex(&sha256(&million)), "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
-    }
 
     #[test]
     fn hmac_matches_rfc_4231() {
@@ -825,6 +1015,39 @@ mod tests {
             hex(&hmac_sha256(&long_key, b"Test Using Larger Than Block-Size Key - Hash Key First")),
             "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54"
         );
+        assert_eq!(b64(b"foobar"), "Zm9vYmFy");
+    }
+
+    #[test]
+    fn motor_signature_matches_the_handbook_example() {
+        // MOTOR DaaS Development Handbook, "Example API Key Credentials":
+        // public L6yPPubKey, private 90PoIbjdUdhY9Hmfrin7JoEVo, epoch 1429200721,
+        // GET /v1/Information/YMME/Years?min=1990, and the header it prints.
+        let data = motor_signature_data("L6yPPubKey", "GET", 1429200721, "/v1/Information/YMME/Years");
+        assert_eq!(data, "L6yPPubKey\nGET\n1429200721\n/v1/Information/YMME/Years");
+        assert_eq!(
+            motor_authorization("L6yPPubKey", "90PoIbjdUdhY9Hmfrin7JoEVo", "GET", 1429200721, "/v1/Information/YMME/Years"),
+            "Shared L6yPPubKey:q+FhRKNYtWNCsUiip9e92yPw73zEIfm4ZETGOh+olRs="
+        );
+        assert_eq!(http_date(1429200721), "Thu, 16 Apr 2015 16:12:01 GMT");
+    }
+
+    #[test]
+    fn http_dates_are_rfc_1123() {
+        assert_eq!(http_date(0), "Thu, 01 Jan 1970 00:00:00 GMT");
+        assert_eq!(http_date(951782400), "Tue, 29 Feb 2000 00:00:00 GMT");
+        assert_eq!(http_date(1789257600), "Sun, 13 Sep 2026 00:00:00 GMT");
+        assert_eq!(http_date(4102444799), "Thu, 31 Dec 2099 23:59:59 GMT");
+    }
+
+    #[test]
+    fn the_signed_path_is_the_path_sent_without_its_query() {
+        assert_eq!(uri_path("https://api.motor.com/v1/Information/YMME/Years?min=1990").as_deref(), Some("/v1/Information/YMME/Years"));
+        assert_eq!(uri_path("https://api.motor.com/v1/Information/Vehicles/Search/ByVIN?VIN=1HGCM").as_deref(), Some("/v1/Information/Vehicles/Search/ByVIN"));
+        assert_eq!(uri_path("https://api.motor.com:443/v1/HelloWorld#x").as_deref(), Some("/v1/HelloWorld"));
+        assert_eq!(uri_path("https://api.motor.com").as_deref(), Some("/"));
+        assert_eq!(uri_path("https://api.motor.com?x=1").as_deref(), Some("/"));
+        assert_eq!(uri_path("http://api.motor.com/v1"), None);
     }
 
     #[test]
@@ -847,8 +1070,9 @@ mod tests {
                 assert!(secret_delete("jzdtest", &field).unwrap());
                 assert_eq!(secret_get("jzdtest", &field).unwrap(), None);
                 assert!(!secret_delete("jzdtest", &field).unwrap());
+                println!("CREDMAN: stored, read back on the native side, deleted, confirmed gone (Windows Credential Manager)");
             }
-            Err(e) => eprintln!("credential store unavailable on this machine, round trip skipped: {e}"),
+            Err(e) => println!("CREDMAN: credential store unavailable on this machine, round trip skipped: {e}"),
         }
         assert!(secret_put("jzdtest", "empty", "").is_err());
         assert!(secret_put("jzdtest", "huge", &"x".repeat(MAX_SECRET_BYTES + 1)).is_err());
@@ -891,7 +1115,6 @@ mod tests {
         let mut lookup = |f: &str| -> Result<Option<String>, String> {
             Ok(match f {
                 "apiKey" => Some("KEY123".to_string()),
-                "privateKey" => Some("key".to_string()),
                 _ => None,
             })
         };
@@ -901,37 +1124,15 @@ mod tests {
         let (s, used) = expand_template("no secrets here", &mut lookup).unwrap();
         assert_eq!(s, "no secrets here");
         assert!(!used);
-        // HMAC-SHA256("key", "The quick brown fox jumps over the lazy dog"), base64
-        let (s, _) = expand_template(
-            "Shared PUB:{{hmac_sha256_b64:privateKey:The quick brown fox jumps over the lazy dog}}",
-            &mut lookup,
-        )
-        .unwrap();
-        assert_eq!(s, "Shared PUB:97yD9DBThCSxMpjmqm+xQ+9NWaFJRhdZl0edvC0aPNg=");
         let missing = expand_template("{{secret:nope}}", &mut lookup).unwrap_err();
         assert!(missing.starts_with("MISSING_CREDENTIAL:nope"), "{missing}");
         assert!(expand_template("{{secret:../x}}", &mut lookup).is_err());
         assert!(expand_template("{{file:C:/x}}", &mut lookup).is_err());
         assert!(expand_template("{{secret:apiKey", &mut lookup).is_err());
-    }
+        // the page cannot ask for a signature over text of its choosing
+        assert!(expand_template("{{hmac_sha256_b64:apiKey:anything}}", &mut lookup).is_err());
+        assert!(expand_template("{{hmac_sha256_b64url:apiKey:anything}}", &mut lookup).is_err());
 
-    #[test]
-    fn a_signed_message_can_include_a_credential_it_does_not_reveal() {
-        let mut lookup = |f: &str| -> Result<Option<String>, String> {
-            Ok(match f {
-                "publicKey" => Some("PUB".to_string()),
-                "privateKey" => Some("key".to_string()),
-                _ => None,
-            })
-        };
-        let (a, _) = expand_template("{{hmac_sha256_b64:privateKey:[[secret:publicKey]]:message}}", &mut lookup).unwrap();
-        let expected = crate::b64_encode(&hmac_sha256(b"key", b"PUB:message"));
-        assert_eq!(a, expected);
-        let (nl, _) = expand_template("{{hmac_sha256_b64:privateKey:[[secret:publicKey]][[nl]]GET}}", &mut lookup).unwrap();
-        assert_eq!(nl, crate::b64_encode(&hmac_sha256(b"key", b"PUB\nGET")));
-        let (q, _) = expand_template("sig={{hmac_sha256_b64url:privateKey:The quick brown fox jumps over the lazy dog}}", &mut lookup).unwrap();
-        assert_eq!(q, "sig=97yD9DBThCSxMpjmqm%2BxQ%2B9NWaFJRhdZl0edvC0aPNg%3D");
-        assert!(expand_template("{{hmac_sha256_b64:privateKey:[[session:x]]}}", &mut lookup).is_err());
         let mut sess = |n: &str| if n == "X-AuthToken" { Some("TOK".to_string()) } else { None };
         let (b, used) = expand_template_with("TecRMI {{session:X-AuthToken}}", &mut lookup, &mut sess).unwrap();
         assert_eq!(b, "TecRMI TOK");
@@ -943,6 +1144,182 @@ mod tests {
         assert_eq!(session_get("tecrmitest", "X-AuthToken").as_deref(), Some("abc"));
         session_clear("tecrmitest");
         assert_eq!(session_get("tecrmitest", "X-AuthToken"), None);
+    }
+
+    fn motor_keys(f: &str) -> Result<Option<String>, String> {
+        Ok(match f {
+            "publicKey" => Some("PUB".to_string()),
+            "privateKey" => Some("k".to_string()),
+            _ => None,
+        })
+    }
+
+    fn spec(url: &str) -> ProviderSpec {
+        ProviderSpec {
+            method: "GET".into(),
+            url: url.into(),
+            headers: vec![("Accept".into(), "application/json".into())],
+            body: None,
+            timeout_secs: 20,
+            auth: Some("motor_shared".into()),
+        }
+    }
+
+    #[test]
+    fn a_motor_request_is_signed_here_exactly_as_documented() {
+        let mut lookup = motor_keys;
+        let mut sess = |_: &str| None;
+        let req = prepare_provider_request(
+            "motor_daas",
+            &spec("https://api.motor.com/v1/HelloWorld?xcorrelationid=abc"),
+            &mut lookup,
+            &mut sess,
+            1_700_000_000,
+            1_000,
+        )
+        .unwrap();
+        let h = |n: &str| req.headers.iter().find(|(k, _)| k == n).map(|(_, v)| v.clone());
+        // HMAC-SHA256("k", "PUB\nGET\n1700000000\n/v1/HelloWorld"), from Python's hmac module
+        assert_eq!(h("Authorization").as_deref(), Some("Shared PUB:hBAMu1TNSNkbyc5IZpjoAU1ht6goLDwwxomk4zuOlTM="));
+        assert_eq!(h("X-Date").as_deref(), Some(http_date(1_700_000_000).as_str()));
+        assert_eq!(h("Accept").as_deref(), Some("application/json"));
+        assert!(!req.follow_redirects, "a signed request never follows a redirect");
+        assert_eq!(req.url, "https://api.motor.com/v1/HelloWorld?xcorrelationid=abc");
+        let cfg = curl_config(&req, Path::new("o"), None).unwrap();
+        assert!(!cfg.contains("location"));
+    }
+
+    #[test]
+    fn a_provider_request_cannot_be_turned_into_a_proxy() {
+        let mut lookup = motor_keys;
+        let mut sess = |_: &str| None;
+        let mut go = |provider: &str, s: ProviderSpec| prepare_provider_request(provider, &s, &mut lookup, &mut sess, 1, 1_000);
+        // unrelated host, look-alike hosts, other schemes, malformed addresses
+        for bad in [
+            "https://evil.example/v1/HelloWorld",
+            "https://api.motor.com.evil.example/v1/HelloWorld",
+            "https://api.motor.com@evil.example/v1/HelloWorld",
+            "http://api.motor.com/v1/HelloWorld",
+            "https://api motor.com/v1",
+            "api.motor.com/v1/HelloWorld",
+            "https:///v1/HelloWorld",
+        ] {
+            assert!(go("motor_daas", spec(bad)).is_err(), "{bad} must be refused");
+        }
+        // a provider with no API hosts (a portal) cannot send anything
+        assert!(go("alldata", spec("https://my.alldata.com/")).is_err());
+        // MOTOR's keys never go to another provider's host, and vice versa
+        assert!(go("tecrmi", spec("https://api.motor.com/v1/HelloWorld")).is_err());
+        // only MOTOR has the Shared signing scheme
+        let mut s = spec("https://rmi-services.tecalliance.net/rest/Times/WorkList");
+        assert!(go("tecrmi", s.clone()).is_err());
+        s.auth = None;
+        assert!(go("tecrmi", s).is_ok());
+        let mut s = spec("https://api.motor.com/v1/HelloWorld");
+        s.auth = Some("mws".into());
+        assert!(go("motor_daas", s).is_err(), "the retired MWS scheme is not offered");
+        // the page cannot supply the headers the signing step owns
+        for name in ["Authorization", "X-Date", "date"] {
+            let mut s = spec("https://api.motor.com/v1/HelloWorld");
+            s.headers.push((name.into(), "Shared PUB:forged".into()));
+            assert!(go("motor_daas", s).is_err(), "{name} must be refused");
+        }
+    }
+
+    #[test]
+    fn missing_motor_keys_are_reported_by_name() {
+        let mut none = |_: &str| -> Result<Option<String>, String> { Ok(None) };
+        let mut sess = |_: &str| None;
+        let e = prepare_provider_request("motor_daas", &spec("https://api.motor.com/v1/HelloWorld"), &mut none, &mut sess, 1, 1)
+            .unwrap_err();
+        assert!(e.starts_with("MISSING_CREDENTIAL:publicKey"), "{e}");
+        let mut only_public = |f: &str| -> Result<Option<String>, String> { Ok(if f == "publicKey" { Some("P".into()) } else { None }) };
+        let e = prepare_provider_request("motor_daas", &spec("https://api.motor.com/v1/HelloWorld"), &mut only_public, &mut sess, 1, 1)
+            .unwrap_err();
+        assert!(e.starts_with("MISSING_CREDENTIAL:privateKey"), "{e}");
+    }
+
+    #[test]
+    fn a_redirect_to_another_host_is_refused_not_followed() {
+        let dump = "HTTP/1.1 302 Found\r\nLocation: https://evil.example/collect\r\n\r\n";
+        let e = redirect_refusal(302, dump).unwrap();
+        assert!(e.starts_with("REDIRECT_REFUSED"), "{e}");
+        assert!(e.contains("evil.example"), "{e}");
+        assert!(redirect_refusal(200, "HTTP/1.1 200 OK\r\n\r\n").is_none());
+        assert!(redirect_refusal(401, "HTTP/1.1 401 Unauthorized\r\n\r\n").is_none());
+    }
+
+    /// A real call to MOTOR's public DaaS sandbox, through the same code the
+    /// desktop app uses. It runs only when the sandbox keys MOTOR publishes at
+    /// motor.com/daas-sandbox are supplied as MOTOR_SANDBOX_PUBLIC and
+    /// MOTOR_SANDBOX_PRIVATE; they are never stored in this repository.
+    ///   cargo test motor_sandbox_live -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn motor_sandbox_live() {
+        let (Ok(public), Ok(private)) = (std::env::var("MOTOR_SANDBOX_PUBLIC"), std::env::var("MOTOR_SANDBOX_PRIVATE")) else {
+            panic!("MOTOR_SANDBOX_PUBLIC and MOTOR_SANDBOX_PRIVATE are not set");
+        };
+        let scratch = scratch("motorlive");
+        let call = |path: &str, private_key: &str| -> (u16, serde_json::Value) {
+            let mut lookup = |f: &str| -> Result<Option<String>, String> {
+                Ok(match f {
+                    "publicKey" => Some(public.clone()),
+                    "privateKey" => Some(private_key.to_string()),
+                    _ => None,
+                })
+            };
+            let mut sess = |_: &str| None;
+            let req = prepare_provider_request(
+                "motor_daas",
+                &spec(&format!("https://api.motor.com/v1{path}")),
+                &mut lookup,
+                &mut sess,
+                now_epoch(),
+                25_000_000,
+            )
+            .unwrap();
+            let out = scratch.join(format!("r{}.json", crate::next_seq()));
+            let status = run_request(&req, &out, &scratch).expect("MOTOR sandbox answered");
+            let body = fs::read_to_string(&out).unwrap_or_default();
+            (status, serde_json::from_str(&body).unwrap_or(serde_json::Value::Null))
+        };
+        let code = |v: &serde_json::Value| v["Header"]["Messages"][0]["Code"].as_str().unwrap_or("").to_string();
+
+        let (st, v) = call("/HelloWorld", &private);
+        println!("LIVE: HelloWorld -> {st} {}", v["Body"]);
+        assert_eq!(st, 200, "authentication with the published sandbox keys: {v}");
+
+        let (st, v) = call("/Information/Vehicles/Search/ByVIN?VIN=19XFA1F57AE000001", &private);
+        let veh = &v["Body"]["Vehicles"][0];
+        println!(
+            "LIVE: ByVIN -> {st} {} {} {} {} BaseVehicleID={} EngineID={}",
+            veh["Year"], veh["MakeName"], veh["ModelName"], veh["SubModelName"], veh["BaseVehicleID"], veh["EngineID"]
+        );
+        assert_eq!(st, 200, "{v}");
+        let base_vehicle = veh["BaseVehicleID"].as_i64().expect("a base vehicle id");
+
+        let (st, v) = call(
+            &format!("/Information/Vehicles/Attributes/BaseVehicleID/{base_vehicle}/Content/Summaries/Of/EstimatedWorkTimes?SearchTerm=brake"),
+            &private,
+        );
+        let apps = v["Body"]["Applications"].as_array().cloned().unwrap_or_default();
+        let first = apps.first().cloned().unwrap_or(serde_json::Value::Null);
+        println!(
+            "LIVE: EstimatedWorkTimes -> {st} {} operations; first: {} {} h (ApplicationID {})",
+            apps.len(),
+            first["DisplayName"],
+            first["Items"][0]["BaseLaborTime"],
+            first["ApplicationID"]
+        );
+        assert_eq!(st, 200, "{v}");
+        assert!(!apps.is_empty(), "the sandbox returned labor operations");
+
+        let (st, v) = call("/HelloWorld", "not-the-private-key");
+        println!("LIVE: wrong private key -> {st} {}", code(&v));
+        assert_eq!(st, 401);
+        assert!(code(&v).starts_with("401."), "MOTOR's own error code is available: {v}");
+        fs::remove_dir_all(&scratch).ok();
     }
 
     #[test]
@@ -983,6 +1360,10 @@ mod tests {
         bad.url = "http://api.nhtsa.gov/".into();
         assert!(curl_config(&bad, Path::new("o"), None).is_err());
         assert_eq!(curl_quote("a\"b\\c"), "\"a\\\"b\\\\c\"");
+        let mut head = req.clone();
+        head.method = "HEAD".into();
+        let cfg = curl_config(&head, Path::new("o"), None).unwrap();
+        assert!(cfg.contains("\nhead\n") && !cfg.contains("request ="));
     }
 
     fn scratch(tag: &str) -> PathBuf {
@@ -1033,6 +1414,110 @@ mod tests {
         // nothing can be committed or written without a refresh in progress
         assert!(ds_commit(&base, "inv", "{}").is_err());
         assert!(ds_write(&base, "inv", "BMW", "x", false).is_err());
+        fs::remove_dir_all(&base).ok();
+    }
+
+    fn tiny_zip() -> Vec<u8> {
+        // a stored (uncompressed) archive holding one empty file named "a"
+        let mut z = vec![];
+        z.extend_from_slice(&[0x50, 0x4b, 0x03, 0x04, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, b'a']);
+        let cd = z.len() as u32;
+        z.extend_from_slice(&[0x50, 0x4b, 0x01, 0x02, 20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, b'a']);
+        let cd_len = z.len() as u32 - cd;
+        z.extend_from_slice(&[0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 1, 0, 1, 0]);
+        z.extend_from_slice(&cd_len.to_le_bytes());
+        z.extend_from_slice(&cd.to_le_bytes());
+        z.extend_from_slice(&[0, 0]);
+        z
+    }
+
+    #[test]
+    fn only_a_whole_zip_download_is_kept() {
+        let base = scratch("zip");
+        let good = base.join("good.part");
+        fs::write(&good, tiny_zip()).unwrap();
+        assert!(zip_is_complete(&good).is_ok());
+        let cut_short = base.join("short.part");
+        let z = tiny_zip();
+        fs::write(&cut_short, &z[..z.len() - 5]).unwrap();
+        assert!(zip_is_complete(&cut_short).unwrap_err().contains("incomplete"));
+        let html = base.join("html.part");
+        fs::write(&html, b"<html>Service Unavailable</html> padding padding").unwrap();
+        assert!(zip_is_complete(&html).unwrap_err().contains("not a ZIP"));
+        assert!(ds_stage_source(&base, "inv", "FLAT_INV", &html).is_err());
+        assert!(ds_source_for_reading(&base, "inv", "FLAT_INV").unwrap().is_none());
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn a_new_download_is_adopted_only_after_the_index_is_committed() {
+        let base = scratch("sources");
+        // the file the working index was built from
+        let first = base.join("1.part");
+        fs::write(&first, tiny_zip()).unwrap();
+        ds_stage_source(&base, "mc", "TSBS_2025", &first).unwrap();
+        ds_adopt_sources(&base, "mc", &["TSBS_2025".to_string()]).unwrap();
+        let kept = ds_source_path(&base, "mc", "TSBS_2025", false).unwrap();
+        assert!(kept.is_file());
+        assert_eq!(ds_source_for_reading(&base, "mc", "TSBS_2025").unwrap().unwrap(), kept);
+
+        // a newer download that then fails to index is thrown away
+        let mut newer = tiny_zip();
+        newer.extend_from_slice(b"");
+        let second = base.join("2.part");
+        fs::write(&second, &newer).unwrap();
+        ds_stage_source(&base, "mc", "TSBS_2025", &second).unwrap();
+        let fresh = ds_source_path(&base, "mc", "TSBS_2025", true).unwrap();
+        assert_eq!(ds_source_for_reading(&base, "mc", "TSBS_2025").unwrap().unwrap(), fresh);
+        ds_discard_fresh_sources(&base, "mc").unwrap();
+        assert!(!fresh.exists());
+        assert!(kept.is_file(), "the file behind the working index is untouched");
+
+        // a successful one replaces it, and files no longer used are removed
+        let third = base.join("3.part");
+        fs::write(&third, tiny_zip()).unwrap();
+        ds_stage_source(&base, "mc", "TSBS_2025", &third).unwrap();
+        let old = base.join("4.part");
+        fs::write(&old, tiny_zip()).unwrap();
+        ds_stage_source(&base, "mc", "TSBS_1995", &old).unwrap();
+        ds_adopt_sources(&base, "mc", &["TSBS_2025".to_string()]).unwrap();
+        assert!(kept.is_file() && !fresh.exists());
+        assert!(!ds_source_path(&base, "mc", "TSBS_1995", false).unwrap().exists());
+        assert!(!ds_source_path(&base, "mc", "TSBS_1995", true).unwrap().exists());
+        assert!(ds_source_path(&base, "mc", "../x", false).is_err());
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn a_swap_interrupted_part_way_is_put_right_on_start() {
+        let base = scratch("recover");
+        ds_begin(&base, "inv").unwrap();
+        ds_write(&base, "inv", "BMW", "good\n", false).unwrap();
+        ds_commit(&base, "inv", "{\"records\":1}").unwrap();
+        // simulate a stop between "move current aside" and "move new in"
+        let root = ds_root(&base);
+        fs::rename(root.join("inv"), root.join("inv.previous")).unwrap();
+        ds_recover(&base, "inv").unwrap();
+        assert_eq!(ds_read(&base, "inv", "BMW").unwrap().unwrap(), "good\n");
+        assert!(!root.join("inv.previous").exists());
+        // and a stop after the new index was placed simply removes the old copy
+        fs::create_dir_all(root.join("inv.previous")).unwrap();
+        ds_recover(&base, "inv").unwrap();
+        assert!(!root.join("inv.previous").exists());
+        assert_eq!(ds_meta(&base, "inv").unwrap().unwrap(), "{\"records\":1}");
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn update_status_survives_a_failed_update_and_is_never_half_written() {
+        let base = scratch("status");
+        assert_eq!(ds_status_read(&base, "inv").unwrap(), None);
+        ds_status_write(&base, "inv", "{\"lastSuccessAt\":\"2026-09-12T10:00:00Z\"}").unwrap();
+        ds_status_write(&base, "inv", "{\"lastSuccessAt\":\"2026-09-12T10:00:00Z\",\"lastFailure\":{\"error\":\"HTTP 503\"}}").unwrap();
+        assert!(ds_status_read(&base, "inv").unwrap().unwrap().contains("HTTP 503"));
+        assert!(ds_status_write(&base, "inv", "not json").is_err());
+        assert!(ds_status_read(&base, "inv").unwrap().unwrap().contains("lastSuccessAt"));
+        assert!(!ds_root(&base).join("inv.status.tmp").exists());
         fs::remove_dir_all(&base).ok();
     }
 

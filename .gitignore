@@ -4,3 +4,7 @@ desktop/dist/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
 node_modules/
+# Local developer settings, such as the MOTOR sandbox keys for testmotorlive.cjs.
+# Credentials never belong in this repository.
+*.env
+.env*

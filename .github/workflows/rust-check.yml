@@ -43,3 +43,58 @@ jobs:
             $hits | Select-Object -First 9 | ForEach-Object { Write-Output "::error::$_" }
             exit $code
           }
+          Get-Content test.log | Where-Object { $_ -match '^test result:' } | ForEach-Object { Write-Output "::notice title=cargo test::$_" }
+          cargo test a_secret_goes_in -- --nocapture 2>&1 | Where-Object { $_ -match '^CREDMAN:' } | ForEach-Object { Write-Output "::notice title=Credential Manager::$_" }
+
+      # A real request to MOTOR's public DaaS sandbox, through the desktop app's
+      # own signing and request code. The sandbox keys are the ones MOTOR
+      # publishes for developers at motor.com/daas-sandbox; they are read from
+      # that page at run time and are never stored in this repository.
+      - name: Live MOTOR sandbox call (desktop shell)
+        shell: pwsh
+        working-directory: desktop/src-tauri
+        run: |
+          $page = (Invoke-WebRequest -UseBasicParsing -Uri 'https://www.motor.com/daas-sandbox/').Content
+          $pub = [regex]::Match($page, 'Public Key:\s*</b>\s*([A-Za-z0-9_\-]+)').Groups[1].Value
+          $priv = [regex]::Match($page, 'Private Key:\s*</b>\s*([A-Za-z0-9_\-]+)').Groups[1].Value
+          if (-not $pub -or -not $priv) {
+            Write-Output "::error title=MOTOR sandbox::Could not read the published sandbox keys from motor.com/daas-sandbox"
+            exit 1
+          }
+          Write-Output "::add-mask::$priv"
+          $env:MOTOR_SANDBOX_PUBLIC = $pub
+          $env:MOTOR_SANDBOX_PRIVATE = $priv
+          # for the page-level live suite in the next step, this job only
+          "MOTOR_SANDBOX_PUBLIC=$pub" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "MOTOR_SANDBOX_PRIVATE=$priv" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          cargo test motor_sandbox_live -- --ignored --nocapture 2>&1 | Tee-Object -FilePath live.log
+          $code = $LASTEXITCODE
+          Get-Content live.log | Where-Object { $_ -match '^LIVE:' } | ForEach-Object {
+            Write-Output ("::notice title=MOTOR sandbox::" + ($_ -replace '::', ': :'))
+          }
+          if ($code -ne 0) {
+            $lines = Get-Content live.log
+            $hits = @()
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+              if ($lines[$i] -match '^error|panicked at') {
+                $end = [Math]::Min($i + 8, $lines.Count - 1)
+                $hits += ,(($lines[$i..$end] -join '%0A') -replace '::', ': :')
+              }
+            }
+            $hits | Select-Object -First 5 | ForEach-Object { Write-Output "::error title=MOTOR sandbox::$_" }
+            exit $code
+          }
+
+      - name: Live MOTOR sandbox call (page adapters) and the data provider suite
+        shell: pwsh
+        run: |
+          npm install --no-save playwright
+          npx playwright install chromium
+          node testdata.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node testmotorlive.cjs 2>&1 | Tee-Object -FilePath motorlive.log
+          $code = $LASTEXITCODE
+          Get-Content motorlive.log | Where-Object { $_ -match 'PASS|FAIL|SKIPPED|MOTOR sandbox calls|Vehicle:' } | ForEach-Object {
+            Write-Output ("::notice title=MOTOR sandbox page::" + ($_.Trim() -replace '::', ': :'))
+          }
+          exit $code
