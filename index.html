@@ -284,6 +284,13 @@
   .tl-DTC,.tl-Diagnosis{background:#e6f0ff;color:#1f4fa8}
   .tl-Declinedwork,.tl-QCFail,.tl-Comebackrecheck{background:#fbe3e0;color:#a3291b}
   /* Data providers: every source says what it is before it says anything else. */
+  .captable{font-size:12px;border-collapse:collapse;margin-top:6px}
+  .captable th{font-size:11px;white-space:nowrap}
+  .captable td,.captable th{padding:4px 6px;border-bottom:1px solid #e5e7eb}
+  .captable td.cm{text-align:center;font-weight:700}
+  .captable td.cm-y{color:#15803d}.captable td.cm-w{color:#b45309}.captable td.cm-n{color:#9ca3af}
+  .dsstatus{font-size:12px;margin:6px 0;padding:6px 8px;border-radius:6px;background:#f3f4f6}
+  .dsstatus .dsfail{color:#b91c1c}
   .provgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px}
   .provcard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 12px;display:flex;flex-direction:column;gap:6px}
   .provcard.priority{border-color:#8fb8f5;box-shadow:0 0 0 1px #8fb8f5 inset}
@@ -4253,20 +4260,21 @@ const PROVIDER_REGISTRY = [
    sandboxUrl:"https://www.motor.com/daas-sandbox/", baseUrl:"https://api.motor.com/v1",
    environments:["sandbox","production"], credentialFields:[{key:"publicKey", label:"Public key"},{key:"privateKey", label:"Private key"}],
    cache:CACHE.LICENSE_CONTROLLED_CACHE, sourceType:"MOTOR licensed data", hosts:["api.motor.com"],
-   implemented:[CAP.VIN_IDENTIFICATION, CAP.LABOR_TIMES, CAP.OEM_WARRANTY_TIMES],
+   implemented:[CAP.VIN_IDENTIFICATION, CAP.LABOR_TIMES, CAP.OEM_WARRANTY_TIMES, CAP.MAINTENANCE, CAP.SPECIFICATIONS, CAP.TORQUE_SPECIFICATIONS,
+                CAP.FLUIDS, CAP.DTC, CAP.TSB, CAP.REPAIR_PROCEDURES, CAP.WIRING, CAP.COMPONENT_LOCATIONS],
    pricing:pricing({publicPriceText:"CUSTOM QUOTE", pricingModel:"Commercial licence", quoteRequired:true,
      trialAvailable:true, notes:"The DaaS sandbox is free for developer evaluation and holds a snapshot of a few vehicles. Production requires a MOTOR licence."}),
-   note:"MOTOR publishes sandbox keys on its sandbox page for evaluation. Paste them into Configure yourself; sandbox results are test data and can never reach a customer document."},
+   note:"Requests are signed with MOTOR's documented Shared scheme by the desktop app. MOTOR publishes sandbox keys on its sandbox page for evaluation; sandbox results are test data and can never reach a customer document. Production needs a MOTOR licence."},
   {id:"dataone", name:"DataOne VIN Decoder API", kind:"api", mode:PMODE.LICENSED_API, owner:"DataOne Software",
    caps:[CAP.VIN_IDENTIFICATION, CAP.ENHANCED_VIN, CAP.SPECIFICATIONS, CAP.MAINTENANCE],
    website:"https://www.dataonesoftware.com/web-services-vin-decoder-api", trialUrl:"https://vins.dataonesoftware.com/vin_decoder_api_free_trial",
-   baseUrl:"https://api.dataonesoftware.com/webservices/vindecoder/decode", environments:["trial","production"],
+   baseUrl:"", environments:["trial","production"],
    credentialFields:[{key:"clientId", label:"Client ID"},{key:"authorizationCode", label:"Authorization code"}],
    cache:CACHE.LICENSE_CONTROLLED_CACHE, sourceType:"DataOne licensed vehicle data", hosts:[".dataonesoftware.com"],
    implemented:[CAP.VIN_IDENTIFICATION, CAP.ENHANCED_VIN],
    pricing:pricing({publicPriceText:"CUSTOM QUOTE", quoteRequired:true, trialAvailable:true,
      notes:"Trial allows 50 VIN decodes with trial credentials. DataOne states production price varies by use case, amount and type of data, VIN volume, endpoint count and traffic."}),
-   note:"The decode address and credentials come in DataOne's trial or production welcome letter."},
+   note:"The decode address and credentials come in DataOne's trial or production welcome letter. No address is assumed: enter the one DataOne gives you in Configure."},
   {id:"tecrmi", name:"TecAlliance TecRMI", kind:"api", mode:PMODE.LICENSED_API, owner:"TecAlliance",
    caps:[CAP.VIN_IDENTIFICATION, CAP.LABOR_TIMES, CAP.REPAIR_PROCEDURES, CAP.MAINTENANCE, CAP.WIRING, CAP.DTC,
          CAP.SPECIFICATIONS, CAP.COMPONENT_LOCATIONS, CAP.PARTS],
@@ -4276,17 +4284,17 @@ const PROVIDER_REGISTRY = [
    cache:CACHE.LICENSE_CONTROLLED_CACHE, sourceType:"TecRMI licensed data", hosts:[".tecalliance.net"],
    implemented:[CAP.LABOR_TIMES],
    pricing:pricing({publicPriceText:"COMMERCIAL LICENSE / QUOTE", quoteRequired:true}),
-   note:"Login follows TecRMI's published REST authentication (POST /auth/login, token in X-AuthToken). Data paths beyond login are confirmed against TecRMI's documentation when licensed."},
+   note:"Mapped from TecRMI's published REST Swagger: POST /Auth/Login (token in X-AuthToken), then /rest/Times/BodiesForTimes, WorkList and WorkSteps. Times are requested as decimal work hours. Vehicles are identified by TecRMI's own type id."},
   {id:"autodata", name:"Autodata API", kind:"api", mode:PMODE.LICENSED_API, owner:"Autodata (Solera)",
    caps:[CAP.VIN_IDENTIFICATION, CAP.LABOR_TIMES, CAP.MAINTENANCE, CAP.REPAIR_PROCEDURES, CAP.WIRING, CAP.FLUIDS,
          CAP.SPECIFICATIONS, CAP.TSB],
-   website:"https://www.autodata-group.com/corporate/api/", docsUrl:"https://developer.autodata-group.com/docs",
-   baseUrl:"https://api.autodata-group.com", tokenUrl:"https://account.autodata-group.com/oauth/access_token", environments:["production"],
-   credentialFields:[{key:"clientId", label:"OAuth client ID"},{key:"clientSecret", label:"OAuth client secret"}],
+   website:"https://www.autodata-group.com/corporate/api/", docsUrl:"https://developer.autodata-group.com/io-docs",
+   baseUrl:"https://api.autodata-group.com", environments:["production"],
+   credentialFields:[{key:"apiKey", label:"API key"}],
    cache:CACHE.LICENSE_CONTROLLED_CACHE, sourceType:"Autodata licensed data", hosts:[".autodata-group.com"],
-   implemented:[CAP.LABOR_TIMES],
+   implemented:[CAP.MAINTENANCE],
    pricing:pricing({publicPriceText:"CUSTOM QUOTE", quoteRequired:true}),
-   note:"Autodata documents OAuth 2.0 access; its endpoint addresses are provided with a licence and entered in Configure. None are guessed here."},
+   note:"Autodata's interactive documentation requires an API key from its customer integration team. Requests follow Autodata's published code samples (api_key, country-code and language on each call). Service schedules are wired; repair times are documented only to licensees and are not guessed."},
   {id:"mitchell_api", name:"Mitchell Data API / Commercial Integration", kind:"api", mode:PMODE.PARTNER_INTEGRATION, owner:"Mitchell 1",
    caps:[CAP.LABOR_TIMES, CAP.REPAIR_PROCEDURES, CAP.PARTS], website:"https://mitchell1.com/resources/api-request/",
    cache:CACHE.NO_PERSISTENT_CONTENT, sourceType:"Mitchell licensed data", blocked:true, environments:[],
@@ -4401,12 +4409,13 @@ function providerConfig(id){
   const all = hubState();
   const p = PROVIDER_BY_ID[id] || {};
   const dflt = {enabled:p.kind === "free" || p.kind === "local", environment:(p.environments || [])[0] || "", baseUrl:"", tokenUrl:"",
-    signingVariant:"", subscription:{status:"", expires:"", plan:"", notes:""}, notes:"",
+    productionLicenseConfirmed:false, subscription:{status:"", expires:"", plan:"", notes:""}, notes:"",
     credentialsConfigured:{}, lastTest:null, cachePolicy:"", cacheAllowedByContract:false, paths:{}};
   const c = all[id] = Object.assign(dflt, all[id] || {});
   c.subscription = Object.assign({status:"", expires:"", plan:"", notes:""}, c.subscription || {});
   c.credentialsConfigured = c.credentialsConfigured || {};
   c.paths = c.paths || {};
+  delete c.signingVariant;   /* from 2.8.0, which guessed a layout; MOTOR's is documented */
   return c;
 }
 function providerBaseUrl(p){ const c = providerConfig(p.id); return String(c.baseUrl || p.baseUrl || "").replace(/\/+$/, ""); }
@@ -4563,8 +4572,10 @@ function providerStatus(p, credState){
     return {status:p.kind === "local" ? PSTATUS.LIVE : PSTATUS.FREE, readiness:"LIVE", usable:true};
   }
   if (p.kind === "portal" || p.kind === "oem"){
-    const sub = c.subscription.status;
+    const lapsed = c.subscription.expires && c.subscription.expires < new Date().toISOString().slice(0, 10);
+    const sub = lapsed && c.subscription.status === "active" ? "expired" : c.subscription.status;
     if (sub === "active") return {status:PSTATUS.LIVE, readiness:"SUBSCRIBED — OPEN EXTERNAL SOURCE", usable:true, launcher:true};
+    if (sub === "expired") return {status:PSTATUS.SUBSCRIPTION_REQUIRED, readiness:"SUBSCRIPTION EXPIRED — PORTAL LAUNCHER", usable:true, launcher:true};
     return {status:PSTATUS.SUBSCRIPTION_REQUIRED, readiness:"PORTAL LAUNCHER", usable:true, launcher:true};
   }
   if (p.kind === "parts"){
@@ -4575,9 +4586,14 @@ function providerStatus(p, credState){
   if (!p.environments || !p.environments.length) return {status:PSTATUS.UNAVAILABLE, readiness:"UNAVAILABLE", usable:false};
   if (cs.state === "reenter") return {status:PSTATUS.NOT_CONNECTED, readiness:"CREDENTIALS MUST BE RE-ENTERED", usable:false};
   if (cs.state !== "complete"){
-    const r = p.id === "dataone" ? "READY FOR CREDENTIALS" : p.id === "motor_daas" ? "READY FOR SANDBOX KEYS" : "READY FOR LICENSE / CREDENTIALS";
+    const r = p.id === "dataone" ? "READY FOR CREDENTIALS"
+      : p.id === "motor_daas" ? (c.environment === "production" ? "NOT LICENSED" : "READY FOR SANDBOX KEYS")
+      : p.id === "autodata" ? "READY FOR LICENSE / API KEY" : "READY FOR LICENSE / CREDENTIALS";
     return {status:p.pricing.quoteRequired ? PSTATUS.CUSTOM_QUOTE_REQUIRED : PSTATUS.NOT_CONNECTED, readiness:r, usable:false};
   }
+  if (p.id === "motor_daas" && c.environment === "production" && !c.productionLicenseConfirmed)
+    return {status:PSTATUS.NOT_CONNECTED, readiness:"NOT LICENSED", usable:false};
+  if (p.id === "dataone" && !providerBaseUrl(p)) return {status:PSTATUS.NOT_CONNECTED, readiness:"READY FOR CREDENTIALS — DECODE ADDRESS NOT ENTERED", usable:false};
   if (!c.enabled) return {status:PSTATUS.NOT_CONNECTED, readiness:"CONFIGURED — DISABLED", usable:false};
   if (c.lastTest && c.lastTest.ok === false) return {status:PSTATUS.UNAVAILABLE, readiness:"LAST TEST FAILED", usable:false};
   if (c.environment === "sandbox") return {status:PSTATUS.SANDBOX, readiness:"SANDBOX CONNECTED", usable:true, sandbox:true};
@@ -4789,10 +4805,12 @@ const datasetShardCache = new Map();
 function shardName(make){
   return String(make || "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "UNKNOWN";
 }
+/* One entry per NHTSA file. `file` names it on disk; `expect` is the one text
+   file the ZIP must hold, per NHTSA's published layout. */
 function datasetSources(id){
   const s = hubSettings();
   if (id === "nhtsa_investigations"){
-    return [{name:"inv_flat", url:NHTSA_STATIC + "/inv/FLAT_INV.zip", label:"FLAT_INV.zip"}];
+    return [{file:"FLAT_INV", url:NHTSA_STATIC + "/inv/FLAT_INV.zip", label:"FLAT_INV.zip", expect:/^FLAT_INV\.txt$/i}];
   }
   /* Communications are published in five-year chunks by the date NHTSA received
      them. The chunk still being filled is named for the current year, so it is
@@ -4804,11 +4822,12 @@ function datasetSources(id){
     const end = start + 4;
     if (end < from) continue;
     if (end < year){
-      out.push({name:"mc_" + start, url:NHTSA_STATIC + "/tsbs/TSBS_RECEIVED_" + start + "-" + end + ".zip", label:"TSBS_RECEIVED_" + start + "-" + end + ".zip"});
+      out.push({file:"TSBS_RECEIVED_" + start + "-" + end, url:NHTSA_STATIC + "/tsbs/TSBS_RECEIVED_" + start + "-" + end + ".zip",
+        label:"TSBS_RECEIVED_" + start + "-" + end + ".zip", expect:/^TSBS_RECEIVED_\d{4}-\d{4}\.txt$/i});
     } else {
       const candidates = [];
       for (let e = Math.min(end, year); e >= start; e--) candidates.push(NHTSA_STATIC + "/tsbs/TSBS_RECEIVED_" + start + "-" + e + ".zip");
-      out.push({name:"mc_" + start, urls:candidates, label:"TSBS_RECEIVED_" + start + "-(current)"});
+      out.push({file:"TSBS_RECEIVED_" + start + "-CURRENT", urls:candidates, label:"TSBS_RECEIVED_" + start + "-(current)", expect:/^TSBS_RECEIVED_\d{4}-\d{4}\.txt$/i});
     }
   }
   return out;
@@ -4821,10 +4840,20 @@ function hubSettings(){
 
 /* Where an index lives. The desktop keeps real files; a browser can only hold a
    small test index, and says so rather than pretending to hold NHTSA's files. */
+const browserDatasetBytes = new Map();   /* browser only, this session: id|file (in use) and id|file|new (not adopted yet) */
 const DatasetStore = {
   async meta(id){
     if (DESKTOP){ try { const t = await invoke("dataset_meta", {name:id}); return t ? parseJsonSafe(t) : null; } catch(e){ return null; } }
     return parseJsonSafe(localStorage.getItem("jzd.ds." + id + ".meta") || "null");
+  },
+  async status(id){
+    if (DESKTOP){ try { const t = await invoke("dataset_status_get", {name:id}); return t ? parseJsonSafe(t) : null; } catch(e){ return null; } }
+    return parseJsonSafe(localStorage.getItem("jzd.ds." + id + ".status") || "null");
+  },
+  async setStatus(id, status){
+    const text = JSON.stringify(status);
+    if (DESKTOP){ try { await invoke("dataset_status_set", {name:id, json:text}); } catch(e){} return; }
+    try { localStorage.setItem("jzd.ds." + id + ".status", text); } catch(e){}
   },
   async read(id, shard){
     if (DESKTOP) return await invoke("dataset_read", {name:id, shard});
@@ -4857,26 +4886,45 @@ const DatasetStore = {
     if (DESKTOP){ try { await invoke("dataset_abort", {name:id}); } catch(e){} return; }
     Object.keys(localStorage).filter(k => k.indexOf("jzd.ds." + id + ".building") === 0).forEach(k => localStorage.removeItem(k));
   },
-  async download(src){
-    const urls = src.urls || [src.url];
-    let lastStatus = 0;
-    for (const url of urls){
-      if (DESKTOP){
-        const r = await invoke("dataset_download", {name:src.name, url});
-        if (r.status === 200){
-          const bytes = await invoke("dataset_zip_bytes", {name:src.name});
-          return {url, buffer:bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes).buffer, bytes:r.bytes};
-        }
-        lastStatus = r.status;
-      } else {
-        const res = await fetch(url);
-        if (res.ok){ const buffer = await res.arrayBuffer(); return {url, buffer, bytes:buffer.byteLength}; }
-        lastStatus = res.status;
-      }
-    }
-    throw new Error("NHTSA did not supply " + src.label + " (HTTP " + lastStatus + ")");
+  /* What NHTSA currently publishes for a file, without downloading it. */
+  async check(url){
+    if (DESKTOP){ const h = await invoke("dataset_check", {url}); return {status:h.status, etag:h.etag, lastModified:h.last_modified, length:h.length}; }
+    const res = await fetch(url, {method:"HEAD"});
+    return {status:res.status, etag:res.headers.get("etag") || "", lastModified:res.headers.get("last-modified") || "", length:Number(res.headers.get("content-length")) || 0};
   },
-  async dropDownload(src){ if (DESKTOP){ try { await invoke("dataset_drop_download", {name:src.name}); } catch(e){} } }
+  async download(id, src, url){
+    if (DESKTOP){
+      const h = await invoke("dataset_download", {name:id, file:src.file, url});
+      return {status:h.status, etag:h.etag, lastModified:h.last_modified, bytes:h.length};
+    }
+    const res = await fetch(url);
+    if (!res.ok) return {status:res.status};
+    const buffer = await res.arrayBuffer();
+    browserDatasetBytes.set(id + "|" + src.file + "|new", buffer);
+    return {status:200, etag:res.headers.get("etag") || "", lastModified:res.headers.get("last-modified") || "", bytes:buffer.byteLength};
+  },
+  async hasSource(id, file){
+    if (DESKTOP){ try { return !!(await invoke("dataset_has_source", {name:id, file})); } catch(e){ return false; } }
+    return browserDatasetBytes.has(id + "|" + file + "|new") || browserDatasetBytes.has(id + "|" + file);
+  },
+  async bytes(id, file){
+    if (DESKTOP){
+      const b = await invoke("dataset_zip_bytes", {name:id, file});
+      return b instanceof ArrayBuffer ? b : new Uint8Array(b).buffer;
+    }
+    const b = browserDatasetBytes.get(id + "|" + file + "|new") || browserDatasetBytes.get(id + "|" + file);
+    if (!b) throw new Error(file + " has not been downloaded");
+    return b;
+  },
+  async adopt(id, files){
+    if (DESKTOP) return invoke("dataset_adopt_sources", {name:id, files});
+    files.forEach(f => { const k = id + "|" + f; if (browserDatasetBytes.has(k + "|new")){ browserDatasetBytes.set(k, browserDatasetBytes.get(k + "|new")); browserDatasetBytes.delete(k + "|new"); } });
+    Array.from(browserDatasetBytes.keys()).filter(k => k.indexOf(id + "|") === 0 && files.indexOf(k.split("|")[1]) < 0).forEach(k => browserDatasetBytes.delete(k));
+  },
+  async discard(id){
+    if (DESKTOP){ try { await invoke("dataset_discard_sources", {name:id}); } catch(e){} return; }
+    Array.from(browserDatasetBytes.keys()).filter(k => k.indexOf(id + "|") === 0 && /\|new$/.test(k)).forEach(k => browserDatasetBytes.delete(k));
+  }
 };
 
 /* The one file inside NHTSA's ZIP, as a stream of text. The format is read
@@ -4963,8 +5011,13 @@ function makeShardWriter(id){
     get records(){ return records; }
   };
 }
+/* NHTSA's published field layout for manufacturer communications (14 fields,
+   tab-separated): NHTSA ID, replacement, date added, document ID, communication
+   date, campaign, type, make, model, year, components, manufacturer system,
+   subsystem, summary. A row that does not have them is counted, not used. */
 async function importMfrComms(textStream, writer, onProgress){
   let cur = null;
+  const tally = {rows:0, used:0, rejected:0};
   const flush = async () => {
     if (!cur) return;
     for (const make of Object.keys(cur.byMake)){
@@ -4976,8 +5029,10 @@ async function importMfrComms(textStream, writer, onProgress){
     cur = null;
   };
   await forEachLine(textStream, async line => {
+    tally.rows++;
     const f = line.split("\t");
-    if (f.length < 14 || !/^\d+$/.test(f[0])) return;   /* a header line or something unreadable */
+    if (f.length < 14 || !/^\d+$/.test(f[0]) || !/^\d{8}$|^$/.test(f[2] || "")){ tally.rejected++; return; }
+    tally.used++;
     const summary = f.slice(13).join(" ");
     if (!cur || cur.i !== f[0]){
       await flush();
@@ -4991,9 +5046,14 @@ async function importMfrComms(textStream, writer, onProgress){
     String(f[10] || "").split(",").map(x => x.trim()).filter(Boolean).forEach(x => cur.co.add(x));
   }, onProgress);
   await flush();
+  return tally;
 }
+/* NHTSA's published layout for defect investigations (11 fields): action
+   number, make, model, year, component, manufacturer, open date, close date,
+   recall campaign, subject, summary. */
 async function importInvestigations(textStream, writer, onProgress){
   let cur = null;
+  const tally = {rows:0, used:0, rejected:0};
   const flush = async () => {
     if (!cur) return;
     for (const make of Object.keys(cur.byMake)){
@@ -5004,8 +5064,10 @@ async function importInvestigations(textStream, writer, onProgress){
     cur = null;
   };
   await forEachLine(textStream, async line => {
+    tally.rows++;
     const f = line.split("\t");
-    if (f.length < 11 || !f[0]) return;
+    if (f.length < 11 || !/^[A-Z]{2}\d{2,}/.test(f[0]) || !/^\d{8}$|^$/.test(f[6] || "")){ tally.rejected++; return; }
+    tally.used++;
     if (!cur || cur.n !== f[0]){
       await flush();
       cur = {n:f[0], mf:f[5], o:f[6], c:f[7], r:f[8], sj:f[9], s:f.slice(10).join(" "), byMake:{}, co:new Set()};
@@ -5015,41 +5077,147 @@ async function importInvestigations(textStream, writer, onProgress){
     if (f[4]) cur.co.add(f[4].trim());
   }, onProgress);
   await flush();
+  return tally;
 }
-/* Build a whole new index, or leave the old one exactly as it was. */
-async function refreshDataset(id, onProgress){
-  const sources = datasetSources(id);
+const DATASET_SOURCE = {
+  nhtsa_mfrcomms:"NHTSA ODI Manufacturer Communications flat files (static.nhtsa.gov/odi/ffdd/tsbs)",
+  nhtsa_investigations:"NHTSA ODI Defect Investigations flat file (static.nhtsa.gov/odi/ffdd/inv)"
+};
+const datasetStatusCache = {};
+
+/* The URL NHTSA currently serves for a source, and its published ETag and
+   Last-Modified. The current five-year chunk is found by trying its names. */
+async function resolveDatasetSource(src){
+  let last = 0;
+  for (const url of src.urls || [src.url]){
+    const h = await DatasetStore.check(url);
+    if (h.status === 200) return Object.assign({url}, h);
+    last = h.status;
+  }
+  throw new Error("NHTSA did not supply " + src.label + " (HTTP " + last + ")");
+}
+
+/* CHECK FOR UPDATES: ask NHTSA, download nothing. */
+async function checkDatasetUpdates(id){
+  const meta = await DatasetStore.meta(id);
+  const status = Object.assign({dataset:id}, await DatasetStore.status(id) || {});
+  const had = {}; ((meta && meta.files) || []).forEach(f => had[f.file] = f);
+  const files = [];
+  try {
+    for (const src of datasetSources(id)){
+      const h = await resolveDatasetSource(src);
+      const old = had[src.file];
+      const changed = !old || !old.etag || old.etag !== h.etag || old.url !== h.url;
+      files.push({file:src.file, url:h.url, etag:h.etag, lastModified:h.lastModified, changed});
+    }
+    const removed = Object.keys(had).filter(f => !files.some(x => x.file === f));
+    status.lastCheckAt = new Date().toISOString();
+    status.lastCheck = {ok:true, files, removed, updateAvailable:!meta || files.some(f => f.changed) || removed.length > 0};
+    delete status.lastCheckError;
+  } catch(e){
+    status.lastCheckAt = new Date().toISOString();
+    status.lastCheck = {ok:false, error:e.message || String(e)};
+  }
+  await DatasetStore.setStatus(id, status);
+  datasetStatusCache[id] = status;
+  if (!status.lastCheck.ok) throw new Error(status.lastCheck.error);
+  return status.lastCheck;
+}
+
+/* UPDATE NHTSA DATA: download only what changed, build a whole new index beside
+   the one in use, swap it in, and only then retire the old files. Anything that
+   goes wrong leaves the last good index — and its source files — exactly as
+   they were, and is recorded as the last failed update. */
+async function updateDataset(id, onProgress, opts){
+  opts = opts || {};
+  const say = ev => { if (onProgress) onProgress(ev); };
+  const startedAt = new Date().toISOString();
+  const status = Object.assign({dataset:id}, await DatasetStore.status(id) || {});
+  const oldMeta = await DatasetStore.meta(id);
+  const had = {}; ((oldMeta && oldMeta.files) || []).forEach(f => had[f.file] = f);
   const writer = makeShardWriter(id);
   const used = [];
-  await DatasetStore.begin(id);
+  let began = false;
   try {
+    const sources = datasetSources(id);
+    const plan = [];
     for (const src of sources){
-      if (onProgress) onProgress({phase:"download", label:src.label});
-      const dl = await DatasetStore.download(src);
-      const entry = zipFirstEntry(dl.buffer);
-      if (onProgress) onProgress({phase:"index", label:entry.name});
-      const tick = n => onProgress && onProgress({phase:"index", label:entry.name, rows:n});
-      if (id === "nhtsa_mfrcomms") await importMfrComms(entry.stream, writer, tick);
-      else await importInvestigations(entry.stream, writer, tick);
+      say({phase:"check", label:src.label});
+      const h = await resolveDatasetSource(src);
+      const old = had[src.file];
+      const unchanged = old && old.etag && old.etag === h.etag && old.url === h.url && await DatasetStore.hasSource(id, src.file);
+      plan.push({src, head:h, old, reuse:!!unchanged && !opts.force});
+    }
+    const removed = Object.keys(had).filter(f => !plan.some(x => x.src.file === f));
+    if (oldMeta && oldMeta.records && !opts.force && plan.every(x => x.reuse) && !removed.length){
+      status.lastCheckAt = new Date().toISOString();
+      status.lastCheck = {ok:true, files:plan.map(x => ({file:x.src.file, url:x.head.url, etag:x.head.etag, lastModified:x.head.lastModified, changed:false})), removed:[], updateAvailable:false};
+      status.lastResult = {at:status.lastCheckAt, outcome:"UP_TO_DATE"};
+      await DatasetStore.setStatus(id, status);
+      datasetStatusCache[id] = status;
+      return Object.assign({upToDate:true}, oldMeta);
+    }
+    for (const x of plan){
+      if (x.reuse){ x.dl = {etag:x.old.etag, lastModified:x.old.lastModified, bytes:x.old.bytes, downloadedAt:x.old.downloadedAt}; continue; }
+      say({phase:"download", label:x.src.label});
+      const r = await DatasetStore.download(id, x.src, x.head.url);
+      if (r.status !== 200) throw new Error("NHTSA did not supply " + x.src.label + " (HTTP " + r.status + ")");
+      x.dl = {etag:r.etag || x.head.etag, lastModified:r.lastModified || x.head.lastModified, bytes:r.bytes, downloadedAt:new Date().toISOString()};
+    }
+    await DatasetStore.begin(id); began = true;
+    let rows = 0, rejected = 0;
+    for (const x of plan){
+      const buffer = await DatasetStore.bytes(id, x.src.file);
+      const entry = zipFirstEntry(buffer);
+      if (x.src.expect && !x.src.expect.test(entry.name)) throw new Error(x.src.label + " does not hold the expected file (found " + entry.name + "). The existing index was kept.");
+      say({phase:"index", label:entry.name});
+      const tick = n => say({phase:"index", label:entry.name, rows:n});
+      const tally = id === "nhtsa_mfrcomms" ? await importMfrComms(entry.stream, writer, tick) : await importInvestigations(entry.stream, writer, tick);
       await writer.flush();
-      used.push({file:entry.name, url:dl.url, bytes:dl.bytes});
-      await DatasetStore.dropDownload(src);
+      if (!tally.used) throw new Error(entry.name + " had no rows in NHTSA's published layout. The existing index was kept.");
+      if (tally.rejected > Math.max(50, tally.rows * 0.02)) throw new Error(entry.name + ": " + tally.rejected.toLocaleString() + " of " + tally.rows.toLocaleString() + " rows are not in NHTSA's published layout. The existing index was kept.");
+      rows += tally.rows; rejected += tally.rejected;
+      used.push({file:x.src.file, entry:entry.name, url:x.head.url, etag:x.dl.etag, lastModified:x.dl.lastModified, bytes:x.dl.bytes,
+        downloadedAt:x.dl.downloadedAt, rows:tally.rows, rowsUsed:tally.used, rowsRejected:tally.rejected, reused:x.reuse});
     }
     if (!writer.records) throw new Error("NHTSA's files contained no usable records. The existing index was kept.");
-    const meta = {dataset:id, records:writer.records, builtAt:new Date().toISOString(), files:used, format:1};
+    const nhtsaUpdatedAt = used.map(f => Date.parse(f.lastModified)).filter(n => !isNaN(n)).sort((a, b) => b - a)[0];
+    const meta = {dataset:id, source:DATASET_SOURCE[id], format:2, records:writer.records, rowsRead:rows, rowsRejected:rejected,
+      builtAt:new Date().toISOString(), nhtsaUpdatedAt:nhtsaUpdatedAt ? new Date(nhtsaUpdatedAt).toISOString() : "", files:used};
+    say({phase:"commit", label:"swapping in the new index"});
     await DatasetStore.commit(id, JSON.stringify(meta));
+    began = false;
+    await DatasetStore.adopt(id, used.map(f => f.file));
     datasetMetaCache[id] = meta;
     Array.from(datasetShardCache.keys()).filter(k => k.indexOf(id + "|") === 0).forEach(k => datasetShardCache.delete(k));
+    status.lastSuccessAt = meta.builtAt;
+    status.lastResult = {at:meta.builtAt, outcome:"UPDATED", records:meta.records, downloaded:used.filter(f => !f.reused).map(f => f.file), reused:used.filter(f => f.reused).map(f => f.file)};
+    status.lastCheckAt = meta.builtAt;
+    status.lastCheck = {ok:true, files:used.map(f => ({file:f.file, url:f.url, etag:f.etag, lastModified:f.lastModified, changed:false})), removed:[], updateAvailable:false};
+    await DatasetStore.setStatus(id, status);
+    datasetStatusCache[id] = status;
     return meta;
   } catch(e){
-    await DatasetStore.abort(id);
+    if (began) await DatasetStore.abort(id);
+    await DatasetStore.discard(id);
+    status.lastFailureAt = new Date().toISOString();
+    status.lastFailure = {at:status.lastFailureAt, startedAt, error:e.message || String(e)};
+    status.lastResult = {at:status.lastFailureAt, outcome:"FAILED", error:e.message || String(e)};
+    await DatasetStore.setStatus(id, status);
+    datasetStatusCache[id] = status;
     throw e;
   }
 }
+/* the 2.8.0 name, kept for anything that still calls it */
+function refreshDataset(id, onProgress){ return updateDataset(id, onProgress); }
+
+/* Loaded in the background at start-up. Never downloads anything. */
 async function loadDatasetMeta(){
   for (const id of ["nhtsa_mfrcomms","nhtsa_investigations"]){
     const m = await DatasetStore.meta(id);
     if (m) datasetMetaCache[id] = m; else delete datasetMetaCache[id];
+    const st = await DatasetStore.status(id);
+    if (st) datasetStatusCache[id] = st; else delete datasetStatusCache[id];
   }
 }
 async function datasetRecords(id, make){
@@ -5079,7 +5247,7 @@ async function adapterMfrComms(vehicle, params){
   const q = ymmOf(vehicle);
   if (!datasetMetaCache.nhtsa_mfrcomms) await loadDatasetMeta();
   const meta = datasetMetaCache.nhtsa_mfrcomms;
-  if (!meta) throw new Error("NHTSA manufacturer communications have not been downloaded yet. Use Refresh data in Settings → Data Providers.");
+  if (!meta) throw new Error("NHTSA manufacturer communications have not been downloaded yet. Use Update NHTSA data in Settings → Data Providers.");
   const rows = await datasetRecords("nhtsa_mfrcomms", q.make);
   const merged = new Map();
   rows.forEach(r => {
@@ -5109,7 +5277,7 @@ async function adapterInvestigations(vehicle, params){
   const q = ymmOf(vehicle);
   if (!datasetMetaCache.nhtsa_investigations) await loadDatasetMeta();
   const meta = datasetMetaCache.nhtsa_investigations;
-  if (!meta) throw new Error("NHTSA defect investigations have not been downloaded yet. Use Refresh data in Settings → Data Providers.");
+  if (!meta) throw new Error("NHTSA defect investigations have not been downloaded yet. Use Update NHTSA data in Settings → Data Providers.");
   const rows = await datasetRecords("nhtsa_investigations", q.make);
   const ident = vehicleIdentity(vehicle);
   const seen = new Set();
@@ -5121,70 +5289,57 @@ async function adapterInvestigations(vehicle, params){
         recallCampaign:r.r || "", subject:r.sj || "", summary:r.s || "", models:r.mo,
         prov:makeProvenance("nhtsa_investigations", CAP.INVESTIGATIONS, {vehicle:ident, applicability:"YMM", sourceRecordId:r.n, originalId:r.n,
           retrievedAt:meta.builtAt, cachedAt:meta.builtAt, fromCache:true,
-          applicabilityWarning:"NHTSA SAFETY DEFECT INVESTIGATION — not a repair diagnosis."})}))};
+          applicabilityWarning:"NHTSA DEFECT INVESTIGATION — not a recall, not a confirmed defect on this VIN, not a diagnosis and not a required repair."})}))};
 }
 
 /* ---------- MOTOR DaaS ----------
-   Built against MOTOR's published Swagger (api.motor.com/v1/documentation).
-   MOTOR signs each request with the account's private key. How the signed text
-   is laid out is not in MOTOR's public pages, so the connection test tries the
-   recognised layouts and remembers the first one MOTOR accepts; if none is
-   accepted it reports MOTOR's own error code rather than guessing further. */
-const MOTOR_SIGNING_VARIANTS = {
-  header:      {label:"Authorization header, path as sent", place:"header", lower:false},
-  headerLower: {label:"Authorization header, lower-case path", place:"header", lower:true},
-  query:       {label:"Query-string signature, path as sent", place:"query", lower:false},
-  queryLower:  {label:"Query-string signature, lower-case path", place:"query", lower:true}
+   Endpoints and response fields follow MOTOR's current interactive API
+   documentation (api.motor.com/v1/documentation). Authentication is MOTOR's
+   documented "Shared" scheme from the DaaS Development Handbook, and it is
+   applied by the desktop shell over the request that is actually sent: the
+   page only asks for auth "motor_shared". Neither key ever reaches the page. */
+function motorRequest(path, query){
+  const base = providerBaseUrl(PROVIDER_BY_ID.motor_daas);
+  const q = query || {};
+  const qs = Object.keys(q).filter(k => q[k] !== "" && q[k] != null).map(k => encodeURIComponent(k) + "=" + encodeURIComponent(q[k]));
+  return {method:"GET", url:base + path + (qs.length ? "?" + qs.join("&") : ""), headers:[["Accept","application/json"]], auth:"motor_shared"};
+}
+/* MOTOR's own codes, in words a service writer can act on. The code itself is
+   always shown as well. */
+const MOTOR_ERRORS = {
+  "401.000051":"MOTOR could not verify the request signature. Check both keys.",
+  "401.000052":"MOTOR did not accept these keys. Check the public and private key.",
+  "403.000162":"MOTOR refused the time stamp: this computer's clock is more than 15 minutes off. Correct the Windows date and time, then try again.",
+  "403.000103":"This MOTOR account is not licensed for that content."
 };
-function motorSignedRequest(variantKey, method, path, query){
-  const v = MOTOR_SIGNING_VARIANTS[variantKey] || MOTOR_SIGNING_VARIANTS.header;
-  const p = PROVIDER_BY_ID.motor_daas;
-  const epoch = Math.floor(Date.now() / 1000);
-  const base = providerBaseUrl(p);
-  const signedPath = "/v1" + path.split("?")[0];
-  const msg = "[[secret:publicKey]][[nl]]" + method + "[[nl]]" + epoch + "[[nl]]" + (v.lower ? signedPath.toLowerCase() : signedPath);
-  const qs = Object.keys(query || {}).filter(k => query[k] !== "" && query[k] != null).map(k => encodeURIComponent(k) + "=" + encodeURIComponent(query[k]));
-  const headers = [["Accept","application/json"]];
-  if (v.place === "header"){
-    headers.push(["Authorization", "Shared {{secret:publicKey}}:{{hmac_sha256_b64:privateKey:" + msg + "}}"]);
-    headers.push(["XDate", String(epoch)]);
-  } else {
-    qs.push("scheme=shared", "apikey={{secret:publicKey}}", "xdate=" + epoch, "sig={{hmac_sha256_b64url:privateKey:" + msg + "}}");
-  }
-  return {method, url:base + path + (qs.length ? "?" + qs.join("&") : ""), headers};
+function motorError(status, body){
+  const m = body && body.Header && (body.Header.Messages || [])[0];
+  const code = m && m.Code || "";
+  const plain = MOTOR_ERRORS[code] || (status === 429 ? "MOTOR's rate limit was reached. Wait a few minutes." : "");
+  const err = new Error((plain ? plain + " " : "") + "MOTOR answered " + status + (m ? " (" + code + " " + (m.LongDescription || m.ShortDescription || "") + ")" : ""));
+  err.status = status; err.code = code;
+  return err;
 }
 function motorEnv(){ return providerConfig("motor_daas").environment || "sandbox"; }
 async function motorCall(path, query){
-  const c = providerConfig("motor_daas");
-  const variant = c.signingVariant || "header";
-  const r = await HubNet.providerFetch("motor_daas", motorSignedRequest(variant, "GET", path, query));
+  const r = await HubNet.providerFetch("motor_daas", motorRequest(path, query));
   const body = parseJsonSafe(r.text);
-  if (r.status !== 200){
-    const m = body && body.Header && (body.Header.Messages || [])[0];
-    const err = new Error("MOTOR answered " + r.status + (m ? " (" + m.Code + " " + (m.LongDescription || m.ShortDescription || "") + ")" : ""));
-    err.status = r.status; err.code = m && m.Code;
+  if (r.status !== 200) throw motorError(r.status, body);
+  if (!body || typeof body !== "object" || !("Body" in body)){
+    const err = new Error("MOTOR's answer could not be read — it was not the documented JSON layout. Nothing was used.");
+    err.malformed = true;
     throw err;
   }
   return body;
 }
 async function motorTest(){
-  const tried = [];
-  for (const key of Object.keys(MOTOR_SIGNING_VARIANTS)){
-    try {
-      const r = await HubNet.providerFetch("motor_daas", motorSignedRequest(key, "GET", "/HelloWorld", {}));
-      const body = parseJsonSafe(r.text);
-      const code = body && body.Header && (body.Header.Messages || [])[0] && body.Header.Messages[0].Code;
-      tried.push({variant:key, status:r.status, code:code || ""});
-      if (r.status === 200){
-        providerConfig("motor_daas").signingVariant = key;
-        return {ok:true, message:"MOTOR accepted the " + MOTOR_SIGNING_VARIANTS[key].label.toLowerCase() + " (" + motorEnv() + ").", tried};
-      }
-    } catch(e){
-      tried.push({variant:key, error:e.message});
-      if (/MISSING_CREDENTIAL/.test(e.message)) return {ok:false, message:"Enter both MOTOR keys first.", tried};
-    }
+  try {
+    await motorCall("/HelloWorld");
+    return {ok:true, message:"MOTOR accepted the " + motorEnv() + " keys (Shared signing) and answered HelloWorld."};
+  } catch(e){
+    if (/MISSING_CREDENTIAL/.test(e.message)) return {ok:false, message:"Enter both MOTOR keys first."};
+    return {ok:false, message:e.message, code:e.code || ""};
   }
-  return {ok:false, message:"MOTOR did not accept any signing layout. Responses: " + tried.map(t => t.variant + " → " + (t.status || "no answer") + (t.code ? " " + t.code : "") + (t.error ? " " + t.error : "")).join("; "), tried};
 }
 function motorProv(capability, vehicle, fields){
   const env = motorEnv();
@@ -5194,25 +5349,35 @@ function motorProv(capability, vehicle, fields){
 function normalizeMotorVehicles(body, vehicle){
   const vs = (body && body.Body && body.Body.Vehicles) || [];
   return vs.map(x => ({kind:"vehicle", year:x.Year, make:x.MakeName, model:x.ModelName, submodel:x.SubModelName || "",
-    engine:x.EngineDescription || "", motorVehicleId:x.VehicleID, baseVehicleId:x.BaseVehicleID, engineId:x.EngineID,
+    engine:x.EngineDescription || "", motorVehicleId:x.VehicleID, baseVehicleId:x.BaseVehicleID, engineId:x.EngineID, subModelId:x.SubModelID,
     prov:motorProv(CAP.VIN_IDENTIFICATION, vehicle, {applicability:"VIN", sourceRecordId:String(x.VehicleID || ""), originalId:String(x.BaseVehicleID || "")})}));
+}
+/* MOTOR states each time's unit in LaborTimeInterval ("Hours" or "Minutes").
+   Everything the shop sees is hours. */
+function motorHours(value, interval){
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  if (!isFinite(n)) return null;
+  return /^min/i.test(String(interval || "")) ? Math.round(n / 60 * 100) / 100 : n;
 }
 function normalizeMotorWorkTimes(body, vehicle){
   const out = [];
   const apps = (body && body.Body && body.Body.Applications) || [];
   const describe = a => a.DisplayName || (a.Taxonomy && (a.Taxonomy.LiteralName || a.Taxonomy.CommonName)) || "Operation " + a.ApplicationID;
   const quals = a => (a.Qualifiers || []).map(q => q.Description).filter(Boolean);
+  const firstHours = o => { const it = (o.Items || [])[0] || {}; return motorHours(it.BaseLaborTime, it.LaborTimeInterval); };
   apps.forEach(a => (a.Items || []).forEach(it => {
-    const env = motorEnv();
+    const env = motorEnv(), unit = it.LaborTimeInterval || "Hours";
     out.push({kind:"labor", providerId:"motor_daas", operationId:String(a.ApplicationID), workTimeId:String(it.EstimatedWorkTimeID || ""),
       description:describe(a), position:(a.Position && a.Position.Name) || "", qualifiers:quals(a),
-      baseHours:Number(it.BaseLaborTime) || 0, baseDescription:it.BaseLaborTimeDescription || "",
-      warrantyHours:it.BaseWarrantyLaborTime != null ? Number(it.BaseWarrantyLaborTime) : null,
-      additionalHours:it.AdditionalLaborTime != null ? Number(it.AdditionalLaborTime) : null, additionalDescription:it.AdditionalLaborTimeDescription || "",
-      allHours:it.AllLaborTime != null ? Number(it.AllLaborTime) : null, skill:(it.RequiredSkill && (it.RequiredSkill.Description || it.RequiredSkill.Name)) || "",
+      baseHours:motorHours(it.BaseLaborTime, unit) || 0, baseDescription:it.BaseLaborTimeDescription || "",
+      warrantyHours:motorHours(it.BaseWarrantyLaborTime, unit),
+      additionalHours:motorHours(it.AdditionalLaborTime, unit), additionalDescription:it.AdditionalLaborTimeDescription || "",
+      allHours:motorHours(it.AllLaborTime, unit), originalUnit:unit,
+      skill:(it.RequiredSkill && (it.RequiredSkill.Name || it.RequiredSkill.Description)) || "",
       serviceType:it.ServiceType || "",
-      optional:(a.OptionalWorkTimes || []).map(o => ({operationId:String(o.ApplicationID), description:describe(o), hours:((o.Items || [])[0] || {}).BaseLaborTime})),
-      addOns:(a.AdditionalWorkTimes || []).map(o => ({operationId:String(o.ApplicationID), description:describe(o), hours:((o.Items || [])[0] || {}).BaseLaborTime})),
+      optional:(a.OptionalWorkTimes || []).map(o => ({operationId:String(o.ApplicationID), description:describe(o), hours:firstHours(o)})),
+      addOns:(a.AdditionalWorkTimes || []).map(o => ({operationId:String(o.ApplicationID), description:describe(o), hours:firstHours(o)})),
       notes:(it.Notes || []).map(n => n.Text || n.Description || "").filter(Boolean),
       prov:motorProv(CAP.LABOR_TIMES, vehicle, {applicability:"BASE_VEHICLE", sourceRecordId:String(it.EstimatedWorkTimeID || ""),
         originalId:String(a.ApplicationID), applicabilityWarning:quals(a).length ? "Applies when: " + quals(a).join("; ") : "",
@@ -5220,22 +5385,92 @@ function normalizeMotorWorkTimes(body, vehicle){
   }));
   return out;
 }
+/* MOTOR's ids for this vehicle: kept on the vehicle once known, otherwise found
+   from the VIN. */
+async function motorVehicleIds(vehicle){
+  const x = (vehicle && vehicle.externalIds) || {};
+  if (x.motorBaseVehicleId) return {baseVehicleId:x.motorBaseVehicleId, engineId:x.motorEngineId || "", subModelId:x.motorSubModelId || ""};
+  const found = (await adapterMotorVin(vehicle)).results[0];
+  if (!found) throw new Error("MOTOR did not identify this VIN.");
+  return {baseVehicleId:found.baseVehicleId, engineId:found.engineId || "", subModelId:found.subModelId || ""};
+}
 async function adapterMotorVin(vehicle){
   if (!vehicle || !vehicle.vin) throw new Error("This vehicle has no VIN on record.");
   const body = await motorCall("/Information/Vehicles/Search/ByVIN", {VIN:vehicle.vin});
   return {results:normalizeMotorVehicles(body, vehicle)};
 }
 async function adapterMotorLabor(vehicle, params){
-  let baseVehicleId = vehicle && vehicle.externalIds && vehicle.externalIds.motorBaseVehicleId;
-  let engineId = vehicle && vehicle.externalIds && vehicle.externalIds.motorEngineId;
-  if (!baseVehicleId){
-    const found = (await adapterMotorVin(vehicle)).results[0];
-    if (!found) throw new Error("MOTOR did not identify this VIN.");
-    baseVehicleId = found.baseVehicleId; engineId = found.engineId;
+  const ids = await motorVehicleIds(vehicle);
+  const body = await motorCall("/Information/Vehicles/Attributes/BaseVehicleID/" + encodeURIComponent(ids.baseVehicleId) + "/Content/Summaries/Of/EstimatedWorkTimes",
+    {SearchTerm:(params && params.query) || "", EN:ids.engineId, SM:ids.subModelId});
+  return {results:normalizeMotorWorkTimes(body, vehicle), meta:{total:((body.Header || {}).PagingInfo || {}).TotalItemCount}};
+}
+
+/* The rest of MOTOR's content arrives in one summary layout (ApplicationID,
+   DisplayName, Category, Qualifiers, Taxonomy, and an Item for DTCs and TSBs).
+   Specifications and fluids carry their values in a details call, so the first
+   few are fetched. Documents (PDFs, images) are not downloaded. */
+const MOTOR_CONTENT = {
+  MAINTENANCE:{path:"MaintenanceSchedules", kind:"maintenance"},
+  SPECIFICATIONS:{path:"Specifications", kind:"specification", details:true},
+  TORQUE_SPECIFICATIONS:{path:"Specifications", kind:"specification", details:true, term:"torque"},
+  FLUIDS:{path:"Fluids", kind:"fluid", details:true},
+  DTC:{path:"DiagnosticTroubleCodes", kind:"dtc"},
+  TSB:{path:"TechnicalServiceBulletins", kind:"tsb"},
+  REPAIR_PROCEDURES:{path:"ServiceProcedures", kind:"procedure"},
+  WIRING:{path:"WiringDiagrams", kind:"wiring"},
+  COMPONENT_LOCATIONS:{path:"ComponentLocations", kind:"location"}
+};
+function motorValues(items){
+  return (items || []).filter(i => i.IsActive !== false).map(i => ({value:i.Value || "", min:i.MinValue || "", max:i.MaxValue || "",
+    unit:i.UnitOfMeasure || "", condition:((i.ExtendedParameters || []).find(p => p.Name === "Include_Filter") || {}).Value || "",
+    notes:(i.Notes || []).map(n => n.Text).filter(Boolean)}));
+}
+function normalizeMotorDetail(spec, body){
+  const b = (body && body.Body) || {};
+  if (spec.kind === "fluid"){
+    const f = (b.Fluids || [])[0] || {};
+    return {fluids:(f.Items || []).filter(i => i.IsActive !== false).map(i => ({name:(i.PCDBPart && i.PCDBPart.PartTerminologyName) || "",
+      viscosity:i.Viscosity || "", grade:(i.Grade && (i.Grade.Description || i.Grade.Code)) || "", formulation:i.Formulation || "",
+      tempRange:i.TempRange || "", partNumber:i.PartNumber || ""})),
+      capacities:(f.Capacities || []).map(c => ({name:(c.Taxonomy && c.Taxonomy.LiteralName) || "", values:motorValues(c.Items)}))};
   }
-  const body = await motorCall("/Information/Vehicles/Attributes/BaseVehicleID/" + encodeURIComponent(baseVehicleId) + "/Content/Summaries/Of/EstimatedWorkTimes",
-    {SearchTerm:params.query || "", EN:engineId || ""});
-  return {results:normalizeMotorWorkTimes(body, vehicle)};
+  const s = (b.Specifications || [])[0] || {};
+  return {values:motorValues(s.Items), notes:(s.Notes || []).map(n => n.Text).filter(Boolean)};
+}
+function normalizeMotorContent(capability, spec, body, vehicle){
+  const apps = (body && body.Body && body.Body.Applications) || [];
+  return apps.filter(a => a.IsActive !== false).map(a => {
+    const item = a.Item || {};
+    const tax = a.Taxonomy || {};
+    const quals = (a.Qualifiers || []).map(q => q.Description).filter(Boolean);
+    const title = a.DisplayName || tax.LiteralName || (a.OEMComponentInfo && a.OEMComponentInfo.Description) ||
+      ((a.SAESubjects || []).map(s => s.Name).join(", ")) || (spec.kind + " " + a.ApplicationID);
+    return {kind:spec.kind, providerId:"motor_daas", applicationId:String(a.ApplicationID), title,
+      category:(a.Category && a.Category.Article) || tax.GroupName || "", system:tax.SystemName || "",
+      qualifiers:quals, code:item.Code || "", bulletinNumber:item.ManufacturerNumber || "",
+      issued:item.IssueDate ? String(item.IssueDate).slice(0, 10) : "",
+      bulletinTypes:(item.Types || []).map(t => t.Type).filter(Boolean), documentCount:item.DocumentCount || 0,
+      position:(a.Position && a.Position.Name) || "", detail:null,
+      prov:motorProv(CAP[capability], vehicle, {applicability:"BASE_VEHICLE", sourceRecordId:String(a.ApplicationID), originalId:String(item.DTCID || item.TSBID || a.ApplicationID),
+        applicabilityWarning:quals.length ? "Applies when: " + quals.join("; ") : ""})};
+  });
+}
+async function adapterMotorContent(capability, vehicle, params){
+  const spec = MOTOR_CONTENT[capability];
+  params = params || {};
+  const ids = await motorVehicleIds(vehicle);
+  const base = "/Information/Vehicles/Attributes/BaseVehicleID/" + encodeURIComponent(ids.baseVehicleId) + "/Content/";
+  const body = await motorCall(base + "Summaries/Of/" + spec.path,
+    {SearchTerm:params.query || spec.term || "", EN:ids.engineId, SM:ids.subModelId, ItemsPerPage:params.limit || 30});
+  const results = normalizeMotorContent(capability, spec, body, vehicle);
+  if (spec.details){
+    for (const r of results.slice(0, params.detailCount == null ? 6 : params.detailCount)){
+      try { r.detail = normalizeMotorDetail(spec, await motorCall(base + "Details/Of/" + spec.path + "/" + encodeURIComponent(r.applicationId), {EN:ids.engineId, SM:ids.subModelId})); }
+      catch(e){ r.detailError = e.message; }
+    }
+  }
+  return {results, meta:{total:((body.Header || {}).PagingInfo || {}).TotalItemCount || results.length}};
 }
 
 /* ---------- DataOne ----------
@@ -5274,15 +5509,22 @@ function normalizeDataone(body, vehicle){
   }) : [{kind:"vehicle", year:common.year, make:common.make, model:common.model, trim:common.trim || "", warning:msg,
     prov:makeProvenance("dataone", CAP.ENHANCED_VIN, {vehicle:vehicleIdentity(vehicle), applicability:"VIN", environment:env, licensed:true, applicabilityWarning:msg})}];
 }
+function dataoneAddress(){
+  const u = providerBaseUrl(PROVIDER_BY_ID.dataone);
+  if (!u) throw new Error("Enter the decode address from your DataOne welcome letter in Configure. No address is assumed.");
+  return u;
+}
 async function adapterDataoneVin(vehicle){
   if (!vehicle || !vehicle.vin) throw new Error("This vehicle has no VIN on record.");
+  dataoneAddress();
   const r = await HubNet.providerFetch("dataone", dataoneRequest(vehicle.vin));
-  if (r.status !== 200) throw new Error("DataOne answered " + r.status);
   const body = parseJsonSafe(r.text);
-  if (!body) throw new Error("DataOne's answer was not JSON. Check the decode address in Configure.");
+  if (r.status !== 200) throw new Error("DataOne answered " + r.status + (body && body.decoder_messages ? " — " + JSON.stringify(body.decoder_messages).slice(0, 200) : ""));
+  if (!body || typeof body !== "object") throw new Error("DataOne's answer was not JSON. Check the decode address in Configure.");
   return {results:normalizeDataone(body, vehicle)};
 }
 async function dataoneTest(){
+  dataoneAddress();
   const r = await HubNet.providerFetch("dataone", dataoneRequest("1FTFW1EF5FKD12345"));
   const body = parseJsonSafe(r.text);
   if (r.status === 200 && body && body.query_responses) return {ok:true, message:"DataOne answered a decode (" + (providerConfig("dataone").environment || "trial") + "). Each test uses one decode from your allowance."};
@@ -5305,7 +5547,7 @@ function tecrmiLoginRequest(){
 }
 async function tecrmiLogin(){
   const r = await HubNet.providerFetch("tecrmi", tecrmiLoginRequest());
-  if (r.status !== 200) throw new Error("TecRMI login answered " + r.status);
+  if (r.status !== 200){ const b = parseJsonSafe(r.text); throw new Error("TecRMI login answered " + r.status + (b && (b.Message || b.message) ? " — " + (b.Message || b.message) : "")); }
   return true;
 }
 async function tecrmiGet(path, query){
@@ -5317,21 +5559,43 @@ async function tecrmiGet(path, query){
   catch(e){ if (/MISSING_SESSION/.test(e.message)){ await tecrmiLogin(); r = await HubNet.providerFetch("tecrmi", req); } else throw e; }
   if (r.status === 401){ await tecrmiLogin(); r = await HubNet.providerFetch("tecrmi", req); }
   if (r.status !== 200) throw new Error("TecRMI answered " + r.status + " for " + path);
-  return parseJsonSafe(r.text);
+  const body = parseJsonSafe(r.text);
+  if (body == null) throw new Error("TecRMI's answer for " + path + " was not JSON. Nothing was used.");
+  return body;
 }
 function tecrmiLocale(){ const c = providerConfig("tecrmi"); return {countryCode:(c.paths && c.paths.countryCode) || "US", languageCode:(c.paths && c.paths.languageCode) || "EN"}; }
+/* WorkList: LtPaintMainGroup → SubGroups (LtSubGroup) → ItemMps (LtItemMpKor). */
+function normalizeTecrmiWorkList(groups){
+  const items = [];
+  (Array.isArray(groups) ? groups : []).forEach(g => (g.SubGroups || []).forEach(sg => (sg.ItemMps || []).forEach(it => {
+    if (it.IsLocked) return;
+    items.push({itemMpId:it.ItemMpId, korId:it.KorId, group:g.MainGroupName || "", subGroup:sg.SubGroupName || "",
+      text:[it.ItemMpText, it.KorText].filter(Boolean).join(" — ")});
+  })));
+  return items;
+}
+/* WorkSteps: LtWorkPos. KindOfWorkTimeData 0 = decimal work hours,
+   1 = manufacturer work positions (units, not hours). Only hours become hours. */
 function normalizeTecrmiWorkSteps(list, vehicle, item){
   const out = [];
-  const push = (w, optional) => out.push({kind:"labor", providerId:"tecrmi", operationId:String(w.WorkId), description:w.WorkText || item.text,
-    component:[w.ItemMpText, w.KorText].filter(Boolean).join(" — "), qualifiers:[w.QualColText].filter(Boolean),
-    baseHours:Number(w.WorkTime) || 0, warrantyHours:null, optional:!!optional, referenceOnly:!!w.IsOnlyForReference,
-    tecRmiTime:!!w.IsTecRmiTime, compositeTime:!!w.IsCompositeTime, workPosition:w.WorkPosNo || w.WorkPositionNo || "",
-    prov:makeProvenance("tecrmi", CAP.LABOR_TIMES, {vehicle:vehicleIdentity(vehicle), applicability:"TECRMI_TYPE", licensed:true,
-      environment:"production", sourceRecordId:String(w.WorkId), originalId:String(w.WorkId),
-      applicabilityWarning:[w.IsOnlyForReference ? "reference only" : "", w.IsCompositeTime ? "composite time" : "", w.QualColText || ""].filter(Boolean).join(" · ")})});
-  (list || []).forEach(w => {
-    push(w, false);
-    (w.OptionalExclusivePositions || []).forEach(o => push(o, true));
+  const push = (w, relation) => {
+    const unit = Number(w.KindOfWorkTimeData) === 1 ? "MANUFACTURER_WORK_POSITIONS" : "DECIMAL_WORK_HOURS";
+    const t = Number(w.WorkTime);
+    out.push({kind:"labor", providerId:"tecrmi", operationId:String(w.WorkId), description:w.WorkText || (item && item.text) || "",
+      component:[w.ItemMpText, w.KorText].filter(Boolean).join(" — "), qualifiers:[w.QualColText].filter(Boolean),
+      baseHours:unit === "DECIMAL_WORK_HOURS" && isFinite(t) ? t : null, workUnits:unit === "MANUFACTURER_WORK_POSITIONS" && isFinite(t) ? t : null,
+      originalUnit:unit, warrantyHours:null, relation:relation || "main", optional:relation === "optional", referenceOnly:!!w.IsOnlyForReference,
+      locked:!!w.IsLocked, tecRmiTime:!!w.IsTecRmiTime, compositeTime:!!w.IsCompositeTime, workPosition:w.WorkPosNo || "",
+      itemMpId:w.ItemMpId, korId:w.KorId, qualColId:w.QualColId,
+      prov:makeProvenance("tecrmi", CAP.LABOR_TIMES, {vehicle:vehicleIdentity(vehicle), applicability:"TECRMI_TYPE", licensed:true,
+        environment:"production", sourceRecordId:String(w.WorkId), originalId:String(w.WorkPosNo || w.WorkId),
+        applicabilityWarning:[unit === "MANUFACTURER_WORK_POSITIONS" ? "manufacturer work units, not hours" : "", w.IsOnlyForReference ? "reference only" : "",
+          w.IsCompositeTime ? "composite time" : "", relation === "exclusive" ? "cannot be combined with the main operation" : "", w.QualColText || ""].filter(Boolean).join(" · ")})});
+  };
+  (Array.isArray(list) ? list : []).forEach(w => {
+    push(w, "main");
+    (w.OptionalExclusivePositions || []).forEach(o => push(o, "optional"));
+    (w.ExclusiveWorkPositions || []).forEach(o => push(o, "exclusive"));
   });
   return out;
 }
@@ -5342,37 +5606,65 @@ async function adapterTecrmiLabor(vehicle, params){
   const bodies = await tecrmiGet("/rest/Times/BodiesForTimes", Object.assign({typeId}, loc)) || [];
   const bodyQualColId = (bodies[0] || {}).QualColId || 0;
   const groups = await tecrmiGet("/rest/Times/WorkList", Object.assign({typeId, bodyQualColId, searchText:params.query || "", showPaint:false}, loc)) || [];
-  const items = [];
-  groups.forEach(g => (g.SubGroups || []).forEach(sg => (sg.ItemMps || []).forEach(it => items.push({itemMpId:it.ItemMpId, korId:it.KorId, text:[it.ItemMpText, it.KorText].filter(Boolean).join(" — ")}))));
+  const items = normalizeTecrmiWorkList(groups);
   const out = [];
   for (const it of items.slice(0, 8)){
     const steps = await tecrmiGet("/rest/Times/WorkSteps", Object.assign({typeId, bodyQualColId, itemMpId:it.itemMpId, korId:it.korId,
-      kindOfWorkTime:(providerConfig("tecrmi").paths || {}).kindOfWorkTime || 1}, loc));
+      kindOfWorkTime:0}, loc));
     normalizeTecrmiWorkSteps(steps, vehicle, it).forEach(x => out.push(x));
   }
   return {results:out};
 }
 
 /* ---------- Autodata ----------
-   Autodata documents OAuth 2.0 client-credentials access
-   (account.autodata-group.com/oauth/access_token) against api.autodata-group.com.
-   The data endpoints and their response layout are provided with a licence, so
-   this adapter stops at an honest boundary instead of inventing them. */
-function autodataTokenRequest(){
-  const p = PROVIDER_BY_ID.autodata, c = providerConfig("autodata");
-  return {method:"POST", url:c.tokenUrl || p.tokenUrl, headers:[["Accept","application/json"],["Content-Type","application/x-www-form-urlencoded"]],
-    body:"grant_type=client_credentials&client_id={{secret:clientId}}&client_secret={{secret:clientSecret}}&scope=" + encodeURIComponent((c.paths && c.paths.scope) || "scope1"),
-    capture_json:"access_token"};
+   Autodata's interactive documentation (developer.autodata-group.com/io-docs)
+   needs an API key from its customer integration team. Calls follow Autodata's
+   published code samples: https://api.autodata-group.com/v1/..., with
+   country-code, language and api_key on each request, and results in "data".
+   Autodata's errors carry status, message, code and info. Repair times are
+   documented only to licensees, so that capability stops at an honest boundary. */
+function autodataRequest(path, query){
+  const c = providerConfig("autodata");
+  const q = Object.assign({"country-code":(c.paths && c.paths.countryCode) || "us", language:(c.paths && c.paths.language) || "en-us"}, query || {});
+  const qs = Object.keys(q).filter(k => q[k] !== "" && q[k] != null).map(k => encodeURIComponent(k) + "=" + encodeURIComponent(q[k]));
+  qs.push("api_key={{secret:apiKey}}");
+  return {method:"GET", url:providerBaseUrl(PROVIDER_BY_ID.autodata) + path + "?" + qs.join("&"), headers:[["Accept","application/json"]]};
+}
+function autodataError(status, body){
+  const info = body && Array.isArray(body.info) ? body.info.join("; ") : "";
+  return new Error("Autodata answered " + status + (body && (body.code || body.message) ? " (" + [body.code, body.message, info].filter(Boolean).join(" — ") + ")" : ""));
+}
+async function autodataCall(path, query){
+  const r = await HubNet.providerFetch("autodata", autodataRequest(path, query));
+  const body = parseJsonSafe(r.text);
+  if (r.status !== 200) throw autodataError(r.status, body);
+  if (!body || typeof body !== "object") throw new Error("Autodata's answer was not JSON. Nothing was used.");
+  return body;
 }
 async function autodataTest(){
-  const r = await HubNet.providerFetch("autodata", autodataTokenRequest());
-  return r.status === 200 ? {ok:true, message:"Autodata issued an access token. Data endpoints still need to be entered from your licence documentation."}
-                          : {ok:false, message:"Autodata token request answered " + r.status};
+  try {
+    const b = await autodataCall("/v1/manufacturers");
+    return {ok:true, message:"Autodata accepted the API key and listed " + ((b.data || []).length) + " manufacturers."};
+  } catch(e){
+    if (/MISSING_CREDENTIAL/.test(e.message)) return {ok:false, message:"Enter the Autodata API key first."};
+    return {ok:false, message:e.message};
+  }
 }
-async function adapterAutodataLabor(vehicle, params){
-  const c = providerConfig("autodata");
-  if (!c.paths || !c.paths.repairTimes) throw new Error("Autodata repair-time endpoint is supplied with the licence and has not been entered in Configure.");
-  throw new Error("Autodata's repair-time response layout has not been mapped yet — it is documented only to licensees. Nothing is guessed.");
+function normalizeAutodataServiceSchedules(body, vehicle, mid){
+  return (body && Array.isArray(body.data) ? body.data : []).map(x => ({kind:"maintenance", providerId:"autodata",
+    applicationId:String(x.service_schedule_id || ""), title:x.description || x.name || x.title || ("Service schedule " + (x.service_schedule_id || "")),
+    qualifiers:[], detail:null,
+    prov:makeProvenance("autodata", CAP.MAINTENANCE, {vehicle:vehicleIdentity(vehicle), applicability:"AUTODATA_MID", licensed:true, environment:"production",
+      sourceRecordId:String(x.service_schedule_id || ""), originalId:String(mid || ""), applicabilityWarning:"Autodata vehicle " + mid})}));
+}
+async function adapterAutodataMaintenance(vehicle){
+  const mid = vehicle && vehicle.externalIds && vehicle.externalIds.autodataMid;
+  if (!mid) throw new Error("Autodata identifies vehicles by its own MID. Enter it under Vehicle → external identifiers.");
+  const body = await autodataCall("/v1/vehicles/" + encodeURIComponent(mid) + "/service-schedules");
+  return {results:normalizeAutodataServiceSchedules(body, vehicle, mid)};
+}
+async function adapterAutodataLabor(){
+  throw new Error("Autodata repair times are documented only to licensees and have not been mapped. Nothing is guessed.");
 }
 
 /* ---------- local sources ---------- */
@@ -5402,10 +5694,11 @@ const ADAPTERS = {
   nhtsa_ncap:{SAFETY_RATINGS:adapterRatings},
   nhtsa_mfrcomms:{MANUFACTURER_COMMUNICATIONS:adapterMfrComms, TSB:adapterMfrComms},
   nhtsa_investigations:{INVESTIGATIONS:adapterInvestigations},
-  motor_daas:{VIN_IDENTIFICATION:adapterMotorVin, LABOR_TIMES:adapterMotorLabor, test:motorTest},
+  motor_daas:Object.assign({VIN_IDENTIFICATION:adapterMotorVin, LABOR_TIMES:adapterMotorLabor, test:motorTest},
+    Object.fromEntries(Object.keys(MOTOR_CONTENT).map(cap => [cap, (vehicle, params) => adapterMotorContent(cap, vehicle, params)]))),
   dataone:{VIN_IDENTIFICATION:adapterDataoneVin, ENHANCED_VIN:adapterDataoneVin, test:dataoneTest},
   tecrmi:{LABOR_TIMES:adapterTecrmiLabor, test:async () => { await tecrmiLogin(); return {ok:true, message:"TecRMI accepted the login."}; }},
-  autodata:{LABOR_TIMES:adapterAutodataLabor, test:autodataTest},
+  autodata:{LABOR_TIMES:adapterAutodataLabor, MAINTENANCE:adapterAutodataMaintenance, test:autodataTest},
   shop_seed:{LABOR_TIMES:adapterSeedLabor},
   shop_parts:{PARTS:adapterLocalParts}
 };
@@ -5422,7 +5715,7 @@ async function testProvider(id){
     else if (id === "nhtsa_ncap"){ const r = await HubNet.publicGet(NHTSA_API + "/SafetyRatings/modelyear/2019/make/ford/model/f-150"); result = {ok:r.status === 200, message:"NHTSA safety ratings answered " + r.status}; }
     else if (id === "nhtsa_vpic"){ const raw = await vpicDecode("1FTFW1EF5FKD12345"); result = {ok:!!raw, message:"NHTSA vPIC decoded a test VIN."}; }
     else if (id === "nhtsa_mfrcomms" || id === "nhtsa_investigations"){ await loadDatasetMeta(); const m = datasetMetaCache[id];
-      result = m ? {ok:true, message:m.records.toLocaleString() + " records indexed " + String(m.builtAt).slice(0, 16).replace("T", " ")} : {ok:false, message:"Not downloaded yet — use Refresh data."}; }
+      result = m ? {ok:true, message:m.records.toLocaleString() + " records indexed " + String(m.builtAt).slice(0, 16).replace("T", " ")} : {ok:false, message:"Not downloaded yet — use Update NHTSA data."}; }
     else if (ADAPTERS[id] && ADAPTERS[id].test){
       const cs = await credentialState(p);
       if (cs.state !== "complete") result = {ok:false, message:cs.state === "reenter" ? "CREDENTIALS MUST BE RE-ENTERED on this computer." : "Credentials are not entered yet."};
@@ -5457,6 +5750,7 @@ function applyLaborResult(o, result, opts){
       selectedBy:opts.by || db.settings.lastTech || "", vehicle:result.prov.vehicle, sandbox:false, licensed:false});
     return line;
   }
+  if (result.baseHours == null && result.workUnits != null) throw new Error("That time is in the manufacturer's work units, not hours, so it cannot be put on a ticket as hours.");
   if (result.baseHours == null || !isFinite(Number(result.baseHours))) throw new Error("That result has no work time to use.");
   const p = PROVIDER_BY_ID[result.providerId] || {name:result.providerId};
   let line = opts.replaceLineId ? (o.labor || []).find(l => l.id === opts.replaceLineId) : null;
@@ -5589,12 +5883,69 @@ function renderProviders(){
       <b>LIVE</b> in use · <b>FREE</b> public data · <b>SANDBOX</b> test data, never for customers · <b>NOT CONNECTED</b> ·
       <b>SUBSCRIPTION REQUIRED</b> · <b>PARTNER APPROVAL REQUIRED</b> · <b>CUSTOM QUOTE REQUIRED</b> · <b>UNAVAILABLE</b>.
       Prices are informational (${esc(PRICE_SOURCE_NOTE)}) Entitlement comes from credentials, never from a price.</div>
+      <div id="capMatrix" class="capmatrix"><div class="muted">Working out what each source can do today…</div></div>
       <div class="tabs">${tabs.map(([k, t]) => `<button class="${providersFilter === k ? "on" : ""}" onclick="providersFilter='${k}';renderProviders()">${esc(t)}</button>`).join("")}</div>
     </div>
     ${groups.filter(g => providersFilter === "all" || providersFilter === g[0]).map(([k, title, fn]) => `
       <h3 style="margin:18px 0 8px">${esc(title)}</h3>
       <div class="provgrid">${PROVIDER_REGISTRY.filter(fn).sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || a.name.localeCompare(b.name)).map(providerTile).join("")}</div>`).join("")}`;
   fillProviderStates();
+  fillCapabilityMatrix();
+}
+/* What the program can actually do today, per source. ✓ wired and usable now ·
+   ○ wired, waiting on credentials, a licence or a download · — not offered. */
+const MATRIX_CAPS = ["VIN_IDENTIFICATION","RECALLS","MANUFACTURER_COMMUNICATIONS","COMPLAINTS","INVESTIGATIONS","SAFETY_RATINGS",
+  "LABOR_TIMES","REPAIR_PROCEDURES","SPECIFICATIONS","MAINTENANCE","FLUIDS","DTC","WIRING","TSB","PARTS"];
+async function capabilityMatrixRows(){
+  const rows = [];
+  const cell = (p, cap, usable) => {
+    const offered = (p.caps || []).indexOf(cap) >= 0 || (ADAPTERS[p.id] && ADAPTERS[p.id][cap]);
+    if (!offered) return "—";
+    const wired = p.kind !== "api" ? !!(ADAPTERS[p.id] && ADAPTERS[p.id][cap]) : (p.implemented || []).indexOf(cap) >= 0 && !!(ADAPTERS[p.id] && ADAPTERS[p.id][cap]);
+    if (!wired) return "—";
+    return usable ? "✓" : "○";
+  };
+  const nhtsa = PROVIDER_REGISTRY.filter(p => p.kind === "free" && /^nhtsa_/.test(p.id));
+  const nst = {}; for (const p of nhtsa) nst[p.id] = await providerUsable(p.id);
+  const nrow = {label:"NHTSA (public data)", env:"PUBLIC", status:"FREE", readiness:nhtsa.map(p => p.name.replace(/^NHTSA /, "") + ": " + nst[p.id].readiness).join(" · "), cells:{}};
+  MATRIX_CAPS.forEach(cap => {
+    const marks = nhtsa.map(p => cell(p, cap, nst[p.id].usable)).filter(m => m !== "—");
+    nrow.cells[cap] = marks.indexOf("✓") >= 0 ? "✓" : marks.length ? "○" : "—";
+  });
+  rows.push(nrow);
+  for (const p of PROVIDER_REGISTRY.filter(x => x.kind === "local")){
+    const st = await providerUsable(p.id);
+    rows.push({label:p.name, env:"THIS COMPUTER", status:st.status, readiness:st.readiness, cells:Object.fromEntries(MATRIX_CAPS.map(cap => [cap, cell(p, cap, st.usable)]))});
+  }
+  for (const p of PROVIDER_REGISTRY.filter(x => x.kind === "api")){
+    const st = await providerUsable(p.id);
+    const c = providerConfig(p.id);
+    if (p.id === "motor_daas"){
+      const sandboxOn = st.usable && c.environment !== "production";
+      const prodOn = st.usable && c.environment === "production";
+      rows.push({label:"MOTOR DaaS — Sandbox", env:"SANDBOX", status:sandboxOn ? "SANDBOX" : st.status, readiness:c.environment === "production" ? "not in use" : st.readiness,
+        cells:Object.fromEntries(MATRIX_CAPS.map(cap => [cap, cell(p, cap, sandboxOn)]))});
+      rows.push({label:"MOTOR DaaS — Production", env:"PRODUCTION", status:prodOn ? "LIVE" : "NOT CONNECTED", readiness:prodOn ? "PRODUCTION" : "NOT LICENSED",
+        cells:Object.fromEntries(MATRIX_CAPS.map(cap => [cap, cell(p, cap, prodOn)]))});
+      continue;
+    }
+    rows.push({label:p.name, env:(c.environment || (p.environments || [])[0] || "—").toUpperCase(), status:st.status, readiness:st.readiness,
+      cells:Object.fromEntries(MATRIX_CAPS.map(cap => [cap, cell(p, cap, st.usable)]))});
+  }
+  return rows;
+}
+async function fillCapabilityMatrix(){
+  const box = document.getElementById("capMatrix"); if (!box) return;
+  const rows = await capabilityMatrixRows();
+  const portals = PROVIDER_REGISTRY.filter(p => p.kind === "portal" || p.kind === "oem" || p.kind === "parts");
+  const el = document.getElementById("capMatrix"); if (!el) return;
+  el.innerHTML = `<h3 style="margin:10px 0 4px">What this program can do today</h3>
+    <div class="muted" style="font-size:11.5px">✓ wired and usable now · ○ wired, waiting on credentials, a licence or a download · — not offered</div>
+    <div style="overflow-x:auto"><table class="captable"><thead><tr><th>Source</th><th>Environment</th><th>Status</th>${MATRIX_CAPS.map(k => `<th>${esc(CAP_LABEL[k] || k)}</th>`).join("")}</tr></thead><tbody>
+    ${rows.map(r => `<tr data-row="${esc(r.label)}"><td><b>${esc(r.label)}</b><div class="muted" style="font-size:11px">${esc(r.readiness)}</div></td><td>${esc(r.env)}</td><td>${statusBadge(r.status)}</td>
+      ${MATRIX_CAPS.map(k => `<td class="cm cm-${r.cells[k] === "✓" ? "y" : r.cells[k] === "○" ? "w" : "n"}" data-cap="${k}">${r.cells[k]}</td>`).join("")}</tr>`).join("")}
+    </tbody></table></div>
+    <div class="muted" style="font-size:11.5px;margin-top:4px">Portal-only — opened in your browser, nothing imported: ${portals.map(p => esc(p.name)).join(" · ")}</div>`;
 }
 function providerTile(p){
   const c = providerConfig(p.id);
@@ -5610,18 +5961,19 @@ function providerTile(p){
     <div class="provstate"><span class="stat" id="provstat_${p.id}">${statusBadge(providerStatus(p, null).status)}</span>
       <span class="ready" id="provready_${p.id}">checking…</span></div>
     ${isApi && (p.environments || []).length ? `<div style="font-size:12px">Environment: <b>${esc((c.environment || p.environments[0]).toUpperCase())}</b>
-      ${p.id === "motor_daas" ? ` · Production: <b>${c.environment === "production" ? "configured" : "not licensed"}</b>` : ""}</div>` : ""}
+      ${p.id === "motor_daas" ? ` · Production: <b>${c.environment === "production" && c.productionLicenseConfirmed ? "licence confirmed" : "NOT LICENSED"}</b>` : ""}</div>` : ""}
     <div class="price"><b>${esc(pr.publicPriceText)}</b>${pr.contractTerm ? " · " + esc(pr.contractTerm) : ""}
       <div class="muted" style="font-size:11.5px">${[pr.pricingLastVerifiedAt ? "Price recorded " + esc(pr.pricingLastVerifiedAt) + " (from the Phase 2.8 brief)" : "",
         c.priceText ? "Shop-verified: " + esc(c.priceText) + (c.priceVerifiedAt ? " on " + esc(c.priceVerifiedAt) : "") : "", pr.notes ? esc(pr.notes) : ""].filter(Boolean).join(" · ")}</div>
       ${p.plans ? `<div class="plans">${p.plans.map(pl => `<span>${esc(pl.label)}: <b>${esc(pl.price)}</b>${pl.term ? " (" + esc(pl.term) + ")" : ""}</span>`).join("")}</div>` : ""}</div>
     ${p.note ? `<div class="provnote">${esc(p.note)}</div>` : ""}
+    ${isDataset ? datasetStatusHtml(p.id) : ""}
     ${c.lastTest ? `<div class="muted" style="font-size:11.5px">Last test ${esc(String(c.lastTest.at).slice(0, 16).replace("T", " "))}: ${c.lastTest.ok ? "OK" : "failed"} — ${esc(c.lastTest.message)}</div>` : ""}
     <div class="provbtns">
       ${p.blocked ? `<button class="sm" disabled title="Not available under Mitchell's published policy">Enable (not eligible)</button>` : ""}
       ${!p.blocked && (isApi || p.kind === "free") ? `<button class="sm" onclick="providerTestClick('${p.id}')">${p.id === "motor_daas" && (c.environment || "sandbox") === "sandbox" ? "Test sandbox" : "Test connection"}</button>` : ""}
       ${!p.blocked && (isApi || p.kind === "free") ? `<button class="sm" onclick="toggleProvider('${p.id}')">${c.enabled ? "Disable" : "Enable"}</button>` : ""}
-      ${isDataset ? `<button class="sm primary" onclick="refreshDatasetClick('${p.id}')">Refresh data</button>` : ""}
+      ${isDataset ? `<button class="sm" onclick="checkDatasetClick('${p.id}')">Check for updates</button><button class="sm primary" onclick="refreshDatasetClick('${p.id}')">Update NHTSA data</button>` : ""}
       ${isPortal ? `<button class="sm primary" onclick="openPortalButton('${p.id}')">Open ${esc(p.name)}</button>` : ""}
       ${!p.blocked ? `<button class="sm" onclick="configureProvider('${p.id}')">${p.id === "motor_daas" ? "Configure" : "Configure"}</button>` : ""}
       ${p.website ? `<button class="sm ghost" onclick="openOfficialUrl('${esc(p.website)}')">Provider website</button>` : ""}
@@ -5652,18 +6004,38 @@ function toggleProvider(id){
   save(); renderProviders();
 }
 let datasetBusy = false;
+function datasetStatusHtml(id){
+  const m = datasetMetaCache[id], st = datasetStatusCache[id] || {};
+  const t = x => x ? esc(String(x).slice(0, 16).replace("T", " ")) : "—";
+  const chk = st.lastCheck;
+  return `<div class="dsstatus">
+    <div><b>${m ? Number(m.records || 0).toLocaleString() + " records" : "Not downloaded yet"}</b>${m ? ` · index built ${t(m.builtAt)}` : ""}${m && m.nhtsaUpdatedAt ? ` · NHTSA file dated ${t(m.nhtsaUpdatedAt)}` : ""}</div>
+    ${m && m.files ? `<div class="muted">${m.files.map(f => esc(f.entry || f.file) + (f.rows != null ? " (" + Number(f.rows).toLocaleString() + " rows)" : "")).join(" · ")}</div>` : ""}
+    <div class="muted">Last successful update: ${t(st.lastSuccessAt || (m && m.builtAt))}${st.lastFailure ? ` · <span class="dsfail">last failed update ${t(st.lastFailure.at)}: ${esc(st.lastFailure.error)}</span>` : ""}</div>
+    ${chk ? `<div class="muted">Last checked ${t(st.lastCheckAt)}: ${chk.ok ? (chk.updateAvailable ? "<b>NHTSA has newer data</b> (" + esc(chk.files.filter(f => f.changed).map(f => f.file).join(", ")) + ")" : "up to date") : "check failed — " + esc(chk.error)}</div>` : ""}
+  </div>`;
+}
+async function checkDatasetClick(id){
+  const r = document.getElementById("provready_" + id);
+  if (r) r.textContent = "checking NHTSA…";
+  try {
+    const res = await checkDatasetUpdates(id);
+    alert((PROVIDER_BY_ID[id] || {}).name + ": " + (res.updateAvailable ? "NHTSA has newer data for " + (res.files.filter(f => f.changed).map(f => f.file).join(", ") || "this index") + ". Use Update NHTSA data." : "Up to date. Nothing needs downloading."));
+  } catch(e){ alert("Could not check NHTSA: " + (e.message || e) + "\n\nThe index already on this computer is unchanged."); }
+  if (view === "providers") renderProviders();
+}
 async function refreshDatasetClick(id){
-  if (datasetBusy){ alert("A refresh is already running."); return; }
+  if (datasetBusy){ alert("An update is already running."); return; }
   if (!DESKTOP && !confirm("NHTSA's files are hundreds of megabytes and cannot be held by a browser. This will only work in the desktop app. Try anyway?")) return;
   datasetBusy = true;
   const r = document.getElementById("provready_" + id);
   try {
-    const meta = await refreshDataset(id, ev => { if (r) r.textContent = ev.phase === "download" ? "downloading " + ev.label + "…" : "indexing " + ev.label + (ev.rows ? " — " + ev.rows.toLocaleString() + " rows" : "") + "…"; });
-    providerConfig(id).lastTest = {at:meta.builtAt, ok:true, message:meta.records.toLocaleString() + " records indexed"};
+    const meta = await updateDataset(id, ev => { if (r) r.textContent = ev.phase === "check" ? "checking " + ev.label + "…" : ev.phase === "download" ? "downloading " + ev.label + "…" : ev.phase === "commit" ? "swapping in the new index…" : "indexing " + ev.label + (ev.rows ? " — " + ev.rows.toLocaleString() + " rows" : "") + "…"; });
+    providerConfig(id).lastTest = {at:new Date().toISOString(), ok:true, message:meta.upToDate ? "up to date — " + meta.records.toLocaleString() + " records" : meta.records.toLocaleString() + " records indexed"};
     save();
-    alert((PROVIDER_BY_ID[id] || {}).name + ": " + meta.records.toLocaleString() + " records indexed. The previous index was replaced only after this finished.");
+    alert((PROVIDER_BY_ID[id] || {}).name + ": " + (meta.upToDate ? "already up to date — nothing was downloaded." : meta.records.toLocaleString() + " records indexed. The previous index was replaced only after this finished."));
   } catch(e){
-    alert("Refresh did not finish: " + (e.message || e) + "\n\nThe index that was already there is unchanged.");
+    alert("Update did not finish: " + (e.message || e) + "\n\nThe index that was already there is unchanged.");
   } finally {
     datasetBusy = false;
     if (view === "providers") renderProviders();
@@ -5679,13 +6051,14 @@ async function configureProvider(id){
     ${p.note ? `<div class="provnote">${esc(p.note)}</div>` : ""}
     ${isApi && (p.environments || []).length ? `<div class="row">
       <div><label>Environment</label><select id="pc_env">${p.environments.map(e => `<option value="${e}" ${(c.environment || p.environments[0]) === e ? "selected" : ""}>${esc(e.toUpperCase())}</option>`).join("")}</select></div>
-      ${field("baseUrl", p.id === "dataone" ? "Decode address (from your welcome letter)" : "API base address", c.baseUrl || p.baseUrl, p.baseUrl)}
-      ${p.id === "autodata" ? field("tokenUrl", "OAuth token address", c.tokenUrl || p.tokenUrl || "https://account.autodata-group.com/oauth/access_token") : ""}
+      ${field("baseUrl", p.id === "dataone" ? "Decode address (from your welcome letter)" : "API base address", c.baseUrl || p.baseUrl, p.baseUrl || "https://… from your onboarding documents")}
     </div>
-    ${p.id === "motor_daas" ? `<div class="muted" style="font-size:12px">Signing layout: <b>${esc(c.signingVariant ? MOTOR_SIGNING_VARIANTS[c.signingVariant].label : "not determined yet — Test finds it")}</b>.
-      Sandbox keys are published on <a href="#" onclick="openOfficialUrl('https://www.motor.com/daas-sandbox/');return false">MOTOR's sandbox page</a>; production keys come with a MOTOR licence.</div>` : ""}
-    ${p.id === "tecrmi" ? `<div class="row">${field("countryCode", "Country code", (c.paths || {}).countryCode, "US")}${field("languageCode", "Language code", (c.paths || {}).languageCode, "EN")}${field("kindOfWorkTime", "kindOfWorkTime", (c.paths || {}).kindOfWorkTime, "1")}</div>` : ""}
-    ${p.id === "autodata" ? `<div class="row">${field("scope", "OAuth scope", (c.paths || {}).scope, "scope1")}${field("repairTimes", "Repair-times endpoint (from licence documentation)", (c.paths || {}).repairTimes, "")}</div>` : ""}
+    ${p.id === "motor_daas" ? `<div class="muted" style="font-size:12px">Requests are signed with MOTOR's documented <b>Shared</b> scheme by the desktop app; this computer's clock must be within 15 minutes.
+      Sandbox keys are published on <a href="#" onclick="openOfficialUrl('https://www.motor.com/daas-sandbox/');return false">MOTOR's sandbox page</a>; production keys come with a MOTOR licence.</div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:6px"><input type="checkbox" id="pc_prodlicense" style="width:auto" ${c.productionLicenseConfirmed ? "checked" : ""}>
+        This shop holds a MOTOR production licence, and the keys entered for PRODUCTION came with it (sandbox keys are never production keys)</label>` : ""}
+    ${p.id === "tecrmi" ? `<div class="row">${field("countryCode", "Country code", (c.paths || {}).countryCode, "US")}${field("languageCode", "Language code", (c.paths || {}).languageCode, "EN")}</div>` : ""}
+    ${p.id === "autodata" ? `<div class="row">${field("countryCode", "Country code", (c.paths || {}).countryCode, "us")}${field("language", "Language", (c.paths || {}).language, "en-us")}</div>` : ""}
     <h3 style="margin:14px 0 4px">Credentials</h3>
     <div class="muted" style="font-size:12px">${HubSecrets.available() ? "Stored in Windows Credential Manager on this computer. They are never written to the book, a backup, a log or a printout, and this screen can never show them again." : "This is not the desktop app, so there is nowhere safe to keep a credential. Nothing can be stored here."}</div>
     ${cs && cs.state === "reenter" ? `<div class="verifynote"><b>CREDENTIALS MUST BE RE-ENTERED.</b> This provider was configured before, but its credentials are not on this computer (for example after restoring a backup).</div>` : ""}
@@ -5717,8 +6090,10 @@ function readProviderForm(id){
     if (u && !/^https:\/\//.test(u)) throw new Error("The address must start with https://");
     c.baseUrl = u === p.baseUrl ? "" : u;
   }
-  if (g("tokenUrl") !== undefined){ const u = g("tokenUrl"); if (u && !/^https:\/\//.test(u)) throw new Error("The token address must start with https://"); c.tokenUrl = u; }
-  ["countryCode","languageCode","kindOfWorkTime","scope","repairTimes"].forEach(k => { if (g(k) !== undefined) c.paths[k] = g(k); });
+  ["countryCode","languageCode","language"].forEach(k => { if (g(k) !== undefined) c.paths[k] = g(k); });
+  if ($("#pc_prodlicense")) c.productionLicenseConfirmed = $("#pc_prodlicense").checked;
+  if (id === "motor_daas" && c.environment === "production" && !c.productionLicenseConfirmed)
+    throw new Error("PRODUCTION needs the MOTOR production licence box ticked. Sandbox keys are test keys and stay in SANDBOX.");
   if ($("#pc_cache")) c.cacheAllowedByContract = $("#pc_cache").checked;
   if (g("sub") !== undefined) c.subscription.status = g("sub");
   if (g("plan") !== undefined) c.subscription.plan = g("plan");
@@ -5763,8 +6138,12 @@ async function clearProviderCredentials(id){
 /* ---------- Vehicle → Technical Data ---------- */
 let techVehicleId = null, techTab = "OVERVIEW", techOrderId = null;
 const techResults = {};
-const TECH_TABS = ["OVERVIEW","VEHICLE IDENTIFICATION","SAFETY / RECALLS","TSBs / MANUFACTURER COMMUNICATIONS","DIAGNOSTIC INFORMATION",
-  "LABOR","REPAIR PROCEDURES","SPECIFICATIONS","FLUIDS","MAINTENANCE","WIRING","PARTS","OEM FACTORY INFORMATION"];
+const TECH_TABS = ["OVERVIEW","VEHICLE","RECALLS","MANUFACTURER COMMUNICATIONS / TSBs","COMPLAINTS","INVESTIGATIONS",
+  "LABOR","PROCEDURES","SPECIFICATIONS","MAINTENANCE","FLUIDS","DTC","WIRING","PARTS","OEM PORTALS","SAFETY INFORMATION"];
+/* 2.8.0 tab names, so a remembered tab still opens the right section */
+const TECH_TAB_ALIASES = {"VEHICLE IDENTIFICATION":"VEHICLE","SAFETY / RECALLS":"RECALLS","TSBs / MANUFACTURER COMMUNICATIONS":"MANUFACTURER COMMUNICATIONS / TSBs",
+  "DIAGNOSTIC INFORMATION":"COMPLAINTS","REPAIR PROCEDURES":"PROCEDURES","OEM FACTORY INFORMATION":"OEM PORTALS"};
+const techContentQuery = {};
 function openTechData(vehicleId, orderId){
   if (typeof leaveSheetFor === "function" && cur && $("#woOverlay").classList.contains("on")) return leaveSheetFor(() => { techVehicleId = vehicleId; techOrderId = orderId || null; techTab = "OVERVIEW"; go("techdata"); });
   techVehicleId = vehicleId; techOrderId = orderId || null; techTab = "OVERVIEW"; go("techdata");
@@ -5793,6 +6172,7 @@ async function loadTech(cap, params){
   const p = Object.assign({}, params || {});
   if (cap === "MANUFACTURER_COMMUNICATIONS"){ p.query = techTsbQuery; p.broad = techTsbBroad; }
   if (cap === "LABOR_TIMES") p.query = techLaborQuery;
+  if (techContentQuery[cap] != null && cap !== "LABOR_TIMES" && cap !== "MANUFACTURER_COMMUNICATIONS") p.query = techContentQuery[cap];
   try { techResults[key] = await lookupCapability(cap, v, p); }
   catch(e){ techResults[key] = {error:e.message || String(e)}; }
   if (view === "techdata" && techVehicleId === v.id){ const b = $("#techBody"); if (b){ b.innerHTML = techSectionHtml(v); renderTechData(); } }
@@ -5826,35 +6206,41 @@ function routeListHtml(route){
   </tbody></table>`;
 }
 function techSectionHtml(v){
+  if (TECH_TAB_ALIASES[techTab]) techTab = TECH_TAB_ALIASES[techTab];
   const t = techTab;
   const R = cap => techResults[techKey(v.id, cap)];
   if (t === "OVERVIEW") return techOverviewHtml(v);
-  if (t === "VEHICLE IDENTIFICATION") return techIdentHtml(v);
-  if (t === "SAFETY / RECALLS"){
-    const r = R("RECALLS"), sr = R("SAFETY_RATINGS");
-    return `<div class="card"><div class="toolbar" style="margin:0"><h2 style="margin:0">Safety recalls</h2><span class="badge b-manual">NHTSA — PUBLIC SAFETY DATA</span><div class="grow"></div>
+  if (t === "VEHICLE") return techIdentHtml(v);
+  if (t === "SAFETY INFORMATION"){
+    const sr = R("SAFETY_RATINGS");
+    return `<div class="card"><div class="toolbar" style="margin:0"><h2 style="margin:0">Safety information — NHTSA crash ratings</h2><div class="grow"></div>
+        <button class="sm" onclick="loadTech('SAFETY_RATINGS')">Load ratings</button></div>
+      <div class="muted" style="font-size:12.5px">Crash-test ratings for this year, make and model. Reference only — not repair information.</div>
+      ${lookupStateHtml(sr, "No NCAP rating for this year, make and model.")}
+      ${(sr && sr.answers || []).map(a => a.results.map(x => `<div class="techrow"><b>${esc(x.description)}</b> ${sourceBadge(x.prov)}
+        <div>Overall ${esc(x.overall)} · Frontal ${esc(x.frontal)} · Side ${esc(x.side)} · Rollover ${esc(x.rollover)}</div></div>`).join("")).join("")}
+    </div>`;
+  }
+  if (t === "RECALLS"){
+    const r = R("RECALLS");
+    return `<div class="card"><div class="toolbar" style="margin:0"><h2 style="margin:0">POTENTIALLY APPLICABLE RECALLS</h2><span class="badge b-manual">NHTSA — PUBLIC SAFETY DATA</span><div class="grow"></div>
         <button class="primary" onclick="loadTech('RECALLS')">Load NHTSA recalls</button>
         ${v.vin ? `<button onclick="openOfficialUrl('https://www.nhtsa.gov/recalls?vin=${esc(v.vin)}')">Check this VIN on NHTSA</button>` : ""}</div>
       <div class="verifynote"><b>POTENTIALLY APPLICABLE RECALLS.</b> NHTSA's recall API is searched by year, make and model. A recall listed here is not confirmed as open — or as applying at all — on this VIN. Use NHTSA's VIN lookup or the manufacturer to confirm.</div>
       ${lookupStateHtml(r, "NHTSA lists no recalls for this year, make and model.")}
       ${(r && r.answers || []).map(a => `${cacheNote(a)}${a.results.map(x => `<div class="techrow">
-        <div class="toolbar" style="margin:0"><b>${esc(x.campaign)}</b><span class="muted">${esc(x.component)}</span><div class="grow"></div>${sourceBadge(x.prov)}</div>
+        <div class="toolbar" style="margin:0"><b>NHTSA campaign ${esc(x.campaign)}</b><span class="muted">${esc(x.component)}</span><div class="grow"></div>${sourceBadge(x.prov)}</div>
         <div class="appl">${esc(x.prov.applicabilityWarning)}</div>
         <div><b>Manufacturer:</b> ${esc(x.manufacturer)} · <b>Report received:</b> ${esc(x.reportReceivedDate)}${x.parkIt ? ` <span class="badge b-verify">PARK IT</span>` : ""}${x.parkOutside ? ` <span class="badge b-verify">PARK OUTSIDE</span>` : ""}</div>
         <div><b>Summary:</b> ${esc(x.summary)}</div>${x.consequence ? `<div><b>Consequence:</b> ${esc(x.consequence)}</div>` : ""}
-        ${x.remedy ? `<div><b>Remedy:</b> ${esc(x.remedy)}</div>` : ""}${x.notes ? `<div class="muted"><b>Notes:</b> ${esc(x.notes)}</div>` : ""}</div>`).join("")}`).join("")}
-    </div>
-    <details class="card"><summary style="cursor:pointer"><b>Safety information — NHTSA crash ratings</b> <span class="muted">(secondary)</span></summary>
-      <div class="toolbar" style="margin:8px 0"><button class="sm" onclick="loadTech('SAFETY_RATINGS')">Load ratings</button></div>
-      ${lookupStateHtml(sr, "No NCAP rating for this year, make and model.")}
-      ${(sr && sr.answers || []).map(a => a.results.map(x => `<div class="techrow"><b>${esc(x.description)}</b> ${sourceBadge(x.prov)}
-        <div>Overall ${esc(x.overall)} · Frontal ${esc(x.frontal)} · Side ${esc(x.side)} · Rollover ${esc(x.rollover)}</div></div>`).join("")).join("")}
-    </details>`;
+        ${x.remedy ? `<div><b>Remedy:</b> ${esc(x.remedy)}</div>` : ""}${x.notes ? `<div class="muted"><b>Notes:</b> ${esc(x.notes)}</div>` : ""}
+        <div class="muted" style="font-size:11.5px">Official source: NHTSA recalls API, campaign ${esc(x.campaign)}${v.vin ? ` · <a href="#" onclick="openOfficialUrl('https://www.nhtsa.gov/recalls?vin=${esc(v.vin)}');return false">confirm open status for this VIN on nhtsa.gov</a>` : ""}</div></div>`).join("")}`).join("")}
+    </div>`;
   }
-  if (t === "TSBs / MANUFACTURER COMMUNICATIONS"){
+  if (t === "MANUFACTURER COMMUNICATIONS / TSBs"){
     const r = R("MANUFACTURER_COMMUNICATIONS");
     return `<div class="card"><div class="toolbar" style="margin:0"><h2 style="margin:0">MANUFACTURER COMMUNICATIONS / PUBLIC TSB DATA</h2><div class="grow"></div></div>
-      <div class="muted" style="font-size:12.5px">Communications manufacturers filed with NHTSA: service bulletins, service campaigns, warranty extensions, over-the-air updates and more. A communication is not a safety recall. ${datasetMetaCache.nhtsa_mfrcomms ? "Index built " + esc(String(datasetMetaCache.nhtsa_mfrcomms.builtAt).slice(0, 10)) + "." : "<b>Not downloaded yet</b> — Settings → Data Providers → NHTSA Manufacturer Communications → Refresh data."}</div>
+      <div class="muted" style="font-size:12.5px">Communications manufacturers filed with NHTSA: service bulletins, service campaigns, warranty extensions, over-the-air updates and more. A communication is not a safety recall. ${datasetMetaCache.nhtsa_mfrcomms ? "Index built " + esc(String(datasetMetaCache.nhtsa_mfrcomms.builtAt).slice(0, 10)) + "." : "<b>Not downloaded yet</b> — Settings → Data Providers → NHTSA Manufacturer Communications → Update NHTSA data."}</div>
       <div class="toolbar" style="margin:10px 0"><input id="tsbQ" class="search" style="max-width:360px" placeholder="Search bulletins — water pump, P0597, coolant…" value="${esc(techTsbQuery)}">
         <label style="display:flex;align-items:center;gap:6px;margin:0"><input type="checkbox" style="width:auto" ${techTsbBroad ? "checked" : ""} onchange="techTsbBroad=this.checked"> every model of this make and year</label>
         <button class="primary" onclick="loadTech('MANUFACTURER_COMMUNICATIONS')">Search</button></div>
@@ -5867,42 +6253,120 @@ function techSectionHtml(v){
         <div class="appl">${esc(x.prov.applicabilityWarning)}</div>
         ${x.documentUrl ? `<button class="sm" onclick="openOfficialUrl('${esc(x.documentUrl)}')">Open NHTSA public document</button>` : ""}</div>`).join("")}`).join("")}
       ${r && r.route ? launchersHtml(r.route, v) : ""}
-    </div>`;
+    </div>
+    ${contentCardHtml(v, "TSB", "LICENSED TECHNICAL SERVICE BULLETINS")}`;
   }
-  if (t === "DIAGNOSTIC INFORMATION"){
-    const c = R("COMPLAINTS"), inv = R("INVESTIGATIONS");
-    return `<div class="card"><div class="toolbar" style="margin:0"><h2 style="margin:0">NHTSA CONSUMER COMPLAINTS</h2><div class="grow"></div><button class="primary" onclick="loadTech('COMPLAINTS')">Load complaints</button></div>
+  if (t === "COMPLAINTS"){
+    const c = R("COMPLAINTS");
+    return `<div class="card"><div class="toolbar" style="margin:0"><h2 style="margin:0">NHTSA CONSUMER COMPLAINTS — INFORMATIONAL</h2><div class="grow"></div><button class="primary" onclick="loadTech('COMPLAINTS')">Load complaints</button></div>
       <div class="verifynote"><b>Informational only.</b> These are owner reports to NHTSA. They are unverified, they are not a diagnosis, and a count of complaints does not prove a common failure. Nothing here creates a diagnosis or an estimate.</div>
       ${lookupStateHtml(c, "NHTSA lists no complaints for this year, make and model.")}
       ${(c && c.answers || []).map(a => `${cacheNote(a)}<div class="cmpcounts">${complaintCountsByComponent(a.results).slice(0, 12).map(x => `<span>${esc(x.component)} <b>${x.count}</b></span>`).join("")}</div>
         <input id="cmpQ" class="search" placeholder="Search complaints" value="${esc(techComplaintQuery)}" style="max-width:320px;margin:6px 0">
         <div id="cmpList">${complaintListHtml()}</div>`).join("")}
-    </div>
-    <div class="card"><div class="toolbar" style="margin:0"><h2 style="margin:0">NHTSA SAFETY DEFECT INVESTIGATIONS</h2><div class="grow"></div><button class="primary" onclick="loadTech('INVESTIGATIONS')">Load investigations</button></div>
-      <div class="muted" style="font-size:12.5px">A safety defect investigation is NHTSA inquiring into a possible defect. It is not a repair diagnosis. ${datasetMetaCache.nhtsa_investigations ? "" : "<b>Not downloaded yet</b> — Settings → Data Providers → NHTSA Defect Investigations → Refresh data."}</div>
+    </div>`;
+  }
+  if (t === "INVESTIGATIONS"){
+    const inv = R("INVESTIGATIONS");
+    return `<div class="card"><div class="toolbar" style="margin:0"><h2 style="margin:0">NHTSA DEFECT INVESTIGATIONS</h2><div class="grow"></div><button class="primary" onclick="loadTech('INVESTIGATIONS')">Load investigations</button></div>
+      <div class="verifynote">An NHTSA defect investigation is NHTSA looking into a possible safety defect across many vehicles. It is <b>not a recall</b>, <b>not a confirmed defect on this VIN</b>, <b>not a diagnosis</b> and <b>not a required repair</b>.</div>
+      <div class="muted" style="font-size:12.5px"> ${datasetMetaCache.nhtsa_investigations ? "" : "<b>Not downloaded yet</b> — Settings → Data Providers → NHTSA Defect Investigations → Update NHTSA data."}</div>
       ${lookupStateHtml(inv, "No investigations for this year, make and model.")}
       ${(inv && inv.answers || []).map(a => a.results.slice(0, 80).map(x => `<div class="techrow">
-        <div class="toolbar" style="margin:0"><b>${esc(x.number)}</b><span class="badge ${x.status === "Open" ? "b-verify" : "b-manual"}">${esc(x.status.toUpperCase())}</span><span class="muted">${esc(x.type)}</span><div class="grow"></div>${sourceBadge(x.prov)}</div>
+        <div class="toolbar" style="margin:0"><span class="badge b-manual">NHTSA DEFECT INVESTIGATION</span><b>${esc(x.number)}</b><span class="badge ${x.status === "Open" ? "b-verify" : "b-manual"}">INVESTIGATION ${esc(x.status.toUpperCase())}</span><span class="muted">${esc(x.type)}</span><div class="grow"></div>${sourceBadge(x.prov)}</div>
         <div class="muted" style="font-size:12px">Opened ${esc(x.opened)}${x.closed ? " · closed " + esc(x.closed) : ""} · ${esc(x.component)}${x.recallCampaign ? " · recall " + esc(x.recallCampaign) : ""}</div>
         <div><b>${esc(x.subject)}</b></div><div style="font-size:12.5px">${esc(String(x.summary).slice(0, 700))}${String(x.summary).length > 700 ? "…" : ""}</div>
         <div class="appl">${esc(x.prov.applicabilityWarning)}</div></div>`).join("")).join("")}
-    </div>
-    ${diagInfoLaunchers(v)}`;
+    </div>`;
   }
   if (t === "LABOR") return techLaborHtml(v);
-  const capByTab = {"REPAIR PROCEDURES":"REPAIR_PROCEDURES", "SPECIFICATIONS":"SPECIFICATIONS", "FLUIDS":"FLUIDS", "MAINTENANCE":"MAINTENANCE",
-    "WIRING":"WIRING", "PARTS":"PARTS", "OEM FACTORY INFORMATION":"OEM_PORTAL"};
+  if (t === "PROCEDURES") return contentCardHtml(v, "REPAIR_PROCEDURES", "REPAIR PROCEDURES");
+  if (t === "SPECIFICATIONS") return contentCardHtml(v, "SPECIFICATIONS", "SPECIFICATIONS") + contentCardHtml(v, "TORQUE_SPECIFICATIONS", "TORQUE SPECIFICATIONS");
+  if (t === "MAINTENANCE") return contentCardHtml(v, "MAINTENANCE", "MAINTENANCE SCHEDULES",
+    `<div class="muted" style="font-size:12.5px">The shop's own maintenance intervals and this vehicle's recorded service are on the vehicle page. Schedules here come only from a connected provider, labelled with its name.</div>`);
+  if (t === "FLUIDS") return contentCardHtml(v, "FLUIDS", "FLUIDS AND CAPACITIES");
+  if (t === "DTC") return contentCardHtml(v, "DTC", "DIAGNOSTIC TROUBLE CODES");
+  if (t === "WIRING") return contentCardHtml(v, "WIRING", "WIRING DIAGRAMS") + contentCardHtml(v, "COMPONENT_LOCATIONS", "COMPONENT LOCATIONS");
+  if (t === "OEM PORTALS") return oemPortalsHtml(v);
+  const capByTab = {"PARTS":"PARTS"};
   const cap = capByTab[t];
   const r = R(cap);
   if (!r){ setTimeout(() => routeOnly(cap), 0); return `<div class="card"><div class="muted">Checking sources…</div></div>`; }
   return `<div class="card"><h2 style="margin-top:0">${esc(t)}</h2>
-    ${t === "SPECIFICATIONS" || t === "FLUIDS" ? `<div class="verifynote">No licensed specification source is connected unless one shows LIVE below. A value typed by the shop is shown as <b>Manual shop entry — verify</b> and is never labelled OEM.</div>` : ""}
-    ${t === "MAINTENANCE" ? `<div class="muted" style="font-size:12.5px">The shop's own maintenance intervals and this vehicle's recorded service are on the vehicle page. External schedules appear here only from a connected provider.</div>` : ""}
     ${t === "PARTS" ? partsTabHtml(v) : ""}
     ${routeListHtml(r.route)}
     ${launchersHtml(r.route, v)}
-    ${t === "OEM FACTORY INFORMATION" && !oemPortalsFor((vehicleProfile(v) || {}).make).length ? `<div class="empty">No OEM portal is registered for this make. All OEM portals are listed in Settings → Data Providers.</div>` : ""}
   </div>`;
+}
+/* One card for any licensed content type: every source that answered, each
+   result with its provider's name on it, nothing merged. */
+function contentCardHtml(v, cap, title, intro){
+  const r = techResults[techKey(v.id, cap)];
+  const q = techContentQuery[cap] || "";
+  const rows = [];
+  (r && r.answers || []).forEach(a => a.results.forEach(x => rows.push(Object.assign({answer:a}, x))));
+  const valueText = d => {
+    if (!d) return "";
+    const vals = (d.values || []).map(x => [x.value || (x.min && x.min === x.max ? x.min : x.min || x.max ? x.min + "–" + x.max : ""), x.unit, x.condition && x.condition !== "Not applicable" ? "(" + x.condition + ")" : ""].filter(Boolean).join(" ")).filter(Boolean);
+    const fl = (d.fluids || []).map(f => [f.name, f.viscosity, f.grade, f.formulation].filter(Boolean).join(" ")).filter(Boolean);
+    const caps = (d.capacities || []).map(c => c.name + ": " + c.values.map(x => x.value + " " + x.unit + (x.condition && x.condition !== "Not applicable" ? " (" + x.condition + ")" : "")).join(", "));
+    return vals.concat(fl, caps).join(" · ");
+  };
+  return `<div class="card techcontent" data-cap="${cap}"><div class="toolbar" style="margin:0"><h2 style="margin:0">${esc(title)}</h2><div class="grow"></div></div>
+    ${intro || ""}
+    <div class="toolbar" style="margin:10px 0"><input id="cq_${cap}" class="search" style="max-width:340px" placeholder="Search — e.g. brake, coolant, P0171" value="${esc(q)}"
+      oninput="techContentQuery['${cap}']=this.value" onkeydown="if(event.key==='Enter')loadTech('${cap}')">
+      <button class="primary" onclick="loadTech('${cap}')">Look up</button></div>
+    ${r ? lookupStateHtml(r, "No connected source has this for the vehicle.") : ""}
+    ${(r && r.answers || []).map(a => `<div class="muted" style="font-size:12px;margin-top:6px">${esc((PROVIDER_BY_ID[a.providerId] || {}).name || a.providerId)}: ${a.results.length}${a.meta && a.meta.total > a.results.length ? " of " + Number(a.meta.total).toLocaleString() : ""} shown</div>`).join("")}
+    ${rows.map(x => `<div class="techrow ${x.prov && x.prov.sandbox ? "sandboxrow" : ""}">
+      <div class="toolbar" style="margin:0">${x.code ? `<b>${esc(x.code)}</b>` : ""}${x.bulletinNumber ? `<b>${esc(x.bulletinNumber)}</b>` : ""}<b>${esc(x.title)}</b>
+        ${x.issued ? `<span class="muted">${esc(x.issued)}</span>` : ""}<div class="grow"></div>${sourceBadge(x.prov)}</div>
+      <div class="muted" style="font-size:12px">${esc([x.category, x.system, x.position, (x.bulletinTypes || []).join(", "), x.documentCount ? x.documentCount + " document(s) at the provider" : ""].filter(Boolean).join(" · "))}</div>
+      ${x.detail ? `<div>${esc(valueText(x.detail))}</div>` : ""}${x.detailError ? `<div class="muted">${esc(x.detailError)}</div>` : ""}
+      ${x.prov && x.prov.applicabilityWarning ? `<div class="appl">${esc(x.prov.applicabilityWarning)}</div>` : ""}
+      ${x.prov && x.prov.sandbox ? `<div class="appl"><b>SANDBOX — TEST DATA — NOT FOR PRODUCTION.</b> Not for a customer, an estimate or a repair decision.</div>` : ""}</div>`).join("")}
+    ${r && r.route ? routeListHtml(r.route) + launchersHtml(r.route, v) : !r ? `<div class="muted" style="font-size:12px">Look up to see which sources answer, in order of preference.</div>` : ""}
+  </div>`;
+}
+/* OEM portals: open the official site, with everything the service writer needs
+   to paste into it, and a place to record the portal's reference. */
+function oemPortalsHtml(v){
+  const p = vehicleProfile(v) || {};
+  const d = (v.vin && db.vinCache[v.vin]) || {};
+  const engine = d.engineModel || [p.displacementL ? p.displacementL + "L" : "", p.cylinders ? p.cylinders + "-cyl" : ""].filter(Boolean).join(" ");
+  const ymm = [p.year, p.make, p.model, p.series || p.trim].filter(Boolean).join(" ");
+  const orders = vals(db.orders).filter(o => o.vehicleId === v.id && !isDead(o)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const o = orders.find(x => x.id === techOrderId) || orders.find(x => !isFinal(x)) || null;
+  const jobText = o ? ticketNo(o) + (o.complaint ? " — " + o.complaint : "") + ((o.labor || []).filter(l => l.desc).length ? "\n" + o.labor.filter(l => l.desc).map(l => "• " + l.desc).join("\n") : "") : "";
+  const copyBtn = (label, text) => text ? `<button class="sm" onclick="copyText(${esc(JSON.stringify(text))}).then(ok=>alert(ok?'${label} copied':'Copy failed'))">Copy ${esc(label)}</button>` : "";
+  const oem = oemPortalsFor(p.make);
+  const subs = PROVIDER_REGISTRY.filter(x => x.kind === "portal");
+  const refs = (v.externalRefs || []).slice().reverse();
+  return `<div class="card"><h2 style="margin-top:0">OEM PORTALS</h2>
+    <div class="muted" style="font-size:12.5px">Official factory and subscription sites open in your browser. Sign in there yourself; nothing is read or copied back into this program.</div>
+    <div class="toolbar" style="margin:10px 0">${copyBtn("VIN", v.vin)}${copyBtn("year/make/model", ymm)}${copyBtn("engine", engine)}${copyBtn("RO / job description", jobText)}</div>
+    ${oem.length ? `<div class="launchers"><b>Factory information for ${esc(p.make)}</b>${oem.map(x => `<div class="launch"><span>${esc(x.name)}</span>${x.priority ? ` <span class="badge b-vehicle">PRIORITY</span>` : ""}
+      <span class="muted" style="font-size:12px">${esc(providerConfig(x.id).priceText || x.pricing.publicPriceText)}</span><div class="grow"></div>
+      <button class="sm primary" onclick="openPortalButton('${x.id}')">OPEN OFFICIAL PORTAL</button></div>`).join("")}</div>`
+      : `<div class="empty">No OEM portal is registered for this make. All OEM portals are listed in Settings → Data Providers.</div>`}
+    <div class="launchers"><b>Subscription information systems</b>${subs.map(x => `<div class="launch"><span>${esc(x.name)}</span><span class="muted" style="font-size:12px">${esc(providerConfig(x.id).subscription.status === "active" ? "subscribed" : x.pricing.publicPriceText)}</span>
+      <div class="grow"></div><button class="sm" onclick="openPortalButton('${x.id}')">OPEN OFFICIAL PORTAL</button></div>`).join("")}</div>
+    <h3 style="margin:14px 0 4px">External references</h3>
+    <div class="muted" style="font-size:12px">Record the document or procedure number you used on a portal. Only your note is kept — never the portal's content.</div>
+    <div class="row"><div><label>Portal</label><select id="xrProv">${oem.concat(subs).map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select></div>
+      <div><label>Reference</label><input id="xrRef" placeholder="e.g. SIB 11 02 18, TSB 21-NA-123"></div>
+      <div><label>Note</label><input id="xrNote"></div></div>
+    <button class="sm" onclick="addVehicleExternalRef('${v.id}')">Add reference</button>
+    ${refs.length ? `<table style="margin-top:6px"><tbody>${refs.map(x => `<tr><td>${esc((PROVIDER_BY_ID[x.providerId] || {name:x.providerId}).name)}</td><td><b>${esc(x.reference)}</b></td><td class="muted">${esc(x.note || "")}</td><td class="muted">${esc(String(x.at).slice(0, 10))}</td></tr>`).join("")}</tbody></table>` : ""}
+  </div>`;
+}
+function addVehicleExternalRef(vehicleId){
+  const v = db.vehicles[vehicleId]; if (!v) return;
+  const reference = ($("#xrRef").value || "").trim();
+  if (!reference){ alert("Type the reference first."); return; }
+  (v.externalRefs = v.externalRefs || []).push({providerId:$("#xrProv").value, reference, note:($("#xrNote").value || "").trim(), at:new Date().toISOString(), by:db.settings.lastTech || ""});
+  save(); renderTechData();
 }
 async function routeOnly(cap){
   const v = db.vehicles[techVehicleId]; if (!v) return;
@@ -5948,10 +6412,14 @@ function techOverviewHtml(v){
   return `<div class="card"><h2 style="margin-top:0">${esc([p.year, p.make, p.model, p.series].filter(Boolean).join(" "))}</h2>
     <div class="muted">${esc(vehicleContextText(v))}</div>
     <table style="margin-top:10px"><tbody>
-      ${row("SAFETY / RECALLS", "RECALLS", "NHTSA — public safety data, matched by year/make/model")}
-      ${row("TSBs / MANUFACTURER COMMUNICATIONS", "MANUFACTURER_COMMUNICATIONS", "NHTSA public manufacturer communications index")}
-      ${row("DIAGNOSTIC INFORMATION", "COMPLAINTS", "NHTSA consumer complaints and defect investigations — informational")}
+      ${row("RECALLS", "RECALLS", "NHTSA — potentially applicable, matched by year/make/model")}
+      ${row("MANUFACTURER COMMUNICATIONS / TSBs", "MANUFACTURER_COMMUNICATIONS", "NHTSA public manufacturer communications index")}
+      ${row("COMPLAINTS", "COMPLAINTS", "NHTSA consumer complaints — informational")}
+      ${row("INVESTIGATIONS", "INVESTIGATIONS", "NHTSA defect investigations — not a recall or a diagnosis")}
       ${row("LABOR", "LABOR_TIMES", "Connected labor guides, then the SHOP SEED catalog")}
+      ${row("MAINTENANCE", "MAINTENANCE", "Connected licensed sources")}
+      ${row("SPECIFICATIONS", "SPECIFICATIONS", "Connected licensed sources")}
+      ${row("DTC", "DTC", "Connected licensed sources")}
     </tbody></table>
     ${oem.length ? `<div class="launchers"><b>OEM factory information for ${esc(p.make)}</b>${oem.map(x => `<div class="launch"><span>${esc(x.name)}</span>
       <span class="muted" style="font-size:12px">${esc(providerConfig(x.id).priceText || x.pricing.publicPriceText)}</span><div class="grow"></div>
@@ -5974,7 +6442,8 @@ function techIdentHtml(v){
     <h3 style="margin:16px 0 4px">External identifiers</h3>
     <div class="muted" style="font-size:12px">Kept for connecting licensed sources later. Nothing here is looked up automatically.</div>
     <div class="row">${idf("vcdbBaseVehicleId", "VCdb BaseVehicle ID")}${idf("vcdbVehicleId", "VCdb Vehicle ID")}${idf("vcdbEngineConfigId", "VCdb EngineConfig ID")}${idf("acesQdbNotes", "Qdb / PCdb notes")}</div>
-    <div class="row">${idf("motorBaseVehicleId", "MOTOR BaseVehicle ID")}${idf("motorEngineId", "MOTOR Engine ID")}${idf("tecrmiTypeId", "TecRMI type ID")}${idf("dataoneStyleId", "DataOne style ID")}</div>
+    <div class="row">${idf("motorBaseVehicleId", "MOTOR BaseVehicle ID")}${idf("motorEngineId", "MOTOR Engine ID")}${idf("motorSubModelId", "MOTOR SubModel ID")}</div>
+    <div class="row">${idf("tecrmiTypeId", "TecRMI type ID")}${idf("autodataMid", "Autodata MID")}${idf("dataoneStyleId", "DataOne style ID")}</div>
   </div>`;
 }
 function setVehicleExternalId(vehicleId, key, value){
@@ -5993,10 +6462,11 @@ function techLaborHtml(v){
     <div class="toolbar" style="margin:10px 0"><input id="laborQ" class="search" style="max-width:360px" placeholder="Operation — water pump, front brakes…" value="${esc(techLaborQuery)}">
       <button class="primary" onclick="loadTech('LABOR_TIMES')">Look up labor</button></div>
     ${lookupStateHtml(r, "No labor operation matches.")}
+    ${(r && r.answers || []).filter(a => a.results.length).length > 1 ? `<div class="verifynote"><b>${(r.answers || []).filter(a => a.results.length).length} SOURCES ANSWERED</b> — ${esc(r.answers.filter(a => a.results.length).map(a => (PROVIDER_BY_ID[a.providerId] || {}).name + " " + a.results.length).join(" · "))}. Their times are listed separately and never averaged or overwritten. Choose the one that goes on the ticket; its source is stored on the line.</div>` : ""}
     ${rows.length ? `<table><thead><tr><th>Operation</th><th>Source</th><th class="right">Hours</th><th>Detail</th><th></th></tr></thead><tbody>
       ${rows.map((x, i) => `<tr class="${x.prov.sandbox ? "sandboxrow" : ""}"><td><b>${esc(x.description)}</b>${x.qualifiers && x.qualifiers.length ? `<div class="muted" style="font-size:11.5px">${esc(x.qualifiers.join("; "))}</div>` : ""}</td>
         <td>${sourceBadge(x.prov)}</td>
-        <td class="right"><b>${x.baseHours == null ? (x.menuPrice != null ? "menu " + money(x.menuPrice) : "—") : esc(x.baseHours)}</b>${x.warrantyHours != null ? `<div class="muted" style="font-size:11px">warranty ${esc(x.warrantyHours)}</div>` : ""}</td>
+        <td class="right"><b>${x.baseHours == null ? (x.workUnits != null ? esc(x.workUnits) + " units" : x.menuPrice != null ? "menu " + money(x.menuPrice) : "—") : esc(x.baseHours)}</b>${x.warrantyHours != null ? `<div class="muted" style="font-size:11px">warranty ${esc(x.warrantyHours)}</div>` : ""}</td>
         <td class="muted" style="font-size:12px">${esc([x.additionalHours != null ? "+" + x.additionalHours + " " + (x.additionalDescription || "additional") : "",
           (x.addOns || []).length ? (x.addOns.length + " add-on operation(s)") : "", (x.optional && x.optional.length) ? x.optional.length + " optional" : "",
           x.prov.applicabilityWarning].filter(Boolean).join(" · "))}</td>
@@ -6054,7 +6524,7 @@ function drawJobTech(){
     ${res ? lookupStateHtml(res, "No labor operation matches.") : ""}
     ${rows.length ? `<table><thead><tr><th>Operation</th><th>Source</th><th class="right">Hours</th><th></th></tr></thead><tbody>
       ${rows.map((x, i) => `<tr class="${x.prov.sandbox ? "sandboxrow" : ""}"><td>${esc(x.description)}<div class="muted" style="font-size:11px">${esc(x.prov.applicabilityWarning || "")}</div></td><td>${sourceBadge(x.prov)}</td>
-        <td class="right"><b>${x.baseHours == null ? "menu" : esc(x.baseHours)}</b></td>
+        <td class="right"><b>${x.baseHours == null ? (x.workUnits != null ? esc(x.workUnits) + " units" : "menu") : esc(x.baseHours)}</b></td>
         <td class="right">${x.prov.sandbox ? `<button class="sm" disabled>SANDBOX — NOT FOR CUSTOMERS</button>` : `<button class="sm primary" onclick="jobTechUse(${i})">Use for this line</button>`}</td></tr>`).join("")}</tbody></table>` : ""}
     <h3 style="margin:14px 0 4px">PROCEDURE · SPECS · TORQUE · WIRING</h3>
     <div class="muted" style="font-size:12px">No licensed procedure source answers here unless one is LIVE in Data Providers. Open the factory or subscription source, then record the reference on the job — nothing from the portal is copied in.</div>

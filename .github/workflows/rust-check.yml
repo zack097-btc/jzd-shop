@@ -49,7 +49,7 @@ jobs:
       # own signing and request code. The sandbox keys are the ones MOTOR
       # publishes for developers at motor.com/daas-sandbox; they are read from
       # that page at run time and are never stored in this repository.
-      - name: Live MOTOR sandbox call
+      - name: Live MOTOR sandbox call (desktop shell)
         shell: pwsh
         working-directory: desktop/src-tauri
         run: |
@@ -63,6 +63,9 @@ jobs:
           Write-Output "::add-mask::$priv"
           $env:MOTOR_SANDBOX_PUBLIC = $pub
           $env:MOTOR_SANDBOX_PRIVATE = $priv
+          # for the page-level live suite in the next step, this job only
+          "MOTOR_SANDBOX_PUBLIC=$pub" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "MOTOR_SANDBOX_PRIVATE=$priv" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           cargo test motor_sandbox_live -- --ignored --nocapture 2>&1 | Tee-Object -FilePath live.log
           $code = $LASTEXITCODE
           Get-Content live.log | Where-Object { $_ -match '^LIVE:' } | ForEach-Object {
@@ -80,3 +83,17 @@ jobs:
             $hits | Select-Object -First 5 | ForEach-Object { Write-Output "::error title=MOTOR sandbox::$_" }
             exit $code
           }
+
+      - name: Live MOTOR sandbox call (page adapters) and the data provider suite
+        shell: pwsh
+        run: |
+          npm install --no-save playwright
+          npx playwright install chromium
+          node testdata.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node testmotorlive.cjs 2>&1 | Tee-Object -FilePath motorlive.log
+          $code = $LASTEXITCODE
+          Get-Content motorlive.log | Where-Object { $_ -match 'PASS|FAIL|SKIPPED|MOTOR sandbox calls|Vehicle:' } | ForEach-Object {
+            Write-Output ("::notice title=MOTOR sandbox page::" + ($_.Trim() -replace '::', ': :'))
+          }
+          exit $code
