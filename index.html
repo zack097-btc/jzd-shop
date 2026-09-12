@@ -85,6 +85,11 @@
   .imatrix input{width:72px;height:38px;text-align:right;font-size:14px}
   .imatrix .pos{font-weight:700;width:52px}
   .sugg{font-size:11px;color:var(--accent);cursor:pointer;text-decoration:underline}
+  .stock{font-weight:700}
+  .stock.low{color:#8f2419}
+  .stock.none{color:var(--muted)}
+  .gp{font-size:11.5px;color:var(--accent2);font-weight:600}
+  .gp.thin{color:#8f2419}
   .appt{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:8px 11px;margin-bottom:7px;background:#fff;cursor:pointer;display:flex;gap:12px;align-items:flex-start}
   .appt:hover{background:#f7f9fc}
   .appt .t{font-weight:800;font-size:15px;min-width:66px}
@@ -223,6 +228,7 @@
     <button data-view="board">Shop Board</button>
     <button data-view="customers">Customers</button>
     <button data-view="vehicles">Vehicles</button>
+    <button data-view="parts">Parts</button>
     <button data-view="services">Services</button>
     <button data-view="catalog">Catalog</button>
     <button data-view="settings">Settings</button>
@@ -559,7 +565,13 @@ const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;
    not know the law. taxParts defaults true because the version before this one
    always taxed parts, and a silent change to that would rewrite what every
    existing draft charges. */
-const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:112.50,rateMin:100,rateMax:125,taxRate:8.25,taxLabor:false,taxParts:true,taxFees:false,partsMarkup:40,nextInvoice:1001,nextEstimate:1,nextRO:1,nextInspection:1,fees:[],techs:[],bays:["Bay 1","Bay 2","Alignment Rack","Outside"],dayStart:8,dayEnd:18,slotMinutes:30,thresholds:{treadMonitor:5,treadUrgent:3,padMonitor:4,padUrgent:2,moistureMonitor:2,moistureUrgent:3},terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},appointments:{},recommendations:{},catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[],inspections:{},attachments:{}};
+const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:112.50,rateMin:100,rateMax:125,taxRate:8.25,taxLabor:false,taxParts:true,taxFees:false,partsMarkup:40,nextInvoice:1001,nextEstimate:1,nextRO:1,nextInspection:1,nextPO:1000,fees:[],techs:[],
+  /* Markup by what the part cost, which is how a shop actually prices: a $6
+     clip and a $600 compressor cannot carry the same percentage. These are
+     starting numbers, not rules - every tier is editable in Settings. */
+  markupMatrix:[{upTo:10,pct:100},{upTo:25,pct:80},{upTo:50,pct:65},{upTo:100,pct:55},{upTo:250,pct:45},{upTo:500,pct:35},{upTo:null,pct:28}],
+  inventoryUnits:["each","quart","gallon","liter","ounce","foot","set","pair"],
+  bays:["Bay 1","Bay 2","Alignment Rack","Outside"],dayStart:8,dayEnd:18,slotMinutes:30,thresholds:{treadMonitor:5,treadUrgent:3,padMonitor:4,padUrgent:2,moistureMonitor:2,moistureUrgent:3},terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},appointments:{},recommendations:{},parts:{},vendors:{},purchaseOrders:{},movements:[],catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[],inspections:{},attachments:{}};
 let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot() */
 /* ---------- where the book actually lives ----------------------------------
 
@@ -586,7 +598,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.5.0";
+const JZD_VERSION = "2.6.0";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -612,7 +624,11 @@ function shapeDb(d){
     inspections: d.inspections || {},
     attachments: d.attachments || {},
     recommendations: d.recommendations || {},
-    appointments: d.appointments || {}
+    appointments: d.appointments || {},
+    parts: d.parts || {},
+    vendors: d.vendors || {},
+    purchaseOrders: d.purchaseOrders || {},
+    movements: Array.isArray(d.movements) ? d.movements : []
   });
 }
 
@@ -1248,7 +1264,8 @@ function orderTotals(o){
    A number, once given out, belongs to that ticket forever. Counters live in
    the book and only ever go up; a ticket that already has a number keeps it. */
 function nextNumber(kind){
-  const key = kind === "estimate" ? "nextEstimate" : kind === "ro" ? "nextRO" : "nextInvoice";
+  const key = kind === "estimate" ? "nextEstimate" : kind === "ro" ? "nextRO"
+            : kind === "inspection" ? "nextInspection" : kind === "po" ? "nextPO" : "nextInvoice";
   const n = parseInt(db.settings[key], 10) || 1;
   db.settings[key] = n + 1;
   return n;
@@ -3398,6 +3415,888 @@ function renderSearch(){
   el.oninput = () => { const at = el.selectionStart; searchQ = el.value; renderSearch(); const n = $("#gq"); n.focus(); n.setSelectionRange(at,at); };
 }
 
+
+/* ====================================================================
+   Parts: what the shop has, what it owes for, and what it sold
+   ====================================================================
+   Two numbers must never be confused and never be lost: what a part
+   COST the shop, and what it SOLD for. The difference is the margin,
+   it is most of a shop's profit, and it is the thing a customer must
+   never see. Everything below is arranged around keeping those two
+   numbers separate, keeping the history of both, and making sure that
+   changing a price today cannot reach backwards into an invoice that
+   has already been handed over.
+
+   The counting convention, stated once because it is the thing most
+   easily got wrong:
+
+     ON HAND   is what is physically on the shelf.
+     COMMITTED is what live tickets have claimed but not yet fitted.
+     AVAILABLE is on hand minus committed.
+
+   Committed is COMPUTED from the tickets themselves, never stored as a
+   counter. A counter drifts the first time somebody deletes a line, and
+   a drifted counter is worse than none: it is confidently wrong. Stock
+   is only physically reduced when a part is actually installed. */
+
+const PART_UNITS_DEFAULT = "each";
+const PO_STATES = ["Draft","Ordered","Partially Received","Received","Backordered","Cancelled","Closed"];
+const MOVE_TYPES = ["Initial Balance","Purchase Receipt","Assigned/Consumed","Return to Stock",
+                    "Vendor Return","Manual Adjustment","Core Out","Core Returned","Other"];
+const CORE_STATES = ["Core Not Required","Core Due","Core Removed","Core Returned to Vendor","Core Credit Received"];
+
+/* ---------- the catalog ---------- */
+function shapePart(p){
+  if (!p) return p;
+  if (p.tracked == null) p.tracked = true;
+  if (p.onHand == null) p.onHand = 0;
+  if (p.unit == null) p.unit = PART_UNITS_DEFAULT;
+  if (p.active == null) p.active = true;
+  p.sources = p.sources || [];
+  p.costHistory = p.costHistory || [];
+  p.core = p.core || {required:false, charge:0};
+  if (p.createdAt == null) p.createdAt = new Date().toISOString();
+  return p;
+}
+function savePart(p){
+  shapePart(p);
+  if (p.defaultVendorId && !p.sources.some(x => x.vendorId === p.defaultVendorId)){
+    p.sources.unshift({vendorId:p.defaultVendorId, vendorSku:p.vendorSku || "", lastCost:null,
+                       quotedCost:null, quotedAt:null, availability:"", leadTime:"", preferred:true});
+  }
+  p.updatedAt = new Date().toISOString();
+  db.parts[p.id] = p;
+  return p;
+}
+function newPart(fields){
+  const p = shapePart(Object.assign({id:uid("prt"), sku:"", altSku:"", supersededBy:"", desc:"",
+    brand:"", category:"", defaultVendorId:"", vendorSku:"", cost:0, price:null, markup:null,
+    taxable:null, tracked:true, onHand:0, reorderLevel:0, bin:"", unit:PART_UNITS_DEFAULT,
+    notes:"", active:true}, fields || {}));
+  if (Number(p.cost) > 0 && !p.costHistory.length){
+    p.costHistory.push({at:new Date().toISOString(), cost:r2(p.cost),
+                        vendorId:p.defaultVendorId || "", poNo:"", note:"opening cost"});
+  }
+  return savePart(p);
+}
+function partLabel(p){
+  if (!p) return "—";
+  return [p.brand, p.desc].filter(Boolean).join(" ") || p.sku || "Part";
+}
+
+/* ---------- markup ----------
+   A sell price always says where it came from, because "why is this part
+   $88?" is a question a shop has to be able to answer a year later. */
+function markupTierFor(cost){
+  const c = Number(cost) || 0;
+  const rows = (db.settings.markupMatrix || []).slice()
+    .sort((a,b) => (a.upTo == null ? Infinity : a.upTo) - (b.upTo == null ? Infinity : b.upTo));
+  for (const row of rows){ if (row.upTo == null || c <= row.upTo) return row; }
+  return null;
+}
+function suggestPrice(cost, part){
+  const c = Number(cost) || 0;
+  if (part && part.price != null && part.price !== "") return {price:r2(part.price), source:"catalog"};
+  if (part && part.markup != null && part.markup !== "") return {price:r2(c * (1 + Number(part.markup)/100)), source:"part markup"};
+  const tier = markupTierFor(c);
+  if (tier) return {price:r2(c * (1 + Number(tier.pct)/100)), source:"markup tier"};
+  return {price:suggestedPrice(c, db.settings.partsMarkup), source:"default markup"};
+}
+
+/* ---------- vendors ---------- */
+function saveVendor(v){
+  if (v.active == null) v.active = true;
+  v.updatedAt = new Date().toISOString();
+  if (!v.createdAt) v.createdAt = v.updatedAt;
+  db.vendors[v.id] = v;
+  return v;
+}
+function newVendor(fields){
+  return saveVendor(Object.assign({id:uid("ven"), name:"", contact:"", phone:"", phone2:"",
+    email:"", account:"", address:"", website:"", notes:"", active:true}, fields || {}));
+}
+function vendorName(id){ const v = db.vendors[id]; return v ? v.name : ""; }
+
+/* ---------- stock ----------
+   Committed is derived from live tickets every time it is asked for. */
+function partCommitted(partId){
+  let n = 0;
+  vals(db.orders).forEach(o => {
+    if (isDead(o) || canonStatus(o.status) === "Paid / Closed") return;
+    (o.parts || []).forEach(x => {
+      if (x.partId !== partId) return;
+      const st = partState(x);
+      if (st === "Installed" || st === "Cancelled" || st === "Returned") return;
+      n += Number(x.qty) || 0;
+    });
+  });
+  return r2(n);
+}
+function partOnHand(partId){ const p = db.parts[partId]; return p ? r2(Number(p.onHand) || 0) : 0; }
+function partAvailable(partId){ return r2(partOnHand(partId) - partCommitted(partId)); }
+function isLowStock(p){
+  if (!p || !p.tracked) return false;
+  const lvl = Number(p.reorderLevel) || 0;
+  if (lvl <= 0) return false;
+  return partAvailable(p.id) <= lvl;
+}
+function lowStockParts(){ return vals(db.parts).filter(p => p.active !== false && isLowStock(p)); }
+
+/* Every change to stock is a movement with a reason attached. Overwriting a
+   quantity leaves nobody able to answer "where did the other two go?". */
+function moveStock(partId, qty, type, opts){
+  opts = opts || {};
+  const p = db.parts[partId];
+  if (!p) return null;
+  const n = Number(qty) || 0;
+  const m = {id:uid("mv"), at:new Date().toISOString(), partId, qty:r2(n), type,
+             poId:opts.poId || "", orderId:opts.orderId || "",
+             who:opts.who || db.settings.lastTech || "", note:opts.note || ""};
+  db.movements.push(m);
+  if (p.tracked){
+    const next = r2((Number(p.onHand) || 0) + n);
+    /* Stock cannot be negative. If the shelf disagrees with the book the book
+       is wrong, and it says so rather than inventing a negative. */
+    p.onHand = next < 0 ? 0 : next;
+    if (next < 0) m.note = (m.note ? m.note + " · " : "") + "count would have gone below zero; held at zero";
+    p.updatedAt = m.at;
+  }
+  return m;
+}
+function movementsFor(partId){
+  return db.movements.filter(m => m.partId === partId).slice().reverse();
+}
+function recordCost(partId, cost, vendorId, poNo){
+  const p = db.parts[partId]; if (!p) return;
+  const c = Number(cost);
+  if (!isFinite(c) || c < 0) return;
+  /* The newest cost becomes the suggestion; the old ones stay, because what a
+     part used to cost is how a shop notices it has gone up 30%. */
+  p.costHistory.push({at:new Date().toISOString(), cost:r2(c), vendorId:vendorId || "", poNo:poNo || ""});
+  p.cost = r2(c);
+  if (vendorId){
+    let src = (p.sources || []).find(x => x.vendorId === vendorId);
+    if (!src){ src = {vendorId, vendorSku:"", lastCost:null, quotedCost:null, quotedAt:null,
+                      availability:"", leadTime:"", preferred:false}; p.sources.push(src); }
+    src.lastCost = r2(c);
+  }
+  p.updatedAt = new Date().toISOString();
+}
+
+/* ---------- purchase orders ---------- */
+function shapePO(po){
+  if (!po) return po;
+  po.lines = po.lines || [];
+  po.history = po.history || [];
+  return po;
+}
+function newPO(vendorId, fields){
+  const po = shapePO(Object.assign({id:uid("po"), no:nextNumber("po"), vendorId:vendorId || "",
+    status:"Draft", createdAt:new Date().toISOString(), orderedAt:null, expected:"",
+    receivedAt:null, notes:"", ref:"", lines:[], history:[]}, fields || {}));
+  db.purchaseOrders[po.id] = po;
+  return po;
+}
+function poLabel(po){ return po ? "PO-" + po.no : "—"; }
+function poTotal(po){
+  return r2((po.lines || []).reduce((s,l) =>
+    s + (Number(l.qty) || 0) * (Number(l.unitCost) || 0) + (Number(l.core) || 0) * (Number(l.qty) || 0), 0));
+}
+function poReceivedTotal(po){
+  return r2((po.lines || []).reduce((s,l) => s + (Number(l.qtyReceived) || 0) * (Number(l.unitCost) || 0), 0));
+}
+function addPOLine(po, fields){
+  const l = Object.assign({id:uid("pol"), partId:"", desc:"", vendorSku:"", qty:1, qtyReceived:0,
+    unitCost:0, core:0, expected:"", orderId:"", roLineId:"", status:"Ordered", note:""}, fields || {});
+  po.lines.push(l);
+  return l;
+}
+function setPOStatus(po, next, note){
+  if (po.status === next) return;
+  po.history.push({at:new Date().toISOString(), from:po.status, to:next, note:note || ""});
+  po.status = next;
+  if (next === "Ordered" && !po.orderedAt) po.orderedAt = new Date().toISOString();
+  if (next === "Received" && !po.receivedAt) po.receivedAt = new Date().toISOString();
+}
+/* A PO is only finished when every ordered unit is accounted for - received or
+   deliberately cancelled. Anything less stays open and visible. */
+function recalcPOStatus(po){
+  if (po.status === "Cancelled" || po.status === "Closed" || po.status === "Draft") return po.status;
+  const lines = (po.lines || []).filter(l => l.status !== "Cancelled");
+  if (!lines.length) return po.status;
+  const all = lines.every(l => (Number(l.qtyReceived) || 0) >= (Number(l.qty) || 0));
+  const some = lines.some(l => (Number(l.qtyReceived) || 0) > 0);
+  const back = lines.some(l => l.status === "Backordered");
+  const next = all ? "Received" : back ? "Backordered" : some ? "Partially Received" : po.status;
+  if (next !== po.status) setPOStatus(po, next, "receiving");
+  return po.status;
+}
+/* Ordering a part from a ticket. If this vendor already has a PO still being
+   built, the line joins it rather than starting a second one — a writer should
+   never have to think about which PO a part belongs on. */
+function draftPOFor(vendorId){
+  return vals(db.purchaseOrders).find(po => po.vendorId === vendorId && po.status === "Draft") || null;
+}
+function orderPartFromRO(o, roLine, vendorId, opts){
+  opts = opts || {};
+  const po = opts.po || draftPOFor(vendorId) || newPO(vendorId);
+  const part = roLine.partId ? db.parts[roLine.partId] : null;
+  const line = addPOLine(po, {
+    partId: roLine.partId || "",
+    desc: roLine.desc || (part ? partLabel(part) : ""),
+    vendorSku: roLine.partNo || (part ? (part.vendorSku || part.sku) : ""),
+    qty: Number(roLine.qty) || 1,
+    unitCost: Number(roLine.cost) || (part ? Number(part.cost) || 0 : 0),
+    core: (part && part.core && part.core.required) ? Number(part.core.charge) || 0 : Number(roLine.core && roLine.core.charge) || 0,
+    expected: roLine.expected || "",
+    orderId: o.id, roLineId: roLine.id, status: "Ordered"
+  });
+  roLine.poId = po.id;
+  roLine.poLineId = line.id;
+  roLine.vendorId = vendorId;
+  roLine.vendor = vendorName(vendorId) || roLine.vendor || "";
+  roLine.orderNo = poLabel(po);
+  if (po.status === "Ordered") roLine.procurement = "Ordered";
+  return {po, line};
+}
+/* Marking a PO ordered is what tells every ticket waiting on it. */
+function markPOOrdered(po){
+  setPOStatus(po, "Ordered", "");
+  (po.lines || []).forEach(l => {
+    const o = db.orders[l.orderId];
+    if (!o) return;
+    const rl = (o.parts || []).find(x => x.id === l.roLineId);
+    if (rl && PART_HELD.indexOf(partState(rl)) >= 0) rl.procurement = "Ordered";
+  });
+}
+/* Receiving. Cost may change - an invoice often differs from a quote - and the
+   new cost is recorded. The SELLING price is never touched: the customer has
+   already been quoted, and moving their price because the shop's supplier put
+   theirs up is not something that should happen by itself. */
+function receivePOLine(po, line, qty, opts){
+  opts = opts || {};
+  const want = Number(qty);
+  if (!isFinite(want) || want <= 0) return null;
+  const outstanding = (Number(line.qty) || 0) - (Number(line.qtyReceived) || 0);
+  const take = Math.min(want, Math.max(0, outstanding));
+  if (take <= 0) return null;
+
+  if (opts.unitCost != null && opts.unitCost !== "" && isFinite(Number(opts.unitCost))){
+    line.unitCost = r2(Number(opts.unitCost));
+  }
+  line.qtyReceived = r2((Number(line.qtyReceived) || 0) + take);
+  line.receivedAt = new Date().toISOString();
+  if (opts.ref) po.ref = opts.ref;
+
+  if (line.partId && db.parts[line.partId]){
+    recordCost(line.partId, line.unitCost, po.vendorId, poLabel(po));
+    moveStock(line.partId, take, "Purchase Receipt",
+      {poId:po.id, orderId:line.orderId, note:opts.ref ? "ref " + opts.ref : "", who:opts.who});
+  }
+  const complete = (Number(line.qtyReceived) || 0) >= (Number(line.qty) || 0);
+  line.status = complete ? "Received" : (opts.backorder ? "Backordered" : "Partially Received");
+
+  /* the ticket that asked for it */
+  const o = db.orders[line.orderId];
+  if (o){
+    const rl = (o.parts || []).find(x => x.id === line.roLineId);
+    if (rl){
+      rl.receivedAt = line.receivedAt;
+      rl.procurement = complete ? "Received" : (opts.backorder ? "Backordered" : "Shipped");
+      /* Cost follows the invoice; the customer's price does not move. */
+      if (!isFinal(o)) rl.cost = line.unitCost;
+    }
+  }
+  recalcPOStatus(po);
+  return {received:take, complete};
+}
+function backorderPOLine(po, line, note){
+  line.status = "Backordered";
+  const o = db.orders[line.orderId];
+  if (o){
+    const rl = (o.parts || []).find(x => x.id === line.roLineId);
+    if (rl) rl.procurement = "Backordered";
+  }
+  po.history.push({at:new Date().toISOString(), from:po.status, to:po.status, note:"backordered: " + (note || line.desc)});
+  recalcPOStatus(po);
+}
+
+/* ---------- a part on a ticket ---------- */
+/* Fitting a part is the moment stock actually leaves the shelf. */
+function installROPart(o, x, who){
+  x.procurement = "Installed";
+  x.installedAt = new Date().toISOString();
+  if (x.partId && db.parts[x.partId]){
+    moveStock(x.partId, -(Number(x.qty) || 0), "Assigned/Consumed",
+      {orderId:o.id, who:who, note:"fitted on " + ticketNo(o)});
+    if (x.core && x.core.required && x.core.status === "Core Not Required") x.core.status = "Core Due";
+  }
+}
+function returnROPartToStock(o, x, qty, note, who){
+  const n = Number(qty) || Number(x.qty) || 0;
+  if (x.partId && db.parts[x.partId]) moveStock(x.partId, n, "Return to Stock", {orderId:o.id, who:who, note:note || ""});
+  x.procurement = "Returned";
+  x.returnedAt = new Date().toISOString();
+  x.returnNote = note || "";
+  return n;
+}
+function returnPartToVendor(x, qty, vendorId, note, expectedCredit, who){
+  const n = Number(qty) || Number(x.qty) || 0;
+  if (x.partId && db.parts[x.partId]) moveStock(x.partId, -n, "Vendor Return",
+    {who:who, note:(note || "") + (vendorId ? " · " + vendorName(vendorId) : "")});
+  x.vendorReturn = {at:new Date().toISOString(), qty:n, vendorId:vendorId || "", note:note || "",
+                    expectedCredit:expectedCredit != null ? r2(expectedCredit) : null, actualCredit:null};
+  x.procurement = "Returned";
+  return x.vendorReturn;
+}
+function shapeCore(x){
+  if (!x.core) x.core = {required:false, charge:0, status:"Core Not Required", expectedCredit:null, actualCredit:null, at:null};
+  return x.core;
+}
+
+/* ---------- is this car waiting on anything? ---------- */
+function partsNeeded(o){
+  return (o.parts || []).filter(x => x.desc && PART_HELD.indexOf(partState(x)) >= 0);
+}
+function partsReady(o){
+  const need = (o.parts || []).filter(x => x.desc && partState(x) !== "Cancelled" && partState(x) !== "Returned");
+  if (!need.length) return false;
+  return need.every(x => {
+    const st = partState(x);
+    if (st === "Received" || st === "Installed") return true;
+    /* something on the shelf is as good as received */
+    if (x.partId && partAvailable(x.partId) >= (Number(x.qty) || 0)) return true;
+    return false;
+  });
+}
+function stockShortfall(x){
+  if (!x.partId) return 0;
+  const p = db.parts[x.partId];
+  if (!p || !p.tracked) return 0;
+  const want = Number(x.qty) || 0;
+  const have = partAvailable(x.partId) + want;   /* this line's own claim does not count against itself */
+  return want > have ? r2(want - have) : 0;
+}
+
+/* ---------- searching the parts world ---------- */
+function searchParts(q){
+  const t = String(q || "").toLowerCase().trim();
+  if (!t) return vals(db.parts).filter(p => p.active !== false).slice(0, 50);
+  return vals(db.parts).filter(p =>
+    [p.sku, p.altSku, p.supersededBy, p.desc, p.brand, p.category, p.bin, p.vendorSku,
+     vendorName(p.defaultVendorId), (p.sources||[]).map(x => x.vendorSku + " " + vendorName(x.vendorId)).join(" ")]
+      .filter(Boolean).join(" ").toLowerCase().indexOf(t) >= 0);
+}
+function searchPOs(q){
+  const t = String(q || "").toLowerCase().trim();
+  if (!t) return [];
+  return vals(db.purchaseOrders).filter(po =>
+    [poLabel(po), vendorName(po.vendorId), po.ref, po.notes,
+     (po.lines||[]).map(l => l.desc + " " + l.vendorSku).join(" ")].filter(Boolean).join(" ").toLowerCase().indexOf(t) >= 0);
+}
+
+
+/* ---------- the parts screens ----------
+   Cost, margin and stock live here and nowhere a customer can see. This is
+   convenience, not security: there are no logins in this program and it does
+   not pretend there are. */
+let partsTab = "dash", partsQ = "", poId = null, vendorId = null;
+function renderParts(){
+  const tabs = [["dash","Overview"],["catalog","Catalog"],["pos","Purchase Orders"],["vendors","Vendors"],["moves","Movements"]];
+  $("#app").innerHTML = `
+  <div class="toolbar"><h2 style="margin:0">Parts</h2>
+    <div class="tabs" style="margin:0">${tabs.map(([k,l])=>`<button class="${partsTab===k?"on":""}" onclick="partsTab='${k}';renderParts()">${l}</button>`).join("")}</div>
+    <div class="grow"></div>
+    ${partsTab==="catalog"?`<button class="primary" onclick="editPart(null)">+ Add part</button>`:""}
+    ${partsTab==="vendors"?`<button class="primary" onclick="editVendor(null)">+ Add vendor</button>`:""}
+    ${partsTab==="pos"?`<button class="primary" onclick="newPODialog()">+ Purchase order</button>`:""}
+  </div>
+  ${partsTab==="dash"?partsDash():partsTab==="catalog"?partsCatalog():partsTab==="pos"?partsPOs():partsTab==="vendors"?partsVendors():partsMoves()}`;
+  const q=$("#pq"); if(q) q.oninput=()=>{const at=q.selectionStart;partsQ=q.value;renderParts();const n=$("#pq");n.focus();n.setSelectionRange(at,at);};
+}
+/* What somebody standing at the parts counter needs to know before lunch. */
+function partsDash(){
+  const low = lowStockParts();
+  const openPOs = vals(db.purchaseOrders).filter(po => ["Draft","Ordered","Partially Received","Backordered"].indexOf(po.status) >= 0);
+  const liveOrders = vals(db.orders).filter(o => !isDead(o) && canonStatus(o.status) !== "Paid / Closed");
+  const needed = [];
+  liveOrders.forEach(o => partsNeeded(o).forEach(x => needed.push({o, x})));
+  const today = todayStr();
+  const expected = [];
+  openPOs.forEach(po => (po.lines||[]).forEach(l => { if (l.expected && l.expected <= today && (Number(l.qtyReceived)||0) < (Number(l.qty)||0)) expected.push({po, l}); }));
+  const ready = liveOrders.filter(o => partsReady(o) && (o.parts||[]).some(x => x.desc));
+  const awaiting = [];
+  liveOrders.forEach(o => (o.parts||[]).forEach(x => { if (partState(x) === "Received") awaiting.push({o, x}); }));
+  const card = (title, n, body) => `<div class="card"><div class="toolbar"><h2 style="margin:0">${title}</h2><span class="muted">${n}</span></div>${body}</div>`;
+  return `
+  <div class="row" style="margin-bottom:6px">
+    <div class="card" style="text-align:center"><div style="font-size:30px;font-weight:800">${low.length}</div><div class="muted">Low stock</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:30px;font-weight:800">${needed.length}</div><div class="muted">Parts needed</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:30px;font-weight:800">${openPOs.length}</div><div class="muted">Open POs</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:30px;font-weight:800">${awaiting.length}</div><div class="muted">Received, not fitted</div></div>
+  </div>
+  ${needed.length?card("Parts needed for open tickets", needed.length,
+    `<table><thead><tr><th>Part</th><th>Ticket</th><th>Vehicle</th><th>State</th><th>PO</th><th></th></tr></thead><tbody>
+    ${needed.map(({o,x})=>`<tr><td><b>${esc(x.desc)}</b>${x.partNo?` <span class="muted">${esc(x.partNo)}</span>`:""}</td>
+      <td class="clk" onclick="editOrder('${o.id}')">${esc(ticketNo(o))}</td><td>${esc(vehLabel(o.vehicleId))}</td>
+      <td><span class="badge ${partState(x)==="Backordered"?"b-verify":"b-override"}">${esc(partState(x))}</span></td>
+      <td>${x.poId&&db.purchaseOrders[x.poId]?`<span class="clk" onclick="openPO('${x.poId}')">${esc(poLabel(db.purchaseOrders[x.poId]))}</span>`:"—"}</td>
+      <td class="right">${x.poId?"":`<button class="sm primary" onclick="orderPartDialog('${o.id}','${x.id}')">Order</button>`}</td></tr>`).join("")}
+    </tbody></table>`):""}
+  ${expected.length?card("Expected today or overdue", expected.length,
+    `<table><thead><tr><th>Part</th><th>PO</th><th>Vendor</th><th>Expected</th></tr></thead><tbody>
+    ${expected.map(({po,l})=>`<tr class="clk" onclick="openPO('${po.id}')"><td>${esc(l.desc)}</td><td>${esc(poLabel(po))}</td>
+      <td>${esc(vendorName(po.vendorId))}</td><td>${esc(l.expected)}</td></tr>`).join("")}</tbody></table>`):""}
+  ${ready.length?card("Tickets with all parts on hand", ready.length,
+    `<table><thead><tr><th>Ticket</th><th>Customer</th><th>Vehicle</th></tr></thead><tbody>
+    ${ready.map(o=>`<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${esc(ticketNo(o))}</b></td>
+      <td>${esc(custName(o.customerId))}</td><td>${esc(vehLabel(o.vehicleId))}</td></tr>`).join("")}</tbody></table>`):""}
+  ${low.length?card("Low stock", low.length,
+    `<table><thead><tr><th>Part</th><th>Bin</th><th>Available</th><th>Reorder at</th><th></th></tr></thead><tbody>
+    ${low.map(p=>`<tr class="clk" onclick="editPart('${p.id}')"><td><b>${esc(partLabel(p))}</b> <span class="muted">${esc(p.sku||"")}</span></td>
+      <td>${esc(p.bin||"—")}</td><td class="stock low">${partAvailable(p.id)}</td><td>${esc(p.reorderLevel)}</td>
+      <td class="right"><button class="sm" onclick="event.stopPropagation();orderStockDialog('${p.id}')">Order</button></td></tr>`).join("")}
+    </tbody></table>`):""}
+  ${openPOs.length?card("Open purchase orders", openPOs.length, poTable(openPOs)):`<div class="card"><div class="empty">No open purchase orders.</div></div>`}`;
+}
+function partsCatalog(){
+  const list = searchParts(partsQ);
+  return `<div class="card">
+    <input class="search" id="pq" style="width:100%;max-width:520px" placeholder="Part number, description, brand, bin, vendor…" value="${esc(partsQ)}">
+    <table><thead><tr><th>Part</th><th>Number</th><th>Bin</th><th>On hand</th><th>Committed</th><th>Available</th><th class="right">Cost</th><th class="right">Sells for</th><th></th></tr></thead><tbody>
+    ${list.map(p=>{const sug=suggestPrice(p.cost,p);const gp=r2(sug.price-(Number(p.cost)||0));
+      return `<tr class="clk" onclick="editPart('${p.id}')">
+      <td><b>${esc(partLabel(p))}</b>${isLowStock(p)?` <span class="badge b-verify">LOW</span>`:""}${p.tracked?"":` <span class="badge b-manual">NON-STOCK</span>`}
+        ${p.category?`<div class="muted" style="font-size:11px">${esc(p.category)}</div>`:""}</td>
+      <td class="muted">${esc(p.sku||"—")}</td><td>${esc(p.bin||"—")}</td>
+      <td>${p.tracked?esc(partOnHand(p.id)):"—"}</td><td>${p.tracked?esc(partCommitted(p.id)):"—"}</td>
+      <td class="stock ${isLowStock(p)?"low":""}">${p.tracked?esc(partAvailable(p.id)):"—"}</td>
+      <td class="right">${money(p.cost)}</td>
+      <td class="right">${money(sug.price)}<div class="gp ${gp<=0?"thin":""}">${money(gp)} · ${sug.source}</div></td>
+      <td class="right"><button class="sm" onclick="event.stopPropagation();adjustStock('${p.id}')">Adjust</button></td></tr>`;}).join("")}
+    </tbody></table>
+    ${list.length?"":`<div class="empty">${partsQ?"Nothing matches that.":"No parts yet. Add the ones you keep on the shelf."}</div>`}
+    <p class="muted" style="font-size:12px;margin-bottom:0">Cost, margin and stock are shown here for the shop. None of it reaches a customer document.</p></div>`;
+}
+function poTable(list){
+  return `<table><thead><tr><th>PO</th><th>Vendor</th><th>Status</th><th>Lines</th><th>Expected</th><th class="right">Cost</th></tr></thead><tbody>
+  ${list.sort((a,b)=>b.no-a.no).map(po=>`<tr class="clk" onclick="openPO('${po.id}')"><td><b>${esc(poLabel(po))}</b></td>
+    <td>${esc(vendorName(po.vendorId)||"—")}</td>
+    <td><span class="badge ${po.status==="Backordered"?"b-verify":po.status==="Received"?"b-vehicle":"b-override"}">${esc(po.status)}</span></td>
+    <td>${(po.lines||[]).length}</td><td>${esc(po.expected||"—")}</td><td class="right">${money(poTotal(po))}</td></tr>`).join("")}
+  </tbody></table>`;
+}
+function partsPOs(){
+  const list = partsQ ? searchPOs(partsQ) : vals(db.purchaseOrders);
+  return `<div class="card">
+    <input class="search" id="pq" style="width:100%;max-width:420px" placeholder="PO number, vendor, part…" value="${esc(partsQ)}">
+    ${list.length?poTable(list):`<div class="empty">No purchase orders yet.</div>`}</div>`;
+}
+function partsVendors(){
+  const list = vals(db.vendors).filter(v => !partsQ || (v.name+" "+(v.contact||"")+" "+(v.phone||"")+" "+(v.email||"")).toLowerCase().indexOf(partsQ.toLowerCase())>=0);
+  return `<div class="card">
+    <input class="search" id="pq" style="width:100%;max-width:420px" placeholder="Vendor name, contact, phone…" value="${esc(partsQ)}">
+    ${list.length?`<table><thead><tr><th>Vendor</th><th>Contact</th><th>Phone</th><th>Account</th><th>Open POs</th></tr></thead><tbody>
+    ${list.map(v=>`<tr class="clk" onclick="openVendor('${v.id}')"><td><b>${esc(v.name)}</b></td><td>${esc(v.contact||"")}</td>
+      <td>${esc(v.phone||"")}</td><td>${esc(v.account||"")}</td>
+      <td>${vals(db.purchaseOrders).filter(po=>po.vendorId===v.id&&["Draft","Ordered","Partially Received","Backordered"].indexOf(po.status)>=0).length}</td></tr>`).join("")}
+    </tbody></table>`:`<div class="empty">No vendors yet.</div>`}</div>`;
+}
+function partsMoves(){
+  const list = db.movements.slice().reverse().slice(0,200);
+  return `<div class="card"><h2 style="margin-top:0">Stock movements</h2>
+    ${list.length?`<table><thead><tr><th>When</th><th>Part</th><th>Change</th><th>Why</th><th>Reference</th><th>Who</th></tr></thead><tbody>
+    ${list.map(m=>`<tr><td>${esc(String(m.at).slice(0,16).replace("T"," "))}</td>
+      <td>${esc(partLabel(db.parts[m.partId]))}</td>
+      <td class="stock ${m.qty<0?"low":""}">${m.qty>0?"+":""}${esc(m.qty)}</td>
+      <td>${esc(m.type)}</td>
+      <td>${m.poId&&db.purchaseOrders[m.poId]?esc(poLabel(db.purchaseOrders[m.poId])):""}${m.orderId&&db.orders[m.orderId]?" "+esc(ticketNo(db.orders[m.orderId])):""}${m.note?` <span class="muted">${esc(m.note)}</span>`:""}</td>
+      <td>${esc(m.who||"")}</td></tr>`).join("")}
+    </tbody></table>`:`<div class="empty">No stock movements yet. Every receipt, fitting, return and adjustment is listed here.</div>`}</div>`;
+}
+
+/* ---------- editors ---------- */
+function editPart(id, then){
+  const p = shapePart(id ? JSON.parse(JSON.stringify(db.parts[id])) : newPartDraft());
+  const venOpts = vals(db.vendors).map(v=>`<option value="${v.id}" ${v.id===p.defaultVendorId?"selected":""}>${esc(v.name)}</option>`).join("");
+  const sug = suggestPrice(p.cost, p);
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>${id?"Edit":"Add"} part</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+  <div class="row"><div><label>Description</label><input id="p_desc" value="${esc(p.desc)}"></div>
+    <div><label>Brand</label><input id="p_brand" value="${esc(p.brand)}"></div>
+    <div><label>Category</label><input id="p_category" value="${esc(p.category)}" placeholder="Brakes, Filters, Tire, Fluid…"></div></div>
+  <div class="row"><div><label>Part number</label><input id="p_sku" value="${esc(p.sku)}"></div>
+    <div><label>Alternate number</label><input id="p_altSku" value="${esc(p.altSku)}"></div>
+    <div><label>Superseded by</label><input id="p_supersededBy" value="${esc(p.supersededBy)}"></div></div>
+  <div class="row"><div><label>Default vendor</label><select id="p_defaultVendorId"><option value="">—</option>${venOpts}</select></div>
+    <div><label>Vendor part number</label><input id="p_vendorSku" value="${esc(p.vendorSku)}"></div>
+    <div><label>Bin / location</label><input id="p_bin" value="${esc(p.bin)}"></div>
+    <div><label>Unit</label><select id="p_unit">${(db.settings.inventoryUnits||["each"]).map(u=>`<option value="${u}" ${p.unit===u?"selected":""}>${u}</option>`).join("")}</select></div></div>
+  <div class="row"><div><label>Cost</label><input id="p_cost" inputmode="decimal" value="${esc(p.cost)}"></div>
+    <div><label>Sell price <span class="muted" style="font-weight:400">— blank to use markup</span></label><input id="p_price" inputmode="decimal" value="${esc(p.price==null?"":p.price)}"></div>
+    <div><label>Markup % <span class="muted" style="font-weight:400">— blank to use the tiers</span></label><input id="p_markup" inputmode="decimal" value="${esc(p.markup==null?"":p.markup)}"></div>
+    <div><label>Suggested</label><input value="${money(sug.price)} (${sug.source})" disabled></div></div>
+  <div class="row"><div class="chk"><label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="p_tracked" ${p.tracked?"checked":""} style="width:auto"> Keep stock of this part</label></div>
+    <div><label>On hand</label><input id="p_onHand" inputmode="decimal" value="${esc(p.onHand)}" ${id?"disabled title='Use Adjust to change stock, so the movement is recorded'":""}></div>
+    <div><label>Reorder at</label><input id="p_reorderLevel" inputmode="decimal" value="${esc(p.reorderLevel)}"></div></div>
+  <div class="row"><div class="chk"><label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="p_coreReq" ${p.core.required?"checked":""} style="width:auto"> This part has a core</label></div>
+    <div><label>Core charge</label><input id="p_coreCharge" inputmode="decimal" value="${esc(p.core.charge||0)}"></div></div>
+  <label>Notes</label><input id="p_notes" value="${esc(p.notes)}">
+  ${id?partHistoryBlock(p):""}
+  <div class="toolbar" style="margin-top:14px"><button class="green" id="p_save">Save part</button>
+    ${id?`<button class="sm" onclick="adjustStock('${id}')">Adjust stock…</button>`:""}</div>`;
+  $("#p_save").onclick = () => {
+    ["desc","brand","category","sku","altSku","supersededBy","defaultVendorId","vendorSku","bin","unit","notes"]
+      .forEach(k => { const el=$("#p_"+k); if(el) p[k]=el.value; });
+    p.cost = Number($("#p_cost").value) || 0;
+    p.price = $("#p_price").value === "" ? null : Number($("#p_price").value);
+    p.markup = $("#p_markup").value === "" ? null : Number($("#p_markup").value);
+    p.tracked = $("#p_tracked").checked;
+    p.reorderLevel = Number($("#p_reorderLevel").value) || 0;
+    p.core.required = $("#p_coreReq").checked;
+    p.core.charge = Number($("#p_coreCharge").value) || 0;
+    if (!p.desc && !p.sku){ alert("Give the part a description or a part number."); return; }
+    const isNew = !id;
+    if (isNew){
+      const start = Number($("#p_onHand").value) || 0;
+      p.onHand = 0;
+      savePart(p);
+      if (start) moveStock(p.id, start, "Initial Balance", {note:"opening count"});
+    } else savePart(p);
+    save(); closeRec();
+    if (then) then(p.id); else render();
+  };
+  $("#recOverlay").classList.add("on");
+}
+function newPartDraft(){ return shapePart({id:uid("prt"), sku:"", desc:"", brand:"", category:"", cost:0,
+  price:null, markup:null, tracked:true, onHand:0, reorderLevel:0, bin:"", unit:PART_UNITS_DEFAULT, notes:""}); }
+function partHistoryBlock(p){
+  const hist = (p.costHistory||[]).slice().reverse().slice(0,8);
+  const moves = movementsFor(p.id).slice(0,8);
+  return `${hist.length?`<h3 style="margin:14px 0 4px;font-size:13px">What it has cost</h3>
+    <table><tbody>${hist.map(h=>`<tr><td>${esc(String(h.at).slice(0,10))}</td><td>${esc(vendorName(h.vendorId)||"—")}</td>
+      <td>${esc(h.poNo||"")}</td><td class="right">${money(h.cost)}</td></tr>`).join("")}</tbody></table>`:""}
+  ${moves.length?`<h3 style="margin:14px 0 4px;font-size:13px">Stock movements</h3>
+    <table><tbody>${moves.map(m=>`<tr><td>${esc(String(m.at).slice(0,10))}</td><td>${m.qty>0?"+":""}${esc(m.qty)}</td>
+      <td>${esc(m.type)}</td><td class="muted">${esc(m.note||"")}</td></tr>`).join("")}</tbody></table>`:""}`;
+}
+function adjustStock(id){
+  const p = db.parts[id]; if(!p) return;
+  const raw = prompt(`Stock for ${partLabel(p)} — on hand is ${partOnHand(id)}.\n\nEnter the NEW counted quantity:`, String(partOnHand(id)));
+  if (raw === null) return;
+  const target = Number(raw);
+  if (!isFinite(target) || target < 0){ alert("That is not a quantity."); return; }
+  const delta = r2(target - partOnHand(id));
+  if (!delta){ alert("That is what the book already says."); return; }
+  const why = prompt("Why? (this is kept with the movement)", "counted");
+  if (why === null) return;
+  moveStock(id, delta, "Manual Adjustment", {note:why});
+  save(); closeRec(); render();
+}
+function editVendor(id, then){
+  const v = id ? JSON.parse(JSON.stringify(db.vendors[id])) : {id:uid("ven"), name:"", contact:"", phone:"",
+    phone2:"", email:"", account:"", address:"", website:"", notes:"", active:true};
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>${id?"Edit":"Add"} vendor</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+  <div class="row"><div><label>Vendor name</label><input id="ve_name" value="${esc(v.name)}"></div>
+    <div><label>Contact</label><input id="ve_contact" value="${esc(v.contact)}"></div>
+    <div><label>Account number</label><input id="ve_account" value="${esc(v.account)}"></div></div>
+  <div class="row"><div><label>Phone</label><input id="ve_phone" value="${esc(v.phone)}"></div>
+    <div><label>Other phone</label><input id="ve_phone2" value="${esc(v.phone2)}"></div>
+    <div><label>Email</label><input id="ve_email" value="${esc(v.email)}"></div></div>
+  <div class="row"><div><label>Address</label><input id="ve_address" value="${esc(v.address)}"></div>
+    <div><label>Website</label><input id="ve_website" value="${esc(v.website)}"></div></div>
+  <label>Notes</label><input id="ve_notes" value="${esc(v.notes)}">
+  <div class="toolbar" style="margin-top:14px"><button class="green" id="ve_save">Save vendor</button></div>`;
+  $("#ve_save").onclick = () => {
+    ["name","contact","account","phone","phone2","email","address","website","notes"]
+      .forEach(k => { v[k] = $("#ve_"+k).value; });
+    if (!v.name.trim()){ alert("Give the vendor a name."); return; }
+    saveVendor(v); save(); closeRec();
+    if (then) then(v.id); else render();
+  };
+  $("#recOverlay").classList.add("on");
+}
+function openVendor(id){ leaveSheetFor(() => { vendorId = id; go("vendor"); }); }
+function renderVendor(){
+  const v = db.vendors[vendorId];
+  if (!v){ partsTab="vendors"; go("parts"); return; }
+  const pos = vals(db.purchaseOrders).filter(po => po.vendorId === v.id).sort((a,b)=>b.no-a.no);
+  const openPOs = pos.filter(po => ["Draft","Ordered","Partially Received","Backordered"].indexOf(po.status) >= 0);
+  const bought = [];
+  pos.forEach(po => (po.lines||[]).forEach(l => { if ((Number(l.qtyReceived)||0) > 0) bought.push({po, l}); }));
+  $("#app").innerHTML = `
+  <div class="toolbar"><button onclick="partsTab='vendors';go('parts')">← Vendors</button><h2 style="margin:0">${esc(v.name)}</h2>
+    <div class="grow"></div><button class="sm" onclick="editVendor('${v.id}')">Edit</button>
+    <button class="primary" onclick="newPODialog('${v.id}')">+ Purchase order</button></div>
+  <div class="card"><div class="row">
+    <div><h3>Contact</h3>${esc(v.contact||"—")}<br>${esc(v.phone||"")}${v.phone2?`<br>${esc(v.phone2)}`:""}<br>${esc(v.email||"")}</div>
+    <div><h3>Account</h3>${esc(v.account||"—")}<br>${esc(v.address||"")}<br>${esc(v.website||"")}</div>
+    ${v.notes?`<div><h3>Notes</h3>${esc(v.notes)}</div>`:""}
+  </div></div>
+  ${openPOs.length?`<div class="card"><h2 style="margin-top:0">Open purchase orders</h2>${poTable(openPOs)}</div>`:""}
+  ${pos.length?`<div class="card"><h2 style="margin-top:0">All purchase orders</h2>${poTable(pos.slice(0,25))}</div>`:`<div class="card"><div class="empty">Nothing ordered from this vendor yet.</div></div>`}
+  ${bought.length?`<div class="card"><h2 style="margin-top:0">Recently bought</h2>
+    <table><thead><tr><th>Part</th><th>PO</th><th>Received</th><th class="right">Last cost</th></tr></thead><tbody>
+    ${bought.slice(-20).reverse().map(({po,l})=>`<tr><td>${esc(l.desc)}${l.vendorSku?` <span class="muted">${esc(l.vendorSku)}</span>`:""}</td>
+      <td class="clk" onclick="openPO('${po.id}')">${esc(poLabel(po))}</td><td>${esc(String(l.receivedAt||"").slice(0,10))}</td>
+      <td class="right">${money(l.unitCost)}</td></tr>`).join("")}</tbody></table></div>`:""}`;
+}
+
+/* ---------- a purchase order ---------- */
+function newPODialog(vId){
+  if (!vals(db.vendors).length){ alert("Add a vendor first — a purchase order has to be to somebody."); editVendor(null); return; }
+  const v = vId || prompt("Vendor:\n" + vals(db.vendors).map((x,i)=>(i+1)+". "+x.name).join("\n") + "\n\nNumber:", "1");
+  if (v === null) return;
+  const vendor = db.vendors[v] || vals(db.vendors)[parseInt(v,10)-1];
+  if (!vendor){ alert("No such vendor."); return; }
+  const po = newPO(vendor.id);
+  save(); openPO(po.id);
+}
+function leaveSheetFor(fn){
+  if (cur){ pullWO(); db.orders[cur.id] = JSON.parse(JSON.stringify(cur)); save(); closeWO(); }
+  if ($("#recOverlay").classList.contains("on")) closeRec();
+  fn();
+}
+function openPO(id){ leaveSheetFor(() => { poId = id; go("po"); }); }
+function renderPO(){
+  const po = shapePO(db.purchaseOrders[poId]);
+  if (!po){ partsTab="pos"; go("parts"); return; }
+  const open = po.status !== "Received" && po.status !== "Cancelled" && po.status !== "Closed";
+  $("#app").innerHTML = `
+  <div class="toolbar"><button onclick="partsTab='pos';go('parts')">← Purchase orders</button>
+    <h2 style="margin:0">${esc(poLabel(po))}</h2>
+    <span class="badge ${po.status==="Backordered"?"b-verify":po.status==="Received"?"b-vehicle":"b-override"}">${esc(po.status)}</span>
+    <div class="grow"></div>
+    ${po.status==="Draft"?`<button class="green" onclick="poOrdered()">Mark ordered</button>`:""}
+    ${open&&po.status!=="Draft"?`<button class="primary" onclick="receiveAll()">Receive all</button>`:""}
+    ${open?`<button class="sm danger" onclick="poCancel()">Cancel PO</button>`:""}
+  </div>
+  <div class="card"><div class="row">
+    <div><h3>Vendor</h3>${po.vendorId?`<span class="clk" onclick="openVendor('${po.vendorId}')"><b>${esc(vendorName(po.vendorId))}</b></span>`:"—"}</div>
+    <div><label>Expected</label><input id="po_expected" type="date" value="${esc(po.expected||"")}" onchange="poField('expected',this.value)"></div>
+    <div><label>Reference / packing slip</label><input id="po_ref" value="${esc(po.ref||"")}" onchange="poField('ref',this.value)"></div>
+    <div><h3>Cost</h3><b>${money(poTotal(po))}</b><div class="muted" style="font-size:11.5px">received ${money(poReceivedTotal(po))}</div></div>
+  </div>
+  <label>Notes</label><input id="po_notes" value="${esc(po.notes||"")}" onchange="poField('notes',this.value)"></div>
+  <div class="card"><div class="toolbar"><h2 style="margin:0">Lines</h2><div class="grow"></div>
+    <button class="sm primary" onclick="addPOLineDialog()">+ Line</button></div>
+  <table><thead><tr><th>Part</th><th>Vendor #</th><th>Ordered</th><th>Received</th><th class="right">Unit cost</th><th class="right">Core</th><th>For</th><th>Status</th><th></th></tr></thead><tbody>
+  ${(po.lines||[]).map((l,i)=>{const o=db.orders[l.orderId];
+    return `<tr><td><b>${esc(l.desc)}</b>${l.partId&&db.parts[l.partId]?` <span class="muted">${esc(db.parts[l.partId].sku||"")}</span>`:""}</td>
+    <td class="muted">${esc(l.vendorSku||"")}</td><td>${esc(l.qty)}</td>
+    <td class="${(Number(l.qtyReceived)||0)<(Number(l.qty)||0)?"stock low":"stock"}">${esc(l.qtyReceived||0)}</td>
+    <td class="right">${money(l.unitCost)}</td><td class="right">${l.core?money(l.core):"—"}</td>
+    <td>${o?`<span class="clk" onclick="editOrder('${o.id}')">${esc(ticketNo(o))}</span>`:"stock"}</td>
+    <td><span class="badge ${l.status==="Backordered"?"b-verify":l.status==="Received"?"b-vehicle":"b-override"}">${esc(l.status)}</span></td>
+    <td class="right">${(Number(l.qtyReceived)||0)<(Number(l.qty)||0)?`<button class="sm primary" onclick="receiveLine(${i})">Receive…</button>
+      <button class="sm" onclick="backorderLine(${i})">Backorder</button>`:""}</td></tr>`;}).join("")}
+  </tbody></table>
+  ${(po.lines||[]).length?"":`<div class="empty">Nothing on this purchase order yet.</div>`}</div>
+  ${(po.history||[]).length?`<div class="card"><h3 style="margin-top:0">History</h3>
+    ${po.history.slice().reverse().map(h=>`<div class="authline">${esc(String(h.at).slice(0,16).replace("T"," "))} — ${esc(h.from)} → ${esc(h.to)}${h.note?" · "+esc(h.note):""}</div>`).join("")}</div>`:""}`;
+}
+function poField(k,v){ const po=db.purchaseOrders[poId]; if(!po)return; po[k]=v; save(); }
+function poOrdered(){ markPOOrdered(db.purchaseOrders[poId]); save(); renderPO(); }
+function poCancel(){
+  const po=db.purchaseOrders[poId];
+  if(!confirm("Cancel this purchase order? Lines already received stay received."))return;
+  setPOStatus(po,"Cancelled",prompt("Reason (optional):","")||"");
+  save(); renderPO();
+}
+function addPOLineDialog(){
+  const po=db.purchaseOrders[poId];
+  const q=prompt("Search the parts catalog, or type a description for a one-off:","");
+  if(q===null||!q.trim())return;
+  const hits=searchParts(q);
+  let part=null;
+  if(hits.length){
+    const pick=prompt("Which part?\n"+hits.slice(0,5).map((p,i)=>(i+1)+". "+partLabel(p)+" "+(p.sku||"")).join("\n")+"\n\nNumber, or blank for a one-off line:","1");
+    if(pick===null)return;
+    const n=parseInt(pick,10);
+    if(isFinite(n)&&hits[n-1])part=hits[n-1];
+  }
+  const qty=Number(prompt("Quantity:","1"));
+  if(!isFinite(qty)||qty<=0)return;
+  const cost=Number(prompt("Unit cost:",String(part?part.cost:0)));
+  addPOLine(po,{partId:part?part.id:"",desc:part?partLabel(part):q.trim(),
+    vendorSku:part?(part.vendorSku||part.sku):"",qty,unitCost:isFinite(cost)?cost:0,
+    core:part&&part.core.required?part.core.charge:0,status:po.status==="Draft"?"Draft":"Ordered"});
+  save(); renderPO();
+}
+function receiveLine(i){
+  const po=db.purchaseOrders[poId], l=po.lines[i];
+  const outstanding=(Number(l.qty)||0)-(Number(l.qtyReceived)||0);
+  const raw=prompt(`Receiving ${l.desc}.\n\nHow many arrived? (${outstanding} outstanding)`,String(outstanding));
+  if(raw===null)return;
+  const qty=Number(raw);
+  if(!isFinite(qty)||qty<=0){alert("That is not a quantity.");return;}
+  const costRaw=prompt("Unit cost on the invoice (blank to keep "+money(l.unitCost)+"):","");
+  if(costRaw===null)return;
+  const ref=prompt("Packing slip / invoice reference (optional):",po.ref||"")||"";
+  const res=receivePOLine(po,l,qty,{unitCost:costRaw.trim()===""?null:Number(costRaw),ref});
+  if(res&&!res.complete&&confirm("The rest has not arrived. Mark the remainder backordered?")) backorderPOLine(po,l,"");
+  save(); renderPO();
+}
+function backorderLine(i){
+  const po=db.purchaseOrders[poId];
+  backorderPOLine(po,po.lines[i],prompt("Note (optional):","")||"");
+  save(); renderPO();
+}
+function receiveAll(){
+  const po=db.purchaseOrders[poId];
+  const ref=prompt("Packing slip / invoice reference (optional):",po.ref||"");
+  if(ref===null)return;
+  (po.lines||[]).forEach(l=>{
+    const outstanding=(Number(l.qty)||0)-(Number(l.qtyReceived)||0);
+    if(outstanding>0) receivePOLine(po,l,outstanding,{ref});
+  });
+  save(); renderPO();
+}
+function orderStockDialog(partId){
+  const p=db.parts[partId]; if(!p)return;
+  if(!vals(db.vendors).length){ alert("Add a vendor first."); editVendor(null); return; }
+  const vId=p.defaultVendorId||vals(db.vendors)[0].id;
+  const po=draftPOFor(vId)||newPO(vId);
+  const qty=Number(prompt(`How many ${partLabel(p)}?`,String(Math.max(1,(Number(p.reorderLevel)||1)*2))));
+  if(!isFinite(qty)||qty<=0)return;
+  addPOLine(po,{partId:p.id,desc:partLabel(p),vendorSku:p.vendorSku||p.sku,qty,unitCost:Number(p.cost)||0,
+    core:p.core.required?p.core.charge:0,status:"Draft"});
+  save(); openPO(po.id);
+}
+
+
+/* ---------- parts, from the ticket ----------
+   The counter should never have to retype what the catalog already knows, and
+   should never have to leave the ticket to get a part on order. */
+function pickPartDialog(){
+  pullWO();
+  const q = prompt("Search the parts catalog — number, description, brand or bin.\n\nLeave blank to see what is in stock:", "");
+  if (q === null) return;
+  const hits = searchParts(q).slice(0, 8);
+  if (!hits.length){
+    if (!confirm("Nothing in the catalog matches that.\n\nAdd it to the catalog now?")) return;
+    return editPart(null, id => { addCatalogPartToOrder(id); });
+  }
+  const pick = prompt("Which part?\n" + hits.map((p,i) =>
+    (i+1) + ". " + partLabel(p) + " " + (p.sku ? "["+p.sku+"] " : "") +
+    (p.tracked ? partAvailable(p.id) + " available" : "non-stock") + " · " + money(suggestPrice(p.cost,p).price)).join("\n") +
+    "\n\nNumber, or blank to add a new catalog part:", "1");
+  if (pick === null) return;
+  const n = parseInt(pick, 10);
+  if (isFinite(n) && hits[n-1]) return addCatalogPartToOrder(hits[n-1].id);
+  editPart(null, id => addCatalogPartToOrder(id));
+}
+/* Adding a catalogued part copies its numbers ONTO the ticket rather than
+   pointing at them. A price the customer was quoted must not change later
+   because somebody edited the catalog. */
+function addCatalogPartToOrder(partId){
+  const p = db.parts[partId]; if (!p) return;
+  const qtyRaw = prompt(`How many ${partLabel(p)}?` + (p.tracked ? `\n\n${partAvailable(p.id)} available.` : ""), "1");
+  if (qtyRaw === null) return;
+  const qty = Number(qtyRaw);
+  if (!isFinite(qty) || qty <= 0){ alert("That is not a quantity."); return; }
+  const sug = suggestPrice(p.cost, p);
+  const line = {id:uid("ln"), type:(/tire/i.test(p.category)?"tire":/fluid|oil|coolant/i.test(p.category)?"fluid":"part"),
+    partId:p.id, desc:partLabel(p), partNo:p.sku || "", qty:String(qty),
+    cost:Number(p.cost) || 0, markup:p.markup != null ? p.markup : "", price:sug.price,
+    priceSource:sug.source, priceEdited:false,
+    taxable:p.taxable == null ? null : p.taxable,
+    vendorId:p.defaultVendorId || "", vendor:vendorName(p.defaultVendorId) || "",
+    procurement:(p.tracked && partAvailable(p.id) >= qty) ? "Received" : "Needed",
+    core:{required:!!p.core.required, charge:Number(p.core.charge) || 0,
+          status:p.core.required ? "Core Due" : "Core Not Required", expectedCredit:null, actualCredit:null, at:null}};
+  cur.parts.push(line);
+  save(); renderLines(); updateTotals();
+}
+/* Ordering from the ticket. A vendor with a purchase order still open collects
+   the line rather than starting another one. */
+function orderPartDialog(orderId, lineId){
+  const o = orderId ? db.orders[orderId] : (pullWO(), cur);
+  if (!o) return;
+  const x = (o.parts || []).find(l => l.id === lineId);
+  if (!x){ alert("That part line is gone."); return; }
+  if (!vals(db.vendors).length){
+    if (!confirm("No vendors yet. Add one now?")) return;
+    return editVendor(null, vid => finishOrderPart(o, x, vid));
+  }
+  const list = vals(db.vendors).filter(v => v.active !== false);
+  const pick = prompt("Order " + (x.desc || "this part") + " from:\n" +
+    list.map((v,i) => (i+1) + ". " + v.name + (draftPOFor(v.id) ? "  (open PO " + poLabel(draftPOFor(v.id)) + ")" : "")).join("\n") +
+    "\n\nNumber, or 0 for a new vendor:", "1");
+  if (pick === null) return;
+  const n = parseInt(pick, 10);
+  if (n === 0) return editVendor(null, vid => finishOrderPart(o, x, vid));
+  const v = list[n-1];
+  if (!v){ alert("No such vendor."); return; }
+  finishOrderPart(o, x, v.id);
+}
+function finishOrderPart(o, x, vendorId){
+  const costRaw = prompt("Expected cost each (blank to keep " + money(x.cost || 0) + "):", "");
+  if (costRaw === null) return;
+  if (costRaw.trim() !== "" && isFinite(Number(costRaw))) x.cost = Number(costRaw);
+  const exp = prompt("Expected date (YYYY-MM-DD, optional):", x.expected || "");
+  if (exp === null) return;
+  x.expected = exp.trim();
+  const {po} = orderPartFromRO(o, x, vendorId);
+  db.orders[o.id] = JSON.parse(JSON.stringify(o));
+  save();
+  if (confirm("Added to " + poLabel(po) + ".\n\nOpen the purchase order now?")) return openPO(po.id);
+  if (cur && cur.id === o.id){ cur = db.orders[o.id]; drawWO(); } else render();
+}
+function coreDialog(i){
+  pullWO();
+  const x = cur.parts[i]; if (!x) return;
+  const c = shapeCore(x);
+  const pick = prompt("Core on " + x.desc + " — currently " + c.status + ".\n\n" +
+    CORE_STATES.map((s2,n) => (n+1) + ". " + s2).join("\n") + "\n\nNumber:", String(CORE_STATES.indexOf(c.status) + 1));
+  if (pick === null) return;
+  const n = parseInt(pick, 10);
+  if (!isFinite(n) || !CORE_STATES[n-1]) return;
+  c.status = CORE_STATES[n-1];
+  c.at = new Date().toISOString();
+  if (c.status === "Core Returned to Vendor"){
+    const exp = prompt("Credit expected for the core (optional):", String(c.expectedCredit != null ? c.expectedCredit : c.charge || ""));
+    if (exp !== null && exp.trim() !== "") c.expectedCredit = r2(Number(exp));
+    if (x.partId) moveStock(x.partId, 0, "Core Returned", {orderId:cur.id, note:"core returned to vendor"});
+  }
+  if (c.status === "Core Credit Received"){
+    const act = prompt("Credit actually received:", String(c.expectedCredit != null ? c.expectedCredit : c.charge || ""));
+    if (act !== null && act.trim() !== "") c.actualCredit = r2(Number(act));
+  }
+  if (c.status === "Core Removed" && x.partId) moveStock(x.partId, 0, "Core Out", {orderId:cur.id, note:"core off the vehicle"});
+  save(); renderLines(); updateTotals();
+}
+function returnDialog(i){
+  pullWO();
+  const x = cur.parts[i]; if (!x) return;
+  const which = prompt("Returning " + (x.desc || "this part") + ".\n\n1. Back to our stock (unused)\n2. Back to the vendor\n\nNumber:", "1");
+  if (which === null) return;
+  const qtyRaw = prompt("How many?", String(x.qty || 1));
+  if (qtyRaw === null) return;
+  const qty = Number(qtyRaw);
+  if (!isFinite(qty) || qty <= 0){ alert("That is not a quantity."); return; }
+  const why = prompt("Reason:", "");
+  if (why === null) return;
+  const who = db.settings.lastTech || "";
+  if (which.trim() === "2"){
+    const credit = prompt("Credit expected (optional):", "");
+    returnPartToVendor(x, qty, x.vendorId || "", why, credit && credit.trim() !== "" ? Number(credit) : null, who);
+  } else {
+    returnROPartToStock(cur, x, qty, why, who);
+  }
+  db.orders[cur.id] = JSON.parse(JSON.stringify(cur));
+  save(); renderLines(); updateTotals();
+}
+/* Fitting a part is what takes it off the shelf. */
+function installPart(i){
+  pullWO();
+  const x = cur.parts[i]; if (!x) return;
+  const short = stockShortfall(x);
+  if (short > 0 && !confirm("The book says there are not enough of these on the shelf.\n\nFit it anyway and let the count go to zero?")) return;
+  installROPart(cur, x, db.settings.lastTech || "");
+  db.orders[cur.id] = JSON.parse(JSON.stringify(cur));
+  save(); renderLines(); updateTotals();
+}
+
 /* ---------- the audit trail ---------- */
 /* An override is a person deciding to charge something other than what the
    catalog says. That is a defensible decision; an unexplained one is not. So
@@ -3431,6 +4330,9 @@ function render(){$("#brandTop").innerHTML=esc(db.settings.shopName).replace(/(I
   if(view==="appt")return renderAppointment();
   if(view==="custProfile")return renderCustomerProfile();
   if(view==="search")return renderSearch();
+  if(view==="parts")return renderParts();
+  if(view==="po")return renderPO();
+  if(view==="vendor")return renderVendor();
   if(view==="board")return renderBoard();
   if(view==="techview")return renderTechView();
   if(view==="dash")renderDash();else if(view==="orders")renderOrders();else if(view==="customers")renderCustomers();else if(view==="vehicles")renderVehicles();else if(view==="vehDetail")renderVehicleDetail(detailVeh);else if(view==="services")renderServices();else if(view==="catalog")renderCatalog();else renderSettings();}
@@ -4012,7 +4914,7 @@ function drawWO(){const o=cur;
   <div class="secthead"><h3>Parts &amp; materials</h3><span class="muted" style="font-size:11.5px">cost and markup are yours — they never print on a customer document</span></div>
   <div class="linerow parts"><div class="lbl">Part / description</div><div class="lbl">Part #</div><div class="lbl">Qty</div><div class="lbl">Cost ea</div><div class="lbl">MU%</div><div class="lbl">Price ea</div><div class="lbl right">Amount</div><div></div></div>
   <div id="partsRows"></div>
-  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><button class="sm" onclick="addLine('parts')">+ Part</button><button class="sm" onclick="addLine('parts','tire')">+ Tire</button><button class="sm" onclick="addLine('parts','fluid')">+ Fluid / material</button>${catSelect('parts')}<button class="sm" onclick="saveLinesToCatalog('parts')">Save lines to catalog</button></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><button class="sm primary" onclick="pickPartDialog()">+ From catalog</button><button class="sm" onclick="addLine('parts')">+ One-off part</button><button class="sm" onclick="addLine('parts','tire')">+ Tire</button><button class="sm" onclick="addLine('parts','fluid')">+ Fluid / material</button>${catSelect('parts')}<button class="sm" onclick="saveLinesToCatalog('parts')">Save lines to catalog</button></div>
 
   <div class="secthead"><h3>Sublet, fees &amp; discounts</h3></div>
   <div class="linerow extra"><div class="lbl">Type</div><div class="lbl">Description</div><div class="lbl">Amount / %</div><div class="lbl">Taxable</div><div class="lbl right">Amount</div><div></div></div>
@@ -4203,9 +5105,19 @@ function partRow(x,i,o){
       <span class="badge b-manual">${esc(kind.toUpperCase())}</span>
       <select class="sm" style="height:26px;font-size:11.5px;max-width:140px" onchange="setPartState(${i},this.value)">
         ${PART_STATES.map(st=>`<option value="${st}" ${partState(x)===st?"selected":""}>${st}</option>`).join("")}</select>
+      ${x.partId&&db.parts[x.partId]?(()=>{const short=stockShortfall(x);const avail=partAvailable(x.partId);
+        return short>0?`<span class="badge b-verify">INSUFFICIENT STOCK — ${esc(avail)} available</span>`
+                      :`<span class="badge b-vehicle">IN STOCK — ${esc(avail)} available</span>`;})():""}
+      ${x.poId&&db.purchaseOrders[x.poId]?`<span class="clk" onclick="openPO('${x.poId}')">${esc(poLabel(db.purchaseOrders[x.poId]))}</span>`
+        :`<button class="sm" onclick="orderPartDialog(null,'${x.id}')">Order…</button>`}
+      ${(x.core&&x.core.required)?`<span class="badge b-override">CORE ${money(x.core.charge)} · ${esc(x.core.status)}</span>
+        <button class="sm" onclick="coreDialog(${i})">Core…</button>`:""}
+      ${partState(x)!=="Returned"?`<button class="sm" onclick="returnDialog(${i})">Return…</button>`:""}
       <input value="${esc(x.orderNo||"")}" placeholder="order / ref #" style="max-width:130px;height:24px;font-size:11.5px" onchange="setPartField(${i},'orderNo',this.value)">
       <input value="${esc(x.expected||"")}" type="date" style="max-width:140px;height:24px;font-size:11.5px" title="expected" onchange="setPartField(${i},'expected',this.value)">
-      ${(Number(x.cost)>0)?`<span>cost ${money(partCost(x))} · margin ${money(r2(ext-partCost(x)))}</span>`:`<span>no cost entered — profit reporting will not see this line</span>`}
+      ${(Number(x.cost)>0)?(()=>{const gp=r2(ext-partCost(x));const pct=ext>0?Math.round(gp/ext*100):0;
+        return `<span class="gp ${pct<20?"thin":""}">cost ${money(partCost(x))} · margin ${money(gp)} (${pct}%)</span>`;})()
+        :`<span>no cost entered — profit reporting will not see this line</span>`}
       <label style="display:flex;align-items:center;gap:4px;margin:0;font-weight:400"><input type="checkbox" data-k="parts" data-i="${i}" data-f="taxable" ${lineTaxable(x,taxCfg(o).taxParts)?"checked":""} style="width:auto"> taxable</label>
       <input data-k="parts" data-i="${i}" data-f="vendor" value="${esc(x.vendor||"")}" placeholder="vendor" style="max-width:120px;height:24px;font-size:11.5px">
       <input data-k="parts" data-i="${i}" data-f="intNote" value="${esc(x.intNote||"")}" placeholder="internal note" style="max-width:180px;height:24px;font-size:11.5px">
@@ -4214,19 +5126,32 @@ function partRow(x,i,o){
 }
 function setPartState(i,v){
   pullWO();
-  const x=cur.parts[i]; x.procurement=v;
+  const x=cur.parts[i];
+  /* Fitting is the one status change that moves stock, so it goes through the
+     same path as the button rather than quietly setting a field. */
+  if(v==="Installed"&&partState(x)!=="Installed"){ installPart(i); return; }
+  if(v==="Returned"&&partState(x)!=="Returned"){ returnDialog(i); return; }
+  x.procurement=v;
   if(v==="Received"&&!x.receivedAt) x.receivedAt=new Date().toISOString();
   save(); renderLines(); updateTotals();
 }
 function setPartField(i,f,v){ pullWO(); cur.parts[i][f]=v; save(); }
 /* If a job cannot be finished because a part is not in the building, the ticket
    should say so in those words rather than sitting silently at In Progress. */
+/* The one thing a technician wants to know before walking to the car: can this
+   job go ahead. It answers with the parts themselves, not a guess. */
 function partsBanner(o){
   const out=partsOutstanding(o);
-  if(!out.length) return "";
-  return `<div class="authbox wait" style="margin-top:10px"><b>WAITING ON PARTS</b>
+  const any=(o.parts||[]).some(x=>x.desc);
+  if(!any) return "";
+  if(!out.length){
+    return partsReady(o)?`<div class="authbox ok"><b>PARTS READY</b>
+      <div class="authline">Everything this ticket needs is on hand or already fitted.</div></div>`:"";
+  }
+  return `<div class="authbox wait"><b>WAITING ON PARTS</b>
     <div class="authline">${out.length} part${out.length===1?"":"s"} still needed:</div>
-    ${out.map(x=>`<div class="authline">• ${esc(x.desc||"part")} — ${esc(partState(x))}${x.orderNo?" · "+esc(x.orderNo):""}${x.expected?" · expected "+esc(x.expected):""}</div>`).join("")}</div>`;
+    ${out.map(x=>{const po=x.poId?db.purchaseOrders[x.poId]:null;
+      return `<div class="authline">• ${esc(x.desc||"part")} — ${esc(partState(x))}${po?" · "+esc(poLabel(po)):""}${x.vendor?" · "+esc(x.vendor):""}${x.expected?" · expected "+esc(x.expected):""}${x.partId?" · "+esc(partAvailable(x.partId))+" on the shelf":""}</div>`;}).join("")}</div>`;
 }
 function extraRow(x,i,o){
   const base=(()=>{const t=orderTotals(o);return {labor:t.labor,parts:t.parts,sublet:t.sublet,pre:r2(t.labor+t.parts+t.sublet)};})();

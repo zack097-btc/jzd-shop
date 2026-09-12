@@ -105,6 +105,25 @@ subscription. Settings ▸ **Where is my data?** shows the folder.
 - **A customer inspection report** — what needs attention now, what to keep an
   eye on, and everything checked and sound, with the measurements. Statuses
   print with words as well as colour so a grayscale copy still reads.
+- **Parts you actually have** — a catalog with stock, bins, units and reorder
+  levels, or non-stock items for a one-off special order. **On hand** is the
+  shelf, **committed** is what live tickets have claimed, **available** is the
+  difference, and stock only physically moves when a part is received, fitted,
+  returned or counted — each leaving a movement behind that says why.
+- **Vendors and purchase orders** — order a part straight from the ticket and it
+  joins that vendor's open PO rather than starting another one. Receive all of
+  it, or part of it at a price that differs from the quote; the remainder stays
+  backordered and the ticket keeps saying **WAITING ON PARTS** until it arrives,
+  then says **PARTS READY**.
+- **Markup that matches how a shop prices** — a tier table by cost, because a
+  $6 clip and a $600 compressor cannot carry the same percentage. Every price
+  says where it came from: catalog, part markup, tier, or typed by hand.
+- **Cores, and both kinds of return** — a core charge is tracked apart from the
+  part cost, through due, removed, returned and credited, with the credit
+  expected and the credit actually received. A part can go back to your shelf or
+  back to the supplier, and each leaves its own record.
+- **Cost history** — what a part has cost you over time, so a 30% rise is
+  something you notice rather than absorb.
 - **A schedule, and a front office** — book a customer and a vehicle onto a day
   and a time with the work they asked for, in day or week view, with the hours
   already booked shown against what the shop can actually do. **Arrive / check
@@ -180,6 +199,7 @@ node testflow.cjs      # estimate to paid invoice, and old books still opening
 node testshop.cjs      # check-in, inspection, recommendations, parts, history
 node testphoto.cjs     # photographs, visibility, and a real backup round trip
 node testfront.cjs     # customers, duplicates, appointments, arrival, search
+node testparts.cjs     # stock, vendors, purchase orders, receiving, cores
 cd desktop/src-tauri && cargo test    # the storage layer
 ```
 
@@ -201,5 +221,9 @@ the book: a book carrying its own photographs would be rewritten whole on every
 keystroke and copied into sixty backups. The book keeps a small record and a
 thumbnail; a backup is the one place the two travel together.
 
-Tag a version (`git tag v2.5.0 && git push origin v2.5.0`) and CI runs all seven
+Parts carry two numbers that must never be confused: what they cost you and
+what they sold for. The first never appears on anything a customer sees, and
+changing either today cannot reach backwards into an invoice already issued.
+
+Tag a version (`git tag v2.6.0 && git push origin v2.6.0`) and CI runs all eight
 suites, then builds and publishes the installer.
