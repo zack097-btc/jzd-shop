@@ -105,9 +105,15 @@ subscription. Settings ▸ **Where is my data?** shows the folder.
 - **A customer inspection report** — what needs attention now, what to keep an
   eye on, and everything checked and sound, with the measurements. Statuses
   print with words as well as colour so a grayscale copy still reads.
-- **Backup** — Export/Import a `.json`, plus **Restore from backup…**: the app
-  keeps the last 60 copies of your book automatically, one taken before every
-  single change.
+- **Photographs, where they belong** — on a damage entry, on an inspection
+  finding, on a vehicle. Each one is marked either for the customer or internal
+  to the shop, takes a caption, and appears on the customer's report only when
+  you say so. Tyres and brakes have a camera button on the row itself, because
+  that is where the photographs actually get taken.
+- **Backup** — Export/Import one file that carries the whole book **and every
+  photograph**, so a restore comes back complete. Plus **Restore from
+  backup…**: the app keeps the last 60 copies of your book automatically, one
+  taken before every single change.
 
 ## The catalog is your catalog
 
@@ -155,6 +161,7 @@ node testsave.cjs      # persistence suite
 node testvin.cjs       # VIN, matching, pricing, overrides, provenance
 node testflow.cjs      # estimate to paid invoice, and old books still opening
 node testshop.cjs      # check-in, inspection, recommendations, parts, history
+node testphoto.cjs     # photographs, visibility, and a real backup round trip
 cd desktop/src-tauri && cargo test    # the storage layer
 ```
 
@@ -171,5 +178,10 @@ A completed inspection keeps its own copy of the template it was filled in
 against, so adding a check next month does not leave a hole in every inspection
 already handed to a customer.
 
-Tag a version (`git tag v2.4.0 && git push origin v2.4.0`) and CI runs all five
+Photographs are files in the app's own `attachments/` folder, never bytes in
+the book: a book carrying its own photographs would be rewritten whole on every
+keystroke and copied into sixty backups. The book keeps a small record and a
+thumbnail; a backup is the one place the two travel together.
+
+Tag a version (`git tag v2.4.1 && git push origin v2.4.1`) and CI runs all six
 suites, then builds and publishes the installer.

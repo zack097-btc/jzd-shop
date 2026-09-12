@@ -43,9 +43,13 @@ jobs:
           python -m pip install --quiet pillow
           python desktop/make_icons.py
 
+      # The native storage layer - the book AND every attachment - is compiled
+      # and tested here and nowhere else: the machine this is developed on has
+      # no MSVC linker, so this step is the release authority for Rust changes.
+      # If it fails, no installer is produced.
       - name: Test the storage layer
         working-directory: desktop/src-tauri
-        run: cargo test
+        run: cargo test --verbose
 
       # Both suites drive the real page in a real browser. Neither touches the
       # network - the VIN suite stubs fetch - so a release is never blocked by
@@ -59,6 +63,7 @@ jobs:
           node testvin.cjs
           node testflow.cjs
           node testshop.cjs
+          node testphoto.cjs
 
       - name: Build the installers
         uses: tauri-apps/tauri-action@v0

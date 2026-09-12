@@ -21,12 +21,27 @@ use serde::Serialize;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::Manager;
 
 /// How many previous copies of the book to keep. A shop that edits all day
 /// still gets weeks of history out of this, and the whole folder is a few
 /// megabytes at most.
 const KEEP_BACKUPS: usize = 60;
+
+/// The largest single attachment we will take. A photograph off a phone is a
+/// few megabytes; anything past this is either a mistake or something that does
+/// not belong in a repair order.
+const MAX_ATTACHMENT_BYTES: usize = 25 * 1024 * 1024;
+
+/// What an attachment is allowed to be. This is a whitelist rather than a
+/// blacklist on purpose: the shop needs photographs and the occasional PDF, and
+/// nothing here should ever be able to become something the machine will run.
+const ALLOWED_EXT: &[&str] = &["jpg", "jpeg", "png", "webp", "gif", "pdf", "txt"];
+
+/// Bumped for every attachment saved in this run, so two photographs taken in
+/// the same second cannot collide.
+static ATT_SEQ: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Serialize)]
 struct Loaded {
@@ -51,6 +66,15 @@ struct Saved {
 }
 
 #[derive(Serialize)]
+struct AttSaved {
+    /// The identifier the book stores. The page never chooses this and never
+    /// chooses a path: it gets an id back and refers to the file only by that.
+    id: String,
+    file: String,
+    bytes: usize,
+}
+
+#[derive(Serialize)]
 struct BackupInfo {
     name: String,
     bytes: u64,
@@ -68,6 +92,93 @@ fn data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 fn book_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(data_dir(app)?.join("shop.json"))
+}
+
+fn att_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = data_dir(app)?.join("attachments");
+    fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    Ok(dir)
+}
+
+/// An attachment id is generated here and must look exactly like one coming
+/// back in. Lowercase letters, digits and dashes only: no dots, no separators,
+/// nothing that can climb out of the attachments folder.
+fn safe_att_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+}
+
+/// The extension decides nothing about how the file is treated, but it does
+/// decide what the file is allowed to be called on disk.
+fn safe_ext(ext: &str) -> Option<String> {
+    let e = ext.trim().trim_start_matches('.').to_ascii_lowercase();
+    if ALLOWED_EXT.contains(&e.as_str()) { Some(e) } else { None }
+}
+
+fn att_path(app: &tauri::AppHandle, id: &str) -> Result<PathBuf, String> {
+    if !safe_att_id(id) {
+        return Err("bad attachment id".into());
+    }
+    let dir = att_dir(app)?;
+    // The id is the stem; find whichever allowed extension actually exists.
+    for e in ALLOWED_EXT {
+        let p = dir.join(format!("{id}.{e}"));
+        if p.exists() {
+            return Ok(p);
+        }
+    }
+    Err("attachment file missing".into())
+}
+
+const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+fn b64_val(c: u8) -> Option<u32> {
+    match c {
+        b'A'..=b'Z' => Some((c - b'A') as u32),
+        b'a'..=b'z' => Some((c - b'a') as u32 + 26),
+        b'0'..=b'9' => Some((c - b'0') as u32 + 52),
+        b'+' => Some(62),
+        b'/' => Some(63),
+        _ => None,
+    }
+}
+
+/// Base64 by hand rather than by dependency. The page hands over an image as
+/// text and gets it back as text; that is the whole contract, and it is small
+/// enough to read and to test.
+fn b64_decode(s: &str) -> Result<Vec<u8>, String> {
+    let mut out: Vec<u8> = Vec::with_capacity(s.len() / 4 * 3 + 3);
+    let mut acc: u32 = 0;
+    let mut bits: u32 = 0;
+    for &c in s.as_bytes() {
+        if c == b'=' || c == b'\n' || c == b'\r' || c == b' ' || c == b'\t' {
+            continue;
+        }
+        let v = b64_val(c).ok_or_else(|| "attachment data is not valid base64".to_string())?;
+        acc = (acc << 6) | v;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((acc >> bits) as u8);
+        }
+    }
+    Ok(out)
+}
+
+fn b64_encode(data: &[u8]) -> String {
+    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = *chunk.get(1).unwrap_or(&0) as u32;
+        let b2 = *chunk.get(2).unwrap_or(&0) as u32;
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        out.push(B64[((n >> 18) & 63) as usize] as char);
+        out.push(B64[((n >> 12) & 63) as usize] as char);
+        out.push(if chunk.len() > 1 { B64[((n >> 6) & 63) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 2 { B64[(n & 63) as usize] as char } else { '=' });
+    }
+    out
 }
 
 fn backup_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -218,6 +329,77 @@ fn db_read_backup(app: tauri::AppHandle, name: String) -> Result<String, String>
     fs::read_to_string(&p).map_err(|e| format!("cannot read {name}: {e}"))
 }
 
+/// Take a file into the shop's own storage. The caller supplies bytes and a
+/// kind; it does not supply a name, a path, or an id, so there is nothing for
+/// it to get wrong and nothing for a malicious filename to reach.
+#[tauri::command]
+fn att_save(app: tauri::AppHandle, ext: String, data_b64: String) -> Result<AttSaved, String> {
+    let e = safe_ext(&ext).ok_or_else(|| format!("{ext} is not a kind of file this keeps"))?;
+    let bytes = b64_decode(&data_b64)?;
+    if bytes.is_empty() {
+        return Err("refusing to store an empty attachment".into());
+    }
+    if bytes.len() > MAX_ATTACHMENT_BYTES {
+        return Err(format!(
+            "that file is {} MB; the limit is {} MB",
+            bytes.len() / 1_048_576,
+            MAX_ATTACHMENT_BYTES / 1_048_576
+        ));
+    }
+    let dir = att_dir(&app)?;
+    // Time plus a counter plus the length: two photographs saved in the same
+    // second still land on different names, and an existing file is never
+    // written over even if one somehow did.
+    let seq = ATT_SEQ.fetch_add(1, Ordering::Relaxed);
+    let id = format!("att-{}-{}-{}", stamp(), seq, bytes.len() % 100_000);
+    if !safe_att_id(&id) {
+        return Err("could not generate a safe attachment id".into());
+    }
+    let file = format!("{id}.{e}");
+    let p = dir.join(&file);
+    if p.exists() {
+        return Err("attachment id collision; nothing was written".into());
+    }
+
+    // Same discipline as the book: write aside, commit to the disk, rename,
+    // then read back and check the bytes are the bytes.
+    let tmp = dir.join(format!("{id}.writing"));
+    {
+        let mut f = fs::File::create(&tmp).map_err(|e| format!("cannot open {}: {e}", tmp.display()))?;
+        f.write_all(&bytes).map_err(|e| format!("cannot write {}: {e}", tmp.display()))?;
+        f.flush().map_err(|e| format!("cannot flush {}: {e}", tmp.display()))?;
+        f.sync_all().map_err(|e| format!("cannot commit {} to disk: {e}", tmp.display()))?;
+    }
+    fs::rename(&tmp, &p).map_err(|e| format!("cannot place {}: {e}", p.display()))?;
+    let back = fs::read(&p).map_err(|e| format!("stored but cannot read back: {e}"))?;
+    if back != bytes {
+        let _ = fs::remove_file(&p);
+        return Err("the stored file does not match what was sent".into());
+    }
+    Ok(AttSaved { id, file, bytes: bytes.len() })
+}
+
+#[tauri::command]
+fn att_read(app: tauri::AppHandle, id: String) -> Result<String, String> {
+    let p = att_path(&app, &id)?;
+    let bytes = fs::read(&p).map_err(|e| format!("cannot read attachment: {e}"))?;
+    Ok(b64_encode(&bytes))
+}
+
+#[tauri::command]
+fn att_exists(app: tauri::AppHandle, id: String) -> Result<bool, String> {
+    if !safe_att_id(&id) {
+        return Err("bad attachment id".into());
+    }
+    Ok(att_path(&app, &id).is_ok())
+}
+
+#[tauri::command]
+fn att_delete(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let p = att_path(&app, &id)?;
+    fs::remove_file(&p).map_err(|e| format!("cannot remove attachment: {e}"))
+}
+
 #[tauri::command]
 fn db_where(app: tauri::AppHandle) -> Result<String, String> {
     Ok(data_dir(&app)?.display().to_string())
@@ -243,7 +425,11 @@ fn main() {
             db_save,
             db_backups,
             db_read_backup,
-            db_where
+            db_where,
+            att_save,
+            att_read,
+            att_exists,
+            att_delete
         ])
         .run(tauri::generate_context!())
         .expect("JZD Shop Manager could not start");
@@ -317,5 +503,103 @@ mod tests {
     #[test]
     fn we_keep_enough_history_to_be_useful() {
         assert!(KEEP_BACKUPS >= 30, "a shop editing all day needs real history");
+    }
+
+    /// A photograph goes out as text and must come back as the same bytes. If
+    /// this is wrong every image in the shop is quietly corrupt.
+    #[test]
+    fn base64_round_trips_exactly() {
+        let cases: Vec<Vec<u8>> = vec![
+            vec![],
+            vec![0],
+            vec![0, 1, 2],
+            vec![255, 254, 253, 252],
+            b"hello".to_vec(),
+            b"any carnal pleasure.".to_vec(),
+            (0u8..=255).collect(),
+            (0..1000).map(|i| (i * 7 % 256) as u8).collect(),
+        ];
+        for bytes in cases {
+            let text = b64_encode(&bytes);
+            let back = b64_decode(&text).expect("decodes");
+            assert_eq!(back, bytes, "round trip failed for {} bytes", bytes.len());
+        }
+    }
+
+    /// The encoder must agree with the rest of the world, not just with itself.
+    #[test]
+    fn base64_matches_the_known_answers() {
+        assert_eq!(b64_encode(b""), "");
+        assert_eq!(b64_encode(b"f"), "Zg==");
+        assert_eq!(b64_encode(b"fo"), "Zm8=");
+        assert_eq!(b64_encode(b"foo"), "Zm9v");
+        assert_eq!(b64_encode(b"foob"), "Zm9vYg==");
+        assert_eq!(b64_encode(b"fooba"), "Zm9vYmE=");
+        assert_eq!(b64_encode(b"foobar"), "Zm9vYmFy");
+        assert_eq!(b64_decode("Zm9vYmFy").unwrap(), b"foobar");
+        // A real PNG header, because that is what this will actually carry.
+        let png = [0x89u8, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        assert_eq!(b64_decode(&b64_encode(&png)).unwrap(), png);
+    }
+
+    #[test]
+    fn base64_refuses_rubbish() {
+        assert!(b64_decode("not*valid").is_err());
+        assert!(b64_decode("also#bad").is_err());
+        // whitespace and padding are tolerated, because encoders wrap lines
+        assert!(b64_decode("Zm9v\nYmFy").is_ok());
+        assert_eq!(b64_decode("Zm9v YmFy").unwrap(), b"foobar");
+    }
+
+    /// The same rule as backup names, for the same reason: an id is not a path
+    /// and must never be able to become one.
+    #[test]
+    fn attachment_ids_cannot_escape_the_folder() {
+        for bad in [
+            "../shop.json",
+            "a/b.png",
+            "..\\win.png",
+            "..",
+            "att-1.png",          // a dot would let the extension be chosen
+            "ATT-UPPER",
+            "att 1",
+            "att;rm",
+            "",
+        ] {
+            assert!(!safe_att_id(bad), "{bad} must be refused");
+        }
+        assert!(safe_att_id("att-1700000000-0-12345"));
+        assert!(safe_att_id("att-0-0-0"));
+    }
+
+    #[test]
+    fn only_known_kinds_of_file_are_kept() {
+        for good in ["jpg", "JPEG", ".png", "webp", "pdf"] {
+            assert!(safe_ext(good).is_some(), "{good} should be allowed");
+        }
+        for bad in ["exe", "bat", "cmd", "ps1", "dll", "js", "html", "", "png.exe"] {
+            assert!(safe_ext(bad).is_none(), "{bad} must never be stored");
+        }
+        // it normalizes, so the name on disk is predictable
+        assert_eq!(safe_ext(".JPG").unwrap(), "jpg");
+    }
+
+    #[test]
+    fn an_attachment_has_a_ceiling() {
+        assert!(MAX_ATTACHMENT_BYTES >= 5 * 1024 * 1024, "a phone photo must fit");
+        assert!(MAX_ATTACHMENT_BYTES <= 100 * 1024 * 1024, "but a book is not a file server");
+    }
+
+    /// Two attachments saved in the same second must not be able to share a
+    /// name, or one photograph silently replaces another.
+    #[test]
+    fn ids_do_not_collide_within_a_second() {
+        let now = 1_700_000_000u64;
+        let mut seen = std::collections::HashSet::new();
+        for seq in 0..500u64 {
+            let id = format!("att-{}-{}-{}", now, seq, seq % 100_000);
+            assert!(seen.insert(id.clone()), "duplicate id {id}");
+            assert!(safe_att_id(&id));
+        }
     }
 }
