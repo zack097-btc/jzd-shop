@@ -1,23 +1,23 @@
-/* JZD Shop Manager service worker — offline app shell + fresh-when-online */
-const CACHE = 'jzd-shop-v1';
-const ASSETS = [
-  './', './index.html', './manifest.webmanifest',
-  './icon-192.png', './icon-512.png', './icon-maskable-512.png'
-];
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
-});
+/* JZD Shop Manager's hosted version is retired — Shop Manager is a Windows
+   program now and keeps its book in a real file.
+
+   This worker exists for one reason: a browser that installed the old web app
+   still has the old shop in its cache and would keep serving it offline, out of
+   sight, long after the page is gone. Anything with that installation gets this
+   file on its next update check; it empties the cache, unregisters itself and
+   reloads the tab, which then lands on the notice in index.html.
+
+   It has no fetch handler on purpose — every request goes straight to the
+   network. Delete this file once GitHub Pages is switched off and enough time
+   has passed for the installed copies to have checked in. */
+self.addEventListener('install', () => self.skipWaiting());
+
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
-});
-/* Network-first: always fresh when online (picks up updates automatically), cached copy when offline. */
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    fetch(e.request).then(resp => {
-      const cp = resp.clone();
-      caches.open(CACHE).then(c => c.put(e.request, cp)).catch(()=>{});
-      return resp;
-    }).catch(() => caches.match(e.request, {ignoreSearch: true}).then(m => m || caches.match('./index.html')))
-  );
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+    await self.registration.unregister();
+    const windows = await self.clients.matchAll({ type: 'window' });
+    windows.forEach(c => c.navigate(c.url));
+  })());
 });

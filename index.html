@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#2b3949">
-<link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>JZD Inc. — Shop Manager</title>
@@ -114,6 +113,45 @@
 <div id="printArea"></div>
 
 <script>
+/* ---------- the hosted copy is retired ----------
+   Shop Manager is a desktop app now and keeps its book in a real file. A
+   browser tab keeps its own separate, invisible set of books per origin, which
+   is exactly how two hours of catalogue went missing: the work was being typed
+   into an origin nobody was reading back. So the page at github.io no longer
+   runs the shop. It still answers, on purpose — any browser that installed the
+   old version comes back here once, is told where the app went, and has its
+   service worker and cached copy removed below. Delete this block and sw.js
+   when GitHub Pages itself is switched off. */
+if (/(^|\.)github\.io$/i.test(location.hostname) && !(window.__TAURI__ && window.__TAURI__.core)) {
+  document.body.innerHTML =
+    '<div style="max-width:640px;margin:14vh auto;padding:0 22px">'
+  + '<div style="font:800 20px/1.3 Segoe UI,-apple-system,Roboto,Helvetica,Arial,sans-serif;color:#1c2530">'
+  + 'JZD <span style="color:#1f6feb">Inc.</span> &mdash; Shop Manager</div>'
+  + '<p style="font:15px/1.6 Segoe UI,-apple-system,Roboto,Helvetica,Arial,sans-serif;color:#1c2530;margin-top:18px">'
+  + 'This web version has been retired. Shop Manager is a Windows program now, and it keeps your '
+  + 'customers, vehicles, work orders and catalogues in a real file on your own machine &mdash; written '
+  + 'and read back on every change, with a copy of the previous book kept before each one.</p>'
+  + '<p style="font:15px/1.6 Segoe UI,-apple-system,Roboto,Helvetica,Arial,sans-serif;color:#1c2530">'
+  + '<a href="https://github.com/zack097-btc/jzd-shop/releases/latest" '
+  + 'style="display:inline-block;background:#1f6feb;color:#fff;text-decoration:none;padding:11px 18px;'
+  + 'border-radius:8px;font-weight:600">Download the installer</a></p>'
+  + '<p style="font:13px/1.6 Segoe UI,-apple-system,Roboto,Helvetica,Arial,sans-serif;color:#6b7684">'
+  + 'Anything you entered in this browser is still in this browser and is not lost. Export it from the '
+  + 'old page if you still have it open, then use Settings &#9654; Import backup in the installed app.</p>'
+  + '</div>';
+  document.title = 'JZD Inc. — Shop Manager has moved';
+  /* Remove the installed app shell so a cached copy of the old shop cannot
+     keep answering offline after Pages is switched off. */
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations()
+      .then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+  }
+  if (window.caches) {
+    caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {});
+  }
+  throw new Error('JZD Shop Manager: the hosted copy is retired — use the installed desktop app.');
+}
+
 const $=s=>document.querySelector(s);
 const uid=(p)=>p+"_"+(Date.now().toString(36))+Math.floor(Math.random()*1e5).toString(36); // only at runtime
 const money=n=>"$"+(Number(n)||0).toFixed(2);
@@ -529,14 +567,9 @@ async function boot(){
 }
 boot();
 
-/* Installable app: register the service worker so the browser version loads
-   with no internet. The desktop build keeps its book in a real file and does
-   not use this at all. */
-if (!DESKTOP && "serviceWorker" in navigator && location.protocol === "https:") {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  });
-}
+/* The service worker that made this installable in a browser is gone with the
+   hosted version. sw.js is kept only long enough to uninstall itself from any
+   browser that still has it; nothing registers it. */
 
 /* An unreadable book is the one situation where the program must get in the
    way. It refuses to save, says why in plain words, and points at the two
