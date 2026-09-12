@@ -47,6 +47,17 @@ jobs:
         working-directory: desktop/src-tauri
         run: cargo test
 
+      # Both suites drive the real page in a real browser. Neither touches the
+      # network - the VIN suite stubs fetch - so a release is never blocked by
+      # NHTSA being down, and a green run means the page itself works, not just
+      # that it parsed.
+      - name: Test persistence, VIN decoding, matching and pricing
+        run: |
+          npm install --no-save playwright
+          npx playwright install chromium
+          node testsave.cjs
+          node testvin.cjs
+
       - name: Build the installers
         uses: tauri-apps/tauri-action@v0
         env:

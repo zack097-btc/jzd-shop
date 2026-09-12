@@ -17,6 +17,29 @@
   .logo span{color:#7fc3ff}
   nav{display:flex;gap:4px;margin-left:14px}
   nav button{background:transparent;border:none;color:#cdd6e0;padding:8px 13px;border-radius:7px;cursor:pointer;font:inherit}
+  /* Where a number came from has to be readable at a glance across a counter,
+     so the badges are small but never grey-on-grey. */
+  .badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 6px;border-radius:4px;vertical-align:middle}
+  .b-seed{background:#e7eefc;color:#1f4fa8}
+  .b-override{background:#fdf0dc;color:#8a5200}
+  .b-manual{background:#eceff3;color:#4a5663}
+  .b-vehicle{background:#e3f3ea;color:#146c41}
+  .b-cls{background:#f1f3f6;color:#5b6673;font-weight:600;letter-spacing:0}
+  .b-verify{background:#fbe3e0;color:#a3291b}
+  .linemeta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:2px 0 8px 2px;font-size:11.5px;color:var(--muted)}
+  .verifynote{background:#fdf3f2;border:1px solid #f0c8c2;color:#8f2419;border-radius:6px;padding:7px 10px;font-size:12px;margin:6px 0}
+  .jobrow{display:grid;grid-template-columns:1fr 92px 92px 84px;gap:10px;align-items:center;padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer}
+  .jobrow:hover{background:#f7f9fc}
+  .jobrow .svc{font-weight:600}
+  .jobrow .sub{font-size:11.5px;color:var(--muted);margin-top:2px;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
+  .tabs button{padding:7px 12px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;font:inherit;font-size:13px}
+  .tabs button.on{background:var(--steel);color:#fff;border-color:var(--steel)}
+  .vinbar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+  .vinbar input{font-family:ui-monospace,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase}
+  .decoded{background:#f2f7f4;border:1px solid #cfe4d8;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:13px}
+  .decoded b{font-size:14px}
+  .decwarn{color:#8a5200;font-size:12px;margin-top:6px}
   nav button:hover{background:rgba(255,255,255,.08);color:#fff}
   nav button.on{background:#fff;color:var(--steel);font-weight:700}
   .grow{flex:1}
@@ -93,6 +116,7 @@
     <button data-view="orders">Work Orders</button>
     <button data-view="customers">Customers</button>
     <button data-view="vehicles">Vehicles</button>
+    <button data-view="services">Services</button>
     <button data-view="catalog">Catalog</button>
     <button data-view="settings">Settings</button>
   </nav>
@@ -109,8 +133,262 @@
 <div class="overlay" id="woOverlay"><div class="sheet" id="woSheet"></div></div>
 <!-- CUSTOMER / VEHICLE EDITOR -->
 <div class="overlay" id="recOverlay"><div class="sheet" id="recSheet" style="max-width:560px"></div></div>
+<!-- ADD JOB FROM THE CATALOG -->
+<div class="overlay" id="jobOverlay"><div class="sheet" id="jobSheet"></div></div>
 <!-- PRINT -->
 <div id="printArea"></div>
+
+<!-- The shop's own labor catalog. It is data, not code, so it sits in its own
+     block and is parsed rather than executed. This is curated SHOP SEED data:
+     it is not Mitchell, ALLDATA, MOTOR or an OEM labor guide, and nothing in
+     the app may ever label it as one. Service ID is the stable key. -->
+<script type="application/json" id="seed-catalog">[
+{"id":"MENU-TIRE-001","sec":"Market Menu","cat":"Tires","scope":"All passenger/light truck","svc":"Flat repair \u2014 internal patch/plug","bill":"F","hrs":0.5,"fix":30,"pol":"Package/line-item as noted; otherwise parts extra","note":"Includes demount/inspect/repair/remount/balance when repairable; do not repair sidewall/shoulder or unsafe damage.","conf":"High","ver":0,"src":"https://ronsautospokane.com/","ref":[30,30,30]},
+{"id":"MENU-TIRE-002","sec":"Market Menu","cat":"Tires","scope":"Passenger 15\u201318 in","svc":"Mount & computer balance \u2014 per tire","bill":"F","hrs":0.35,"fix":30,"pol":"Package/line-item as noted; otherwise parts extra","note":"Base price per tire. Specialty/custom wheels may need surcharge.","conf":"High","ver":0,"src":"https://ronsautospokane.com/ | https://www.tirerack.com/installers/wa/spokane/99206","ref":[30,30,30]},
+{"id":"MENU-TIRE-003","sec":"Market Menu","cat":"Tires","scope":"Passenger 19\u201320 in","svc":"Mount & computer balance \u2014 per tire","bill":"F","hrs":0.4,"fix":35,"pol":"Package/line-item as noted; otherwise parts extra","note":"Use higher tier for low-profile/performance fitments.","conf":"High","ver":0,"src":"https://www.tirerack.com/installers/wa/spokane/99224","ref":[35,35,35]},
+{"id":"MENU-TIRE-004","sec":"Market Menu","cat":"Tires","scope":"Passenger 21\u201324 in","svc":"Mount & computer balance \u2014 per tire","bill":"F","hrs":0.45,"fix":40,"pol":"Package/line-item as noted; otherwise parts extra","note":"Specialty/custom wheels subject to inspection.","conf":"High","ver":0,"src":"https://www.tirerack.com/installers/wa/spokane/99224","ref":[40,40,40]},
+{"id":"MENU-TIRE-005","sec":"Market Menu","cat":"Tires","scope":"Run-flat / ultra-low-profile","svc":"Run-flat / low-profile handling surcharge \u2014 per tire","bill":"F","hrs":0.15,"fix":15,"pol":"Package/line-item as noted; otherwise parts extra","note":"Add to mount/balance where appropriate.","conf":"High","ver":0,"src":"https://www.tirerack.com/installers/wa/spokane/99206","ref":[15,15,15]},
+{"id":"MENU-TIRE-006","sec":"Market Menu","cat":"Tires","scope":"All","svc":"Road-force balance \u2014 per tire","bill":"F","hrs":0.35,"fix":35,"pol":"Package/line-item as noted; otherwise parts extra","note":"If road-force balancer is available.","conf":"High","ver":0,"src":"https://www.tirerack.com/installers/wa/spokane/99206","ref":[35,35,35]},
+{"id":"MENU-TIRE-007","sec":"Market Menu","cat":"Tires","scope":"Passenger","svc":"Tire disposal \u2014 per tire","bill":"F","hrs":0,"fix":6,"pol":"Package/line-item as noted; otherwise parts extra","note":"Environmental/disposal line item; local published range roughly $4\u2013$10.","conf":"High","ver":0,"src":"https://www.tirerack.com/installers/wa/spokane/99206 | https://www.tirerack.com/installers/wa/spokane/99224","ref":[6,6,6]},
+{"id":"MENU-TIRE-008","sec":"Market Menu","cat":"Tires","scope":"Passenger/light truck","svc":"Tire rotation","bill":"F","hrs":0.3,"fix":30,"pol":"Package/line-item as noted; otherwise parts extra","note":"Market-menu recommendation for in-shop service; free/discount with qualifying packages if desired.","conf":"Medium","ver":0,"src":"Internal recommendation","ref":[30,30,30]},
+{"id":"MENU-TIRE-009","sec":"Market Menu","cat":"Tires","scope":"All","svc":"Wheel balance only \u2014 per tire","bill":"F","hrs":0.25,"fix":25,"pol":"Package/line-item as noted; otherwise parts extra","note":"Standard spin balance; road-force is separate.","conf":"Medium","ver":0,"src":"Internal recommendation","ref":[25,25,25]},
+{"id":"MENU-ALIGN-001","sec":"Market Menu","cat":"Alignment","scope":"Most cars/light trucks","svc":"4-wheel alignment","bill":"F","hrs":1,"fix":120,"pol":"Package/line-item as noted; otherwise parts extra","note":"Suggested Spokane-area menu price; published local prices roughly $100\u2013$140.","conf":"High","ver":0,"src":"https://ronsautospokane.com/ | https://www.perfectiontire.com/stores/spokane-northwest-blvd-store/coupons","ref":[120,120,120]},
+{"id":"MENU-LOF-001","sec":"Market Menu","cat":"Maintenance","scope":"Most gasoline cars","svc":"Conventional LOF \u2014 up to 5 qt","bill":"F","hrs":0.35,"fix":65,"pol":"Package/line-item as noted; otherwise parts extra","note":"Package price includes standard oil/filter allowance; specialty filters/oil extra.","conf":"High","ver":0,"src":"https://ronsautospokane.com/ | https://www.perfectiontire.com/stores/spokane-northwest-blvd-store/coupons","ref":[65,65,65]},
+{"id":"MENU-LOF-002","sec":"Market Menu","cat":"Maintenance","scope":"Most gasoline cars","svc":"Full synthetic LOF \u2014 up to 6 qt","bill":"F","hrs":0.4,"fix":105,"pol":"Package/line-item as noted; otherwise parts extra","note":"Package price includes standard synthetic oil/filter allowance; extra quarts/premium specs extra.","conf":"High","ver":0,"src":"https://ronsautospokane.com/","ref":[105,105,105]},
+{"id":"MENU-LOF-003","sec":"Market Menu","cat":"Maintenance","scope":"BMW 4/6-cylinder eligible models","svc":"BMW synthetic oil service \u2014 base package","bill":"F","hrs":0.5,"fix":120,"pol":"Package/line-item as noted; otherwise parts extra","note":"Use BMW-approved oil/filter; extra capacity or M-specific fluids may add cost.","conf":"High","ver":0,"src":"https://www.bmwofspokane.com/service-parts-specials.html","ref":[120,120,120]},
+{"id":"MENU-LOF-004","sec":"Market Menu","cat":"Maintenance","scope":"BMW V8 / E9x M3","svc":"BMW V8/M oil service \u2014 base package","bill":"F","hrs":0.6,"fix":150,"pol":"Package/line-item as noted; otherwise parts extra","note":"Suggested package aligned with local dealer BMW V8 starting price; verify oil quantity/spec.","conf":"High","ver":1,"src":"https://www.bmwofspokane.com/service-parts-specials.html","ref":[150,150,150]},
+{"id":"MENU-DIAG-001","sec":"Market Menu","cat":"Diagnostics","scope":"All","svc":"Basic diagnostic / scan minimum","bill":"F","hrs":0.75,"fix":90,"pol":"Package/line-item as noted; otherwise parts extra","note":"Includes initial scan and basic verification; additional diagnostic time requires authorization.","conf":"Medium","ver":0,"src":"https://ronsautospokane.com/","ref":[90,90,90]},
+{"id":"MENU-AC-001","sec":"Market Menu","cat":"HVAC","scope":"R134a vehicles","svc":"A/C performance service / evac-recharge base","bill":"F","hrs":1,"fix":200,"pol":"Package/line-item as noted; otherwise parts extra","note":"Refrigerant quantity, dye and repairs extra; use proper equipment.","conf":"High","ver":1,"src":"https://ronsautospokane.com/","ref":[200,200,200]},
+{"id":"MENU-TPMS-001","sec":"Market Menu","cat":"Tires","scope":"All","svc":"TPMS sensor replace/program labor \u2014 each","bill":"F","hrs":0.25,"fix":25,"pol":"Package/line-item as noted; otherwise parts extra","note":"Sensor part extra; programming complexity can vary.","conf":"Medium","ver":1,"src":"Internal recommendation","ref":[25,25,25]},
+{"id":"MENU-TPMS-002","sec":"Market Menu","cat":"Tires","scope":"All","svc":"TPMS relearn/reset only","bill":"F","hrs":0.15,"fix":20,"pol":"Package/line-item as noted; otherwise parts extra","note":"Charge only when standalone; often bundled with tire service.","conf":"Medium","ver":1,"src":"Internal recommendation","ref":[20,20,20]},
+{"id":"GEN-DIAG-001","sec":"General Labor","cat":"Diagnostics","scope":"All","svc":"Comprehensive diagnostic \u2014 first hour","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Initial diagnostic authorization; additional time in 0.5 hr increments.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-DIAG-002","sec":"General Labor","cat":"Diagnostics","scope":"All","svc":"Electrical diagnostic \u2014 first hour","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Parasitic draw/network faults may require multiple hours.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-DIAG-003","sec":"General Labor","cat":"Diagnostics","scope":"All","svc":"Pre-purchase inspection","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Road test + visual/mechanical inspection; compression/leakdown extra.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-DIAG-004","sec":"General Labor","cat":"Diagnostics","scope":"All","svc":"Check-engine-light diagnosis","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Includes scan data and basic pinpoint testing; repair not included.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-DIAG-005","sec":"General Labor","cat":"Diagnostics","scope":"All","svc":"Noise/vibration diagnosis","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Road test and lift inspection; advanced NVH work extra.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-DIAG-006","sec":"General Labor","cat":"Diagnostics","scope":"All","svc":"Cooling-system pressure test/diagnosis","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Includes pressure test and visual inspection.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[90,80,100]},
+{"id":"GEN-DIAG-007","sec":"General Labor","cat":"Diagnostics","scope":"All","svc":"Charging/starting system diagnosis","bill":"H","hrs":0.6,"fix":null,"pol":"Parts/fluids extra","note":"Battery, alternator and voltage-drop checks.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[67.5,60,75]},
+{"id":"GEN-DIAG-008","sec":"General Labor","cat":"Diagnostics","scope":"All","svc":"Brake/suspension inspection","bill":"H","hrs":0.5,"fix":null,"pol":"Parts/fluids extra","note":"Inspection only; may be bundled with repair.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[56.25,50,62.5]},
+{"id":"GEN-MAINT-001","sec":"General Labor","cat":"Maintenance","scope":"Most gasoline cars","svc":"Oil & filter change \u2014 labor only","bill":"H","hrs":0.4,"fix":null,"pol":"Parts/fluids extra","note":"Use fixed menu package when selling oil/filter package.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[45,40,50]},
+{"id":"GEN-MAINT-002","sec":"General Labor","cat":"Maintenance","scope":"Light trucks/SUV","svc":"Oil & filter change \u2014 labor only","bill":"H","hrs":0.5,"fix":null,"pol":"Parts/fluids extra","note":"Extra skid plates/capacity may increase time.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[56.25,50,62.5]},
+{"id":"GEN-MAINT-003","sec":"General Labor","cat":"Maintenance","scope":"All","svc":"Engine air filter replacement","bill":"H","hrs":0.2,"fix":null,"pol":"Parts/fluids extra","note":"Complex airboxes may require override.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[22.5,20,25]},
+{"id":"GEN-MAINT-004","sec":"General Labor","cat":"Maintenance","scope":"All","svc":"Cabin air filter replacement","bill":"H","hrs":0.3,"fix":null,"pol":"Parts/fluids extra","note":"Some European vehicles 0.5\u20130.8 hr.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[33.75,30,37.5]},
+{"id":"GEN-MAINT-005","sec":"General Labor","cat":"Maintenance","scope":"All","svc":"Wiper blade replacement \u2014 pair","bill":"H","hrs":0.2,"fix":null,"pol":"Parts/fluids extra","note":"Usually bundled with blade sale.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[22.5,20,25]},
+{"id":"GEN-MAINT-006","sec":"General Labor","cat":"Maintenance","scope":"All","svc":"Brake fluid flush/bleed","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Use pressure bleeder where appropriate.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-MAINT-007","sec":"General Labor","cat":"Maintenance","scope":"All","svc":"Cooling-system drain/fill","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Does not include component replacement.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-MAINT-008","sec":"General Labor","cat":"Maintenance","scope":"All","svc":"Cooling-system flush","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Chemical flush if appropriate; coolant extra.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-MAINT-009","sec":"General Labor","cat":"Maintenance","scope":"RWD/AWD","svc":"Rear differential service","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Fluid extra; limited-slip friction modifier as required.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[90,80,100]},
+{"id":"GEN-MAINT-010","sec":"General Labor","cat":"Maintenance","scope":"AWD/4WD","svc":"Front differential service","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Fluid extra.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[90,80,100]},
+{"id":"GEN-MAINT-011","sec":"General Labor","cat":"Maintenance","scope":"AWD/4WD","svc":"Transfer-case fluid service","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Fluid extra; adaptation/reset if required extra.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[90,80,100]},
+{"id":"GEN-MAINT-012","sec":"General Labor","cat":"Maintenance","scope":"Manual transmission","svc":"Manual transmission fluid service","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Fluid extra.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[90,80,100]},
+{"id":"GEN-MAINT-013","sec":"General Labor","cat":"Maintenance","scope":"Automatic transmission","svc":"Automatic transmission drain/fill","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"No pan/filter removal.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-MAINT-014","sec":"General Labor","cat":"Maintenance","scope":"Automatic transmission","svc":"Transmission pan/filter service","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Sealed units, exhaust or crossmember access may increase time.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[225,200,250]},
+{"id":"GEN-MAINT-015","sec":"General Labor","cat":"Maintenance","scope":"All","svc":"Fuel filter replacement \u2014 accessible external","bill":"H","hrs":0.7,"fix":null,"pol":"Parts/fluids extra","note":"In-tank or chassis-specific filters vary.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[78.75,70,87.5]},
+{"id":"GEN-ENG-001","sec":"General Labor","cat":"Engine","scope":"4-cylinder","svc":"Spark plug replacement","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Coil-on-plug; access can vary.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-ENG-002","sec":"General Labor","cat":"Engine","scope":"I6/V6","svc":"Spark plug replacement","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Transverse V6 may require intake removal; override if needed.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-ENG-003","sec":"General Labor","cat":"Engine","scope":"V8","svc":"Spark plug replacement","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Truck applications may vary widely.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-ENG-004","sec":"General Labor","cat":"Engine","scope":"Coil-on-plug","svc":"Ignition coil replacement \u2014 one","bill":"H","hrs":0.4,"fix":null,"pol":"Parts/fluids extra","note":"Add incremental 0.1\u20130.2 hr each additional coil when accessible.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[45,40,50]},
+{"id":"GEN-ENG-005","sec":"General Labor","cat":"Engine","scope":"All","svc":"Serpentine belt replacement","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Single main belt typical.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[90,80,100]},
+{"id":"GEN-ENG-006","sec":"General Labor","cat":"Engine","scope":"All","svc":"Belt tensioner/idler replacement","bill":"H","hrs":1.2,"fix":null,"pol":"Parts/fluids extra","note":"Add belt if removed.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[135,120,150]},
+{"id":"GEN-ENG-007","sec":"General Labor","cat":"Engine","scope":"Most cars/light trucks","svc":"Alternator replacement","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Some European/diesel applications require higher override.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[225,200,250]},
+{"id":"GEN-ENG-008","sec":"General Labor","cat":"Engine","scope":"Most cars/light trucks","svc":"Starter replacement","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Intake or exhaust removal may increase time.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-ENG-009","sec":"General Labor","cat":"Engine","scope":"Inline-4/I6","svc":"Valve cover gasket","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Base estimate; turbo packaging can increase.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"GEN-ENG-010","sec":"General Labor","cat":"Engine","scope":"V6/V8","svc":"Valve cover gasket(s)","bill":"H","hrs":5,"fix":null,"pol":"Parts/fluids extra","note":"Both banks where applicable; highly configuration-dependent.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[562.5,500,625]},
+{"id":"GEN-ENG-011","sec":"General Labor","cat":"Engine","scope":"Most cars","svc":"Oil pan gasket","bill":"H","hrs":6,"fix":null,"pol":"Parts/fluids extra","note":"Subframe/axle removal may raise to 8\u201312+ hr.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[675,600,750]},
+{"id":"GEN-ENG-012","sec":"General Labor","cat":"Engine","scope":"Most light trucks","svc":"Oil pan gasket","bill":"H","hrs":5,"fix":null,"pol":"Parts/fluids extra","note":"4WD/diesel configurations often substantially higher.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[562.5,500,625]},
+{"id":"GEN-ENG-013","sec":"General Labor","cat":"Engine","scope":"All","svc":"Engine mount replacement \u2014 pair","bill":"H","hrs":3.5,"fix":null,"pol":"Parts/fluids extra","note":"Base RWD/FWD estimate; packaging varies.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[393.75,350,437.5]},
+{"id":"GEN-ENG-014","sec":"General Labor","cat":"Engine","scope":"All","svc":"Intake manifold gasket","bill":"H","hrs":4,"fix":null,"pol":"Parts/fluids extra","note":"Upper intake/plenum typical; transverse/V8 varies.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[450,400,500]},
+{"id":"GEN-ENG-015","sec":"General Labor","cat":"Engine","scope":"All","svc":"Throttle body replacement/cleaning","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Adaptation/relearn as required.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-ENG-016","sec":"General Labor","cat":"Engine","scope":"All","svc":"Oxygen sensor replacement \u2014 accessible","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Seized sensors/exhaust access may increase.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-ENG-017","sec":"General Labor","cat":"Engine","scope":"Gasoline direct injection","svc":"High-pressure fuel pump replacement","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Brand/model-specific access varies.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-ENG-018","sec":"General Labor","cat":"Engine","scope":"Port/direct injection","svc":"Fuel injector replacement \u2014 set, accessible rail","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Coding/seals may be additional.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"GEN-ENG-019","sec":"General Labor","cat":"Engine","scope":"All","svc":"Compression test","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Baseline gasoline engine; add time for difficult plug access.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-ENG-020","sec":"General Labor","cat":"Engine","scope":"All","svc":"Leak-down test","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Requires cylinder positioning and compressed air.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[225,200,250]},
+{"id":"GEN-COOL-001","sec":"General Labor","cat":"Cooling","scope":"Most cars/light trucks","svc":"Water pump replacement","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Mechanical/electric pump packaging varies.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"GEN-COOL-002","sec":"General Labor","cat":"Cooling","scope":"Most cars/light trucks","svc":"Thermostat replacement","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Coolant bleed included; parts/fluids extra.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[225,200,250]},
+{"id":"GEN-COOL-003","sec":"General Labor","cat":"Cooling","scope":"Most cars/light trucks","svc":"Radiator replacement","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"A/C condenser or front-end disassembly can add time.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-COOL-004","sec":"General Labor","cat":"Cooling","scope":"Most cars/light trucks","svc":"Upper/lower radiator hose replacement","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Per hose group; coolant extra.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-COOL-005","sec":"General Labor","cat":"Cooling","scope":"All","svc":"Expansion tank / coolant reservoir replacement","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Bleed procedure included.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-COOL-006","sec":"General Labor","cat":"Cooling","scope":"All","svc":"Cooling fan assembly replacement","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Electric fan assembly typical.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-COOL-007","sec":"General Labor","cat":"Cooling","scope":"All","svc":"Heater hose replacement \u2014 accessible","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Firewall/turbo access may increase.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-COOL-008","sec":"General Labor","cat":"Cooling","scope":"All","svc":"Heater core replacement","bill":"H","hrs":7,"fix":null,"pol":"Parts/fluids extra","note":"Dash removal jobs vary 5\u201312+ hr.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[787.5,700,875]},
+{"id":"GEN-COOL-009","sec":"General Labor","cat":"Cooling","scope":"All","svc":"Coolant temperature sensor replacement","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Accessible sensor typical.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[90,80,100]},
+{"id":"GEN-COOL-010","sec":"General Labor","cat":"Cooling","scope":"All","svc":"Coolant leak diagnosis + pressure test","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Use diagnostic time if leak not obvious.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-BRK-001","sec":"General Labor","cat":"Brakes","scope":"Most cars","svc":"Brake pads \u2014 one axle","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Clean/lube hardware and inspect rotors.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-BRK-002","sec":"General Labor","cat":"Brakes","scope":"Most cars","svc":"Brake pads + rotors \u2014 one axle","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Electronic parking brake service mode where required.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-BRK-003","sec":"General Labor","cat":"Brakes","scope":"Light trucks/SUV","svc":"Brake pads + rotors \u2014 one axle","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Larger/seized hardware may require more time.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[225,200,250]},
+{"id":"GEN-BRK-004","sec":"General Labor","cat":"Brakes","scope":"All","svc":"Brake caliper replacement \u2014 one","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Includes bleed at affected corner; full flush separate.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-BRK-005","sec":"General Labor","cat":"Brakes","scope":"All","svc":"Brake hose replacement \u2014 one","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Includes localized bleed.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-BRK-006","sec":"General Labor","cat":"Brakes","scope":"All","svc":"Master cylinder replacement","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Includes bench bleed/system bleed.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[225,200,250]},
+{"id":"GEN-BRK-007","sec":"General Labor","cat":"Brakes","scope":"All","svc":"Brake booster replacement","bill":"H","hrs":4,"fix":null,"pol":"Parts/fluids extra","note":"Dashboard/firewall access varies.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[450,400,500]},
+{"id":"GEN-BRK-008","sec":"General Labor","cat":"Brakes","scope":"Rear drum","svc":"Rear drum brake shoes \u2014 both sides","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Hardware kit recommended.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-BRK-009","sec":"General Labor","cat":"Brakes","scope":"All","svc":"Parking brake shoe/cable service","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Base estimate; electronic systems differ.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-BRK-010","sec":"General Labor","cat":"Brakes","scope":"All","svc":"ABS wheel speed sensor \u2014 one","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Seized sensors/hub-integrated sensors vary.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[90,80,100]},
+{"id":"GEN-SUS-001","sec":"General Labor","cat":"Suspension","scope":"MacPherson front","svc":"Front struts \u2014 pair","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Alignment recommended after replacement.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"GEN-SUS-002","sec":"General Labor","cat":"Suspension","scope":"Rear shocks","svc":"Rear shocks \u2014 pair","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Interior trim access may increase.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-SUS-003","sec":"General Labor","cat":"Suspension","scope":"All","svc":"Control arm replacement \u2014 one","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Alignment recommended.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-SUS-004","sec":"General Labor","cat":"Suspension","scope":"All","svc":"Ball joint replacement \u2014 one","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Pressed/riveted designs may take longer.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-SUS-005","sec":"General Labor","cat":"Suspension","scope":"All","svc":"Outer tie rod end \u2014 one","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Alignment required/recommended.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[90,80,100]},
+{"id":"GEN-SUS-006","sec":"General Labor","cat":"Suspension","scope":"All","svc":"Inner + outer tie rod \u2014 one side","bill":"H","hrs":1.2,"fix":null,"pol":"Parts/fluids extra","note":"Alignment required/recommended.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[135,120,150]},
+{"id":"GEN-SUS-007","sec":"General Labor","cat":"Suspension","scope":"All","svc":"Sway bar end links \u2014 pair","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Base estimate.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[90,80,100]},
+{"id":"GEN-SUS-008","sec":"General Labor","cat":"Suspension","scope":"All","svc":"Sway bar bushings \u2014 pair","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Subframe placement can increase time.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-SUS-009","sec":"General Labor","cat":"Suspension","scope":"Bolt-on hub","svc":"Wheel bearing/hub assembly \u2014 one","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Rust/seizure can add time.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-SUS-010","sec":"General Labor","cat":"Suspension","scope":"Press-in bearing","svc":"Wheel bearing press-in \u2014 one","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Knuckle removal/press work.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-SUS-011","sec":"General Labor","cat":"Suspension","scope":"FWD/AWD","svc":"CV axle replacement \u2014 one","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Intermediate shaft or seized axle may add time.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-SUS-012","sec":"General Labor","cat":"Steering","scope":"All","svc":"Steering rack replacement","bill":"H","hrs":4.5,"fix":null,"pol":"Parts/fluids extra","note":"Alignment and fluid/bleed or programming extra as required.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[506.25,450,562.5]},
+{"id":"GEN-SUS-013","sec":"General Labor","cat":"Steering","scope":"Hydraulic steering","svc":"Power steering pump replacement","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Flush/bleed included; fluid extra.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-SUS-014","sec":"General Labor","cat":"Suspension","scope":"All","svc":"Coil spring replacement \u2014 pair","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Strut-integrated springs overlap strut labor.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"GEN-SUS-015","sec":"General Labor","cat":"Suspension","scope":"All","svc":"Ride height / suspension diagnosis","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Initial inspection and measurement.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-DRV-001","sec":"General Labor","cat":"Drivetrain","scope":"RWD","svc":"Driveshaft removal/reinstall","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Exhaust/heat shield removal may add time.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[225,200,250]},
+{"id":"GEN-DRV-002","sec":"General Labor","cat":"Drivetrain","scope":"RWD","svc":"Guibo/flex disc replacement","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Common European RWD estimate; inspect center support bearing.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-DRV-003","sec":"General Labor","cat":"Drivetrain","scope":"RWD","svc":"Center support bearing replacement","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Often overlaps guibo/driveshaft work.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"GEN-DRV-004","sec":"General Labor","cat":"Drivetrain","scope":"Manual RWD","svc":"Clutch replacement","bill":"H","hrs":6.5,"fix":null,"pol":"Parts/fluids extra","note":"Base RWD; dual-mass flywheel inspection recommended.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[731.25,650,812.5]},
+{"id":"GEN-DRV-005","sec":"General Labor","cat":"Drivetrain","scope":"Manual FWD","svc":"Clutch replacement","bill":"H","hrs":7.5,"fix":null,"pol":"Parts/fluids extra","note":"Subframe/transaxle access varies.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[843.75,750,937.5]},
+{"id":"GEN-DRV-006","sec":"General Labor","cat":"Drivetrain","scope":"Manual AWD","svc":"Clutch replacement","bill":"H","hrs":9,"fix":null,"pol":"Parts/fluids extra","note":"Transfer case/front driveline increases labor.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[1012.5,900,1125]},
+{"id":"GEN-DRV-007","sec":"General Labor","cat":"Drivetrain","scope":"Automatic","svc":"Transmission R&R","bill":"H","hrs":8,"fix":null,"pol":"Parts/fluids extra","note":"Base estimate; verify model-specific time.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[900,800,1000]},
+{"id":"GEN-DRV-008","sec":"General Labor","cat":"Drivetrain","scope":"RWD/AWD","svc":"Differential replacement R&R","bill":"H","hrs":4,"fix":null,"pol":"Parts/fluids extra","note":"Fluid and alignment checks extra.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[450,400,500]},
+{"id":"GEN-DRV-009","sec":"General Labor","cat":"Drivetrain","scope":"All","svc":"Axle/output seal \u2014 one","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Base accessible seal estimate.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[225,200,250]},
+{"id":"GEN-DRV-010","sec":"General Labor","cat":"Drivetrain","scope":"All","svc":"Transmission mount(s) replacement","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Crossmember access typical.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-DRV-011","sec":"General Labor","cat":"Drivetrain","scope":"AWD/4WD","svc":"Transfer case R&R","bill":"H","hrs":5,"fix":null,"pol":"Parts/fluids extra","note":"Highly model-specific; verify.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[562.5,500,625]},
+{"id":"GEN-DRV-012","sec":"General Labor","cat":"Drivetrain","scope":"RWD","svc":"Pinion seal replacement","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Mark/preload procedure required.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-ELEC-001","sec":"General Labor","cat":"Electrical","scope":"All","svc":"Battery replacement","bill":"H","hrs":0.5,"fix":null,"pol":"Parts/fluids extra","note":"Battery coding/registration separate if required.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[56.25,50,62.5]},
+{"id":"GEN-ELEC-002","sec":"General Labor","cat":"Electrical","scope":"BMW/Euro","svc":"Battery registration/coding","bill":"H","hrs":0.3,"fix":null,"pol":"Parts/fluids extra","note":"Standalone; bundle with battery replacement if desired.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[33.75,30,37.5]},
+{"id":"GEN-ELEC-003","sec":"General Labor","cat":"Electrical","scope":"All","svc":"Headlamp bulb \u2014 accessible pair","bill":"H","hrs":0.5,"fix":null,"pol":"Parts/fluids extra","note":"HID/LED module/headlamp assemblies vary.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[56.25,50,62.5]},
+{"id":"GEN-ELEC-004","sec":"General Labor","cat":"Electrical","scope":"All","svc":"Window regulator \u2014 one door","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Door design varies.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-ELEC-005","sec":"General Labor","cat":"Electrical","scope":"All","svc":"Blower motor replacement","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Dash access varies widely.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[225,200,250]},
+{"id":"GEN-ELEC-006","sec":"General Labor","cat":"HVAC","scope":"All","svc":"A/C compressor replacement","bill":"H","hrs":4,"fix":null,"pol":"Parts/fluids extra","note":"Evac/recharge separate or bundled; receiver/drier may be required.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[450,400,500]},
+{"id":"GEN-ELEC-007","sec":"General Labor","cat":"HVAC","scope":"All","svc":"A/C condenser replacement","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Evac/recharge separate or bundled.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"GEN-ELEC-008","sec":"General Labor","cat":"Electrical","scope":"All","svc":"Parasitic draw diagnosis \u2014 first hour","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Additional time with authorization.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-ELEC-009","sec":"General Labor","cat":"Electrical","scope":"All","svc":"Fuse/relay/basic circuit repair","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Initial labor allowance; complex harness repair additional.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-ELEC-010","sec":"General Labor","cat":"Electrical","scope":"All","svc":"Module coding/programming \u2014 base","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Programming subscriptions/licensing may be separate.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-EXH-001","sec":"General Labor","cat":"Exhaust","scope":"All","svc":"Cat-back exhaust R&R","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Bolt-on system, normal corrosion.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"GEN-EXH-002","sec":"General Labor","cat":"Exhaust","scope":"All","svc":"Muffler replacement","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Bolt-on/clamp system.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"GEN-EXH-003","sec":"General Labor","cat":"Exhaust","scope":"All","svc":"Catalytic converter replacement \u2014 accessible","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Manifold-integrated cats may be much higher.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[225,200,250]},
+{"id":"GEN-EXH-004","sec":"General Labor","cat":"Exhaust","scope":"All","svc":"Exhaust manifold gasket \u2014 inline engine","bill":"H","hrs":4,"fix":null,"pol":"Parts/fluids extra","note":"Broken studs can add substantial labor.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[450,400,500]},
+{"id":"GEN-EXH-005","sec":"General Labor","cat":"Exhaust","scope":"All","svc":"Exhaust leak diagnosis","bill":"H","hrs":0.7,"fix":null,"pol":"Parts/fluids extra","note":"Smoke/visual inspection as needed.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify model-specific guide when flagged","ref":[78.75,70,87.5]},
+{"id":"TRK-MAINT-001","sec":"Truck & Fleet","cat":"Maintenance","scope":"1/2-ton gas pickup","svc":"Oil & filter change \u2014 labor only","bill":"H","hrs":0.5,"fix":null,"pol":"Parts/fluids extra","note":"Skid plates/large capacity may add time.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[56.25,50,62.5]},
+{"id":"TRK-MAINT-002","sec":"Truck & Fleet","cat":"Maintenance","scope":"3/4- & 1-ton diesel pickup","svc":"Diesel oil & filter change \u2014 labor only","bill":"H","hrs":0.7,"fix":null,"pol":"Parts/fluids extra","note":"High oil capacity; package pricing should include actual oil quantity.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[78.75,70,87.5]},
+{"id":"TRK-MAINT-003","sec":"Truck & Fleet","cat":"Maintenance","scope":"Diesel pickup","svc":"Fuel filter(s) replacement","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Some platforms have two filters; prime/bleed as required.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[90,80,100]},
+{"id":"TRK-MAINT-004","sec":"Truck & Fleet","cat":"Maintenance","scope":"4WD pickup","svc":"Front + rear differential service","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Fluid extra.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"TRK-MAINT-005","sec":"Truck & Fleet","cat":"Maintenance","scope":"4WD pickup","svc":"Transfer-case service","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Fluid extra.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[90,80,100]},
+{"id":"TRK-BRK-001","sec":"Truck & Fleet","cat":"Brakes","scope":"1/2-ton pickup","svc":"Front pads + rotors","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Base labor; seized/rusted hardware extra.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"TRK-BRK-002","sec":"Truck & Fleet","cat":"Brakes","scope":"3/4- & 1-ton pickup","svc":"Front pads + rotors","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Heavy components and hub setups may add time.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"TRK-BRK-003","sec":"Truck & Fleet","cat":"Brakes","scope":"Pickup/SUV","svc":"Rear pads + rotors","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Drum-in-hat parking brake service extra.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"TRK-BRK-004","sec":"Truck & Fleet","cat":"Brakes","scope":"Pickup/SUV","svc":"Rear parking brake shoes","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Common drum-in-hat design.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"TRK-BRK-005","sec":"Truck & Fleet","cat":"Brakes","scope":"Pickup/SUV","svc":"Brake caliper \u2014 one","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Includes localized bleed.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"TRK-SUS-001","sec":"Truck & Fleet","cat":"Suspension","scope":"2WD pickup","svc":"Front hub assembly \u2014 one","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Rust may add time.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"TRK-SUS-002","sec":"Truck & Fleet","cat":"Suspension","scope":"4WD pickup","svc":"Front hub assembly \u2014 one","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"CV axle/4WD hardware may increase labor.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"TRK-SUS-003","sec":"Truck & Fleet","cat":"Suspension","scope":"4WD pickup","svc":"Front CV axle \u2014 one","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Base estimate.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"TRK-SUS-004","sec":"Truck & Fleet","cat":"Suspension","scope":"Pickup","svc":"Upper control arm \u2014 one","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Alignment required.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"TRK-SUS-005","sec":"Truck & Fleet","cat":"Suspension","scope":"Pickup","svc":"Lower control arm \u2014 one","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Torsion bar/spring setup may vary.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"TRK-SUS-006","sec":"Truck & Fleet","cat":"Suspension","scope":"Pickup","svc":"Upper ball joint \u2014 one","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Pressed/riveted designs vary.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"TRK-SUS-007","sec":"Truck & Fleet","cat":"Suspension","scope":"Pickup","svc":"Lower ball joint \u2014 one","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Pressed-in heavy-duty joints may take longer.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"TRK-SUS-008","sec":"Truck & Fleet","cat":"Suspension","scope":"Pickup","svc":"Outer tie rod \u2014 one","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Alignment required.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[90,80,100]},
+{"id":"TRK-SUS-009","sec":"Truck & Fleet","cat":"Suspension","scope":"Pickup","svc":"Inner + outer tie rod \u2014 one side","bill":"H","hrs":1.3,"fix":null,"pol":"Parts/fluids extra","note":"Alignment required.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[146.25,130,162.5]},
+{"id":"TRK-SUS-010","sec":"Truck & Fleet","cat":"Suspension","scope":"Pickup","svc":"Front shocks \u2014 pair","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Coilover/strut trucks may require 2.5\u20133.5 hr.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"TRK-SUS-011","sec":"Truck & Fleet","cat":"Suspension","scope":"Pickup","svc":"Rear shocks \u2014 pair","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Base estimate.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"TRK-SUS-012","sec":"Truck & Fleet","cat":"Suspension","scope":"Leaf-spring pickup","svc":"Leaf spring replacement \u2014 one side","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Rust/seized bolts may add substantial time.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"TRK-SUS-013","sec":"Truck & Fleet","cat":"Suspension","scope":"Leaf-spring pickup","svc":"Shackle/hanger replacement \u2014 pair","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Cutting/rust may add time.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"TRK-STR-001","sec":"Truck & Fleet","cat":"Steering","scope":"HD pickup","svc":"Pitman arm replacement","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Alignment/steering center check after repair.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"TRK-STR-002","sec":"Truck & Fleet","cat":"Steering","scope":"HD pickup","svc":"Idler arm replacement","bill":"H","hrs":1.2,"fix":null,"pol":"Parts/fluids extra","note":"Alignment recommended.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[135,120,150]},
+{"id":"TRK-STR-003","sec":"Truck & Fleet","cat":"Steering","scope":"Pickup","svc":"Steering gear/box replacement","bill":"H","hrs":3.5,"fix":null,"pol":"Parts/fluids extra","note":"Hydraulic bleed included; programming if electronic varies.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[393.75,350,437.5]},
+{"id":"TRK-DRV-001","sec":"Truck & Fleet","cat":"Drivetrain","scope":"Pickup","svc":"Driveshaft R&R","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Base one-piece shaft.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"TRK-DRV-002","sec":"Truck & Fleet","cat":"Drivetrain","scope":"Pickup","svc":"U-joint replacement \u2014 one","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Press work included; staked joints may vary.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"TRK-DRV-003","sec":"Truck & Fleet","cat":"Drivetrain","scope":"Pickup","svc":"U-joints \u2014 pair on driveshaft","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Press work included.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"TRK-DRV-004","sec":"Truck & Fleet","cat":"Drivetrain","scope":"4WD pickup","svc":"Front axle U-joint \u2014 one side","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Hub/axle shaft removal required.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"TRK-DRV-005","sec":"Truck & Fleet","cat":"Drivetrain","scope":"Pickup","svc":"Rear differential cover service","bill":"H","hrs":1.2,"fix":null,"pol":"Parts/fluids extra","note":"Clean cover/magnet, reseal, refill.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[135,120,150]},
+{"id":"TRK-DRV-006","sec":"Truck & Fleet","cat":"Drivetrain","scope":"Pickup","svc":"Rear pinion seal","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Preload/yoke procedure required.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"TRK-DRV-007","sec":"Truck & Fleet","cat":"Drivetrain","scope":"Pickup","svc":"Rear axle shaft seal \u2014 one","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"C-clip/full-float designs vary.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"TRK-DRV-008","sec":"Truck & Fleet","cat":"Drivetrain","scope":"Pickup","svc":"Transmission pan/filter service","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Exhaust/crossmember access can vary.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"TRK-ENG-001","sec":"Truck & Fleet","cat":"Engine","scope":"Gas pickup","svc":"Water pump replacement","bill":"H","hrs":3.5,"fix":null,"pol":"Parts/fluids extra","note":"Fan/clutch/front accessory packaging varies.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[393.75,350,437.5]},
+{"id":"TRK-ENG-002","sec":"Truck & Fleet","cat":"Engine","scope":"Gas pickup","svc":"Alternator replacement","bill":"H","hrs":1.8,"fix":null,"pol":"Parts/fluids extra","note":"Base estimate.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[202.5,180,225]},
+{"id":"TRK-ENG-003","sec":"Truck & Fleet","cat":"Engine","scope":"Gas pickup","svc":"Starter replacement","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"4WD/exhaust access may increase.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"TRK-ENG-004","sec":"Truck & Fleet","cat":"Engine","scope":"Gas pickup V8","svc":"Spark plugs \u2014 set","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Broken/seized plugs or difficult Ford applications require override.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"TRK-ENG-005","sec":"Truck & Fleet","cat":"Engine","scope":"Gas pickup","svc":"Serpentine belt","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Base estimate.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[90,80,100]},
+{"id":"TRK-ENG-006","sec":"Truck & Fleet","cat":"Engine","scope":"Gas pickup","svc":"Engine mounts \u2014 pair","bill":"H","hrs":4,"fix":null,"pol":"Parts/fluids extra","note":"4WD/exhaust packaging may increase.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[450,400,500]},
+{"id":"TRK-DSL-001","sec":"Truck & Fleet","cat":"Diesel","scope":"Diesel pickup","svc":"Dual batteries replacement","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Battery parts extra.","conf":"High","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"TRK-DSL-002","sec":"Truck & Fleet","cat":"Diesel","scope":"Diesel pickup","svc":"Serpentine belt replacement","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Heavy-duty accessory drive.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"TRK-DSL-003","sec":"Truck & Fleet","cat":"Diesel","scope":"Diesel pickup","svc":"Glow plugs \u2014 set","bill":"H","hrs":5,"fix":null,"pol":"Parts/fluids extra","note":"Platform-specific; broken plugs can greatly increase time.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[562.5,500,625]},
+{"id":"TRK-DSL-004","sec":"Truck & Fleet","cat":"Diesel","scope":"Diesel pickup","svc":"Turbocharger R&R","bill":"H","hrs":8,"fix":null,"pol":"Parts/fluids extra","note":"Very platform-specific; verify VIN/labor guide before quote.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[900,800,1000]},
+{"id":"TRK-DSL-005","sec":"Truck & Fleet","cat":"Diesel","scope":"Diesel pickup","svc":"Injector replacement \u2014 full set","bill":"H","hrs":8,"fix":null,"pol":"Parts/fluids extra","note":"Very platform-specific; fuel-system procedure/coding varies.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[900,800,1000]},
+{"id":"TRK-DSL-006","sec":"Truck & Fleet","cat":"Diesel","scope":"Diesel pickup","svc":"EGR cooler replacement","bill":"H","hrs":6,"fix":null,"pol":"Parts/fluids extra","note":"Platform-specific; verify before quote.","conf":"Low","ver":1,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[675,600,750]},
+{"id":"TRK-ELEC-001","sec":"Truck & Fleet","cat":"Electrical","scope":"Pickup/trailer","svc":"7-pin trailer connector diagnosis/repair","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Initial allowance; harness repair extra.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"TRK-ELEC-002","sec":"Truck & Fleet","cat":"Electrical","scope":"Pickup","svc":"Trailer brake controller install \u2014 plug-and-play","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Programming may be required.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"TRK-TOW-001","sec":"Truck & Fleet","cat":"Chassis","scope":"Pickup","svc":"Receiver hitch install \u2014 bolt-on","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Drilling/cutting or bumper removal may add time.","conf":"Medium","ver":0,"src":"Internal seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"M3-E30-001","sec":"BMW M3","cat":"Maintenance","scope":"BMW M3 E30 (1988\u20131991, S14)","svc":"Oil & filter service \u2014 labor only","bill":"H","hrs":0.6,"fix":null,"pol":"Parts/fluids extra","note":"Use correct high-quality oil/filter; package price can be configured separately.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[67.5,60,75]},
+{"id":"M3-E30-002","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E30 (1988\u20131991, S14)","svc":"Valve clearance adjustment","bill":"H","hrs":3.5,"fix":null,"pol":"Parts/fluids extra","note":"Mechanical valvetrain; cold-engine procedure and shims as required.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[393.75,350,437.5]},
+{"id":"M3-E30-003","sec":"BMW M3","cat":"Ignition","scope":"BMW M3 E30 (1988\u20131991, S14)","svc":"Spark plugs","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Base service.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"M3-E30-004","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 E30 (1988\u20131991, S14)","svc":"Water pump","bill":"H","hrs":3.5,"fix":null,"pol":"Parts/fluids extra","note":"Age/corrosion can increase time.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[393.75,350,437.5]},
+{"id":"M3-E30-005","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 E30 (1988\u20131991, S14)","svc":"Thermostat","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Bleed cooling system.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"M3-E30-006","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E30 (1988\u20131991, S14)","svc":"Valve cover gasket","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Often overlaps valve adjustment.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"M3-E30-007","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 E30 (1988\u20131991, S14)","svc":"Clutch replacement","bill":"H","hrs":7,"fix":null,"pol":"Parts/fluids extra","note":"Older hardware/corrosion may increase time.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[787.5,700,875]},
+{"id":"M3-E30-008","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 E30 (1988\u20131991, S14)","svc":"Guibo/flex disc + inspect CSB","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Center support bearing overlap available.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"M3-E30-009","sec":"BMW M3","cat":"Suspension","scope":"BMW M3 E30 (1988\u20131991, S14)","svc":"Front control arms/bushings \u2014 pair","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Alignment required.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"M3-E30-010","sec":"BMW M3","cat":"Brakes","scope":"BMW M3 E30 (1988\u20131991, S14)","svc":"Pads + rotors \u2014 one axle","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Base labor.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"M3-E36-001","sec":"BMW M3","cat":"Maintenance","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Oil & filter service \u2014 labor only","bill":"H","hrs":0.5,"fix":null,"pol":"Parts/fluids extra","note":"Synthetic package can use generic menu if desired.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[56.25,50,62.5]},
+{"id":"M3-E36-002","sec":"BMW M3","cat":"Ignition","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Spark plugs","bill":"H","hrs":1.2,"fix":null,"pol":"Parts/fluids extra","note":"Includes coil removal.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[135,120,150]},
+{"id":"M3-E36-003","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Valve cover gasket","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Inspect grommets and ignition wells.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"M3-E36-004","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Water pump","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Common cooling-system service item.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"M3-E36-005","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Thermostat + housing","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Cooling bleed included.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"M3-E36-006","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Radiator","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Inspect expansion tank/hoses while open.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"M3-E36-007","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Clutch replacement","bill":"H","hrs":6.5,"fix":null,"pol":"Parts/fluids extra","note":"Inspect rear main seal, guibo and CSB.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[731.25,650,812.5]},
+{"id":"M3-E36-008","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Guibo/flex disc","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"CSB often overlapped.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"M3-E36-009","sec":"BMW M3","cat":"Suspension","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Rear trailing arm bushings \u2014 pair","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Alignment required.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"M3-E36-010","sec":"BMW M3","cat":"Suspension","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Front control arm bushings \u2014 pair","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Alignment recommended.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"M3-E36-011","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"VANOS seal/unit service","bill":"H","hrs":4,"fix":null,"pol":"Parts/fluids extra","note":"Scope varies from seals to full unit rebuild.","conf":"Low","ver":1,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[450,400,500]},
+{"id":"M3-E36-012","sec":"BMW M3","cat":"Brakes","scope":"BMW M3 E36 (1995\u20131999, S50/S52)","svc":"Pads + rotors \u2014 one axle","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Base labor.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"M3-E46-001","sec":"BMW M3","cat":"Maintenance","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Oil & filter service \u2014 labor only","bill":"H","hrs":0.6,"fix":null,"pol":"Parts/fluids extra","note":"Use correct M-approved oil spec.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[67.5,60,75]},
+{"id":"M3-E46-002","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Valve clearance adjustment","bill":"H","hrs":5,"fix":null,"pol":"Parts/fluids extra","note":"Public specialist discussion commonly places adjustment around 4\u20136 hr; cold-engine setup required.","conf":"Medium","ver":0,"src":"https://www.bmwfaq.org/threads/reglaje-de-valvulas-m3-e46.862432/","ref":[562.5,500,625]},
+{"id":"M3-E46-003","sec":"BMW M3","cat":"Ignition","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Spark plugs","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Includes coil/cover removal.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"M3-E46-004","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Valve cover gasket","bill":"H","hrs":3.5,"fix":null,"pol":"Parts/fluids extra","note":"Combine with valve adjustment where appropriate.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[393.75,350,437.5]},
+{"id":"M3-E46-005","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Rod bearing service","bill":"H","hrs":10,"fix":null,"pol":"Parts/fluids extra","note":"Common preventive/repair job; public specialist/owner reports commonly cluster around 8\u201312 hr. Verify scope and hardware.","conf":"Medium","ver":0,"src":"https://www.reddit.com/r/E46M3/comments/14evh06/ | https://www.reddit.com/r/E46M3/comments/15sqhff","ref":[1125,1000,1250]},
+{"id":"M3-E46-006","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"VANOS overhaul / major service","bill":"H","hrs":8,"fix":null,"pol":"Parts/fluids extra","note":"Scope varies: seals, hub, cam bolts, solenoid pack; quote by inspection.","conf":"Low","ver":1,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[900,800,1000]},
+{"id":"M3-E46-007","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Water pump","bill":"H","hrs":4,"fix":null,"pol":"Parts/fluids extra","note":"Cooling bleed included.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[450,400,500]},
+{"id":"M3-E46-008","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Thermostat","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Overlap with water pump available.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"M3-E46-009","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Clutch replacement \u2014 6MT/SMG clutch","bill":"H","hrs":7.5,"fix":null,"pol":"Parts/fluids extra","note":"SMG adaptation/bleed may add time; public estimate shows high labor variability.","conf":"Medium","ver":0,"src":"https://repairpal.com/estimator/bmw/m3/2003/clutch-replacement-cost","ref":[843.75,750,937.5]},
+{"id":"M3-E46-010","sec":"BMW M3","cat":"Chassis","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Rear axle carrier panel/subframe reinforcement \u2014 weld-in","bill":"H","hrs":24,"fix":null,"pol":"Parts/fluids extra","note":"Fabrication-level job; inspection, interior/fuel tank/exhaust scope changes time substantially.","conf":"Low","ver":1,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[2700,2400,3000]},
+{"id":"M3-E46-011","sec":"BMW M3","cat":"Suspension","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Rear trailing arm bushings \u2014 pair","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Alignment required.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"M3-E46-012","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Oil pan gasket","bill":"H","hrs":7,"fix":null,"pol":"Parts/fluids extra","note":"Subframe access; often overlaps rod-bearing service.","conf":"Low","ver":1,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[787.5,700,875]},
+{"id":"M3-E46-013","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Differential service","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Use correct limited-slip fluid.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[90,80,100]},
+{"id":"M3-E46-014","sec":"BMW M3","cat":"Brakes","scope":"BMW M3 E46 (2001\u20132006, S54)","svc":"Pads + rotors \u2014 one axle","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Base labor.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"M3-E9X-001","sec":"BMW M3","cat":"Maintenance","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Oil & filter service \u2014 labor only","bill":"H","hrs":0.7,"fix":null,"pol":"Parts/fluids extra","note":"Use correct M-approved oil and capacity; menu package around local BMW V8 market can be configured.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[78.75,70,87.5]},
+{"id":"M3-E9X-002","sec":"BMW M3","cat":"Ignition","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Spark plugs \u2014 set of 8","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Coils/covers/cowl access included.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"M3-E9X-003","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Rod bearing service","bill":"H","hrs":10,"fix":null,"pol":"Parts/fluids extra","note":"Public 2026 owner/shop examples show about 10 hr common, with 8\u201312+ hr depending shop/scope.","conf":"Medium","ver":0,"src":"https://www.reddit.com/r/E92M3/comments/1rrvwtf/rod_bearing_replacement_quote/","ref":[1125,1000,1250]},
+{"id":"M3-E9X-004","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Throttle actuators \u2014 pair","bill":"H","hrs":4.5,"fix":null,"pol":"Parts/fluids extra","note":"Common S65 failure; adaptation/diagnostic confirmation included.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[506.25,450,562.5]},
+{"id":"M3-E9X-005","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Valve cover gaskets \u2014 both banks","bill":"H","hrs":7,"fix":null,"pol":"Parts/fluids extra","note":"RepairPal current labor estimates imply substantial labor; verify exact body/ancillary scope.","conf":"Medium","ver":0,"src":"https://repairpal.com/estimator/bmw/m3/valve-cover-gasket-replacement-cost","ref":[787.5,700,875]},
+{"id":"M3-E9X-006","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Oil pan gasket","bill":"H","hrs":8,"fix":null,"pol":"Parts/fluids extra","note":"Subframe access; overlaps rod-bearing service.","conf":"Low","ver":1,"src":"https://repairpal.com/estimator/bmw/m3/oil-pan-gasket-replacement-cost","ref":[900,800,1000]},
+{"id":"M3-E9X-007","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Water pump","bill":"H","hrs":4,"fix":null,"pol":"Parts/fluids extra","note":"RepairPal estimates support multi-hour labor; verify exact year/body.","conf":"Medium","ver":0,"src":"https://repairpal.com/estimator/bmw/m3/water-pump-replacement-cost","ref":[450,400,500]},
+{"id":"M3-E9X-008","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Thermostat","bill":"H","hrs":3,"fix":null,"pol":"Parts/fluids extra","note":"Overlap with pump available.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[337.5,300,375]},
+{"id":"M3-E9X-009","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"DCT fluid/pan/filter service","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Fluid, pan/filter and adaptation procedure as required.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"M3-E9X-010","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"6MT clutch replacement","bill":"H","hrs":8,"fix":null,"pol":"Parts/fluids extra","note":"Inspect flywheel/rear main seal.","conf":"Low","ver":1,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[900,800,1000]},
+{"id":"M3-E9X-011","sec":"BMW M3","cat":"Engine","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Engine mounts \u2014 pair","bill":"H","hrs":5,"fix":null,"pol":"Parts/fluids extra","note":"Significant access; commonly overlapped with rod bearings.","conf":"Low","ver":1,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[562.5,500,625]},
+{"id":"M3-E9X-012","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Differential service","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Correct limited-slip fluid.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[90,80,100]},
+{"id":"M3-E9X-013","sec":"BMW M3","cat":"Brakes","scope":"BMW M3 E90/E92/E93 (2008\u20132013, S65)","svc":"Pads + rotors \u2014 one axle","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Base labor; electronic wear sensor as required.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"M3-F80-001","sec":"BMW M3","cat":"Maintenance","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"Oil & filter service \u2014 labor only","bill":"H","hrs":0.6,"fix":null,"pol":"Parts/fluids extra","note":"Use correct BMW/M oil spec.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[67.5,60,75]},
+{"id":"M3-F80-002","sec":"BMW M3","cat":"Ignition","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"Spark plugs","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Common maintenance on tuned cars at shorter intervals.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"M3-F80-003","sec":"BMW M3","cat":"Engine","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"Ignition coils \u2014 set","bill":"H","hrs":1.2,"fix":null,"pol":"Parts/fluids extra","note":"Overlap with spark plugs.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[135,120,150]},
+{"id":"M3-F80-004","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"Water pump","bill":"H","hrs":4.5,"fix":null,"pol":"Parts/fluids extra","note":"RepairPal current estimates show substantial labor; verify configuration.","conf":"Medium","ver":0,"src":"https://repairpal.com/estimator/bmw/m3/water-pump-replacement-cost","ref":[506.25,450,562.5]},
+{"id":"M3-F80-005","sec":"BMW M3","cat":"Engine","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"Valve cover gasket","bill":"H","hrs":4.5,"fix":null,"pol":"Parts/fluids extra","note":"Turbo plumbing/cowl access increases time versus older inline-six cars.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[506.25,450,562.5]},
+{"id":"M3-F80-006","sec":"BMW M3","cat":"Engine","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"Oil pan gasket","bill":"H","hrs":9,"fix":null,"pol":"Parts/fluids extra","note":"RepairPal 2018 labor estimate indicates high labor; verify exact scope.","conf":"Low","ver":1,"src":"https://repairpal.com/estimator/bmw/m3/2018/oil-pan-gasket-replacement-cost","ref":[1012.5,900,1125]},
+{"id":"M3-F80-007","sec":"BMW M3","cat":"Engine","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"Crank hub upgrade/repair","bill":"H","hrs":14,"fix":null,"pol":"Parts/fluids extra","note":"Performance-specialty job with large scope variance; must verify parts system and procedure before quote.","conf":"Low","ver":1,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[1575,1400,1750]},
+{"id":"M3-F80-008","sec":"BMW M3","cat":"Induction","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"Charge pipe(s) replacement","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Aftermarket fitment can vary.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"M3-F80-009","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"DCT fluid/pan/filter service","bill":"H","hrs":2.5,"fix":null,"pol":"Parts/fluids extra","note":"Fluid/pan/filter and adaptation as required.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[281.25,250,312.5]},
+{"id":"M3-F80-010","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"6MT clutch replacement","bill":"H","hrs":9,"fix":null,"pol":"Parts/fluids extra","note":"Verify flywheel and transmission hardware.","conf":"Low","ver":1,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[1012.5,900,1125]},
+{"id":"M3-F80-011","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"Differential service","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Correct BMW M differential fluid.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[90,80,100]},
+{"id":"M3-F80-012","sec":"BMW M3","cat":"Brakes","scope":"BMW M3 F80 (2015\u20132018, S55)","svc":"Pads + rotors \u2014 one axle","bill":"H","hrs":1.5,"fix":null,"pol":"Parts/fluids extra","note":"Steel brakes; carbon ceramics require special handling but similar base R&R.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[168.75,150,187.5]},
+{"id":"M3-G80-001","sec":"BMW M3","cat":"Maintenance","scope":"BMW M3 G80/G81 (2021\u20132026, S58)","svc":"Oil & filter service \u2014 labor only","bill":"H","hrs":0.7,"fix":null,"pol":"Parts/fluids extra","note":"Use current BMW-approved oil spec and capacity.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[78.75,70,87.5]},
+{"id":"M3-G80-002","sec":"BMW M3","cat":"Ignition","scope":"BMW M3 G80/G81 (2021\u20132026, S58)","svc":"Spark plugs","bill":"H","hrs":1.8,"fix":null,"pol":"Parts/fluids extra","note":"Cowl/cover access included.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[202.5,180,225]},
+{"id":"M3-G80-003","sec":"BMW M3","cat":"Engine","scope":"BMW M3 G80/G81 (2021\u20132026, S58)","svc":"Valve cover gasket","bill":"H","hrs":9.5,"fix":null,"pol":"Parts/fluids extra","note":"Current RepairPal 2024 labor estimate is very high; treat as verify-before-quote default.","conf":"Low","ver":1,"src":"https://repairpal.com/estimator/bmw/m3/2024/valve-cover-gasket-replacement-cost","ref":[1068.75,950,1187.5]},
+{"id":"M3-G80-004","sec":"BMW M3","cat":"Cooling","scope":"BMW M3 G80/G81 (2021\u20132026, S58)","svc":"Water pump","bill":"H","hrs":6.5,"fix":null,"pol":"Parts/fluids extra","note":"Current RepairPal 2022+ labor estimate indicates materially higher labor than earlier generations.","conf":"Low","ver":1,"src":"https://repairpal.com/estimator/bmw/m3/2022/water-pump-replacement-cost","ref":[731.25,650,812.5]},
+{"id":"M3-G80-005","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 G80/G81 (2021\u20132026, S58)","svc":"ZF 8HP pan/filter/fluid service","bill":"H","hrs":2,"fix":null,"pol":"Parts/fluids extra","note":"Automatic models; fluid/temp fill procedure required.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[225,200,250]},
+{"id":"M3-G80-006","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 G80/G81 (2021\u20132026, S58)","svc":"6MT clutch replacement","bill":"H","hrs":9.5,"fix":null,"pol":"Parts/fluids extra","note":"Manual models only; verify exact procedure.","conf":"Low","ver":1,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[1068.75,950,1187.5]},
+{"id":"M3-G80-007","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 G80/G81 xDrive (2022\u20132026, S58)","svc":"Transfer-case service","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"xDrive only; adaptation/reset if required.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"M3-G80-008","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 G80/G81 xDrive (2022\u20132026, S58)","svc":"Front differential service","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"xDrive only.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[90,80,100]},
+{"id":"M3-G80-009","sec":"BMW M3","cat":"Drivetrain","scope":"BMW M3 G80/G81 (2021\u20132026, S58)","svc":"Rear differential service","bill":"H","hrs":0.8,"fix":null,"pol":"Parts/fluids extra","note":"Correct active M differential fluid/spec.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[90,80,100]},
+{"id":"M3-G80-010","sec":"BMW M3","cat":"Brakes","scope":"BMW M3 G80/G81 (2021\u20132026, S58)","svc":"Pads + rotors \u2014 one axle","bill":"H","hrs":1.7,"fix":null,"pol":"Parts/fluids extra","note":"Steel brakes; carbon ceramics require special handling/procedures.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[191.25,170,212.5]},
+{"id":"M3-G80-011","sec":"BMW M3","cat":"Maintenance","scope":"BMW M3 G80/G81 (2021\u20132026, S58)","svc":"Brake fluid flush","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"BMW-compatible low-viscosity fluid as specified.","conf":"High","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[112.5,100,125]},
+{"id":"M3-G80-012","sec":"BMW M3","cat":"Electrical","scope":"BMW M3 G80/G81 (2021\u20132026, S58)","svc":"Battery replacement + registration","bill":"H","hrs":1,"fix":null,"pol":"Parts/fluids extra","note":"Battery type/coding dependent.","conf":"Medium","ver":0,"src":"Internal BMW specialist seed estimate \u2014 verify VIN-specific guide when flagged","ref":[112.5,100,125]}
+]</script>
 
 <script>
 /* ---------- the hosted copy is retired ----------
@@ -158,7 +436,10 @@ const money=n=>"$"+(Number(n)||0).toFixed(2);
 const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 /* ---------- data ---------- */
-const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:120,taxRate:8.25,taxLabor:false,nextInvoice:1001,terms:"Thank you for your business. Payment due on receipt."},customers:{},vehicles:{},orders:{},catalog:{labor:{},parts:{}}};
+/* The shop's door rate. 112.50 is the current rate; rateMin/rateMax are the
+   range it is expected to move within and are a guide for the settings screen,
+   not a business rule — a shop that raises its rate is not a validation error. */
+const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:112.50,rateMin:100,rateMax:125,taxRate:8.25,taxLabor:false,nextInvoice:1001,terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[]};
 let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot() */
 /* ---------- where the book actually lives ----------------------------------
 
@@ -185,7 +466,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.1.0";
+const JZD_VERSION = "2.2.0";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -197,9 +478,17 @@ let storageLocked = null;
 let storeHint = DESKTOP ? "this computer" : "this browser";
 
 function shapeDb(d){
+  /* A book written by an older version is missing whatever was added since. It
+     is filled in here, never rejected: an unreadable book is an emergency, but
+     an OLD book is just a book. Shop settings the owner has already chosen —
+     the door rate above all — are kept exactly as found. */
   return Object.assign({}, DEFAULT, d, {
-    settings: Object.assign({}, DEFAULT.settings, d.settings),
-    catalog: Object.assign({labor:{},parts:{}}, d.catalog||{})
+    settings: Object.assign({}, DEFAULT.settings, d.settings, {
+      providers: Object.assign({}, DEFAULT.settings.providers, (d.settings||{}).providers)
+    }),
+    catalog: Object.assign({labor:{},parts:{},overrides:{},disabled:{}}, d.catalog||{}),
+    vinCache: d.vinCache || {},
+    audit: Array.isArray(d.audit) ? d.audit : []
   });
 }
 
@@ -301,17 +590,434 @@ function vals(o){return Object.values(o||{});}
 /* ---------- helpers ---------- */
 function custName(id){const c=db.customers[id];return c?c.name:"—";}
 function vehLabel(id){const v=db.vehicles[id];return v?`${v.year||""} ${v.make||""} ${v.model||""}`.trim()||"Vehicle":"—";}
-function orderTotals(o){const labor=(o.labor||[]).reduce((s,l)=>s+(Number(l.hours)||0)*(Number(l.rate)||0),0);const parts=(o.parts||[]).reduce((s,p)=>s+(Number(p.qty)||0)*(Number(p.price)||0),0);const taxable=parts+(db.settings.taxLabor?labor:0);const tax=taxable*(Number(db.settings.taxRate)||0)/100;return {labor,parts,tax,total:labor+parts+tax};}
+function orderTotals(o){const labor=(o.labor||[]).reduce((s,l)=>s+lineAmount(l,o),0);const parts=(o.parts||[]).reduce((s,p)=>s+(Number(p.qty)||0)*(Number(p.price)||0),0);const taxable=parts+(db.settings.taxLabor?labor:0);const tax=taxable*(Number(db.settings.taxRate)||0)/100;return {labor,parts,tax,total:labor+parts+tax};}
 
 /* ---------- router ---------- */
 let view="dash",detailVeh=null;
 $("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;go(b.dataset.view);});
+
+/* ====================================================================
+   VIN, vehicle matching, and where a labor time came from
+   ====================================================================
+   Everything below answers one question a shop cannot afford to get
+   wrong: for THIS vehicle, what is the job, what does it cost, and who
+   says so. Nothing here invents a labor time, and nothing here lets the
+   shop seed catalog wear another company name. */
+
+/* ---------- the catalog, as shipped ---------- */
+const SEED = JSON.parse(document.getElementById("seed-catalog").textContent);
+const SEED_BY_ID = {}; SEED.forEach(r => SEED_BY_ID[r.id] = r);
+const SECTIONS = ["Market Menu","General Labor","Truck & Fleet","BMW M3"];
+
+/* How a row is described to the user. SHOP SEED is this shop curated catalog.
+   It is never MOTOR, Mitchell, ALLDATA or OEM, and there is no code path that
+   can print those words over a seed row. */
+const SRC_SEED="SHOP SEED", SRC_OVERRIDE="SHOP OVERRIDE", SRC_MANUAL="MANUAL", SRC_VEHICLE="NHTSA VEHICLE ID";
+
+/* ---------- providers ----------
+   One place decides who answers a question, so no screen has to know. Only the
+   two free ones are live. The commercial adapters are real boundaries with no
+   implementation on purpose: turning one on is a licensing decision, not a code
+   change, and until that licence exists the app is fully usable without it. */
+const Providers = {
+  vehicle: {
+    id: "nhtsa", name: "NHTSA vPIC", active: true,
+    decodeVin: vin => vpicDecode(vin)
+  },
+  labor: {
+    id: "seed", name: "Shop seed catalog", active: true,
+    searchOperations: (profile, q) => searchCatalog(profile, q),
+    getOperation: id => SEED_BY_ID[id] || null
+  },
+  /* MOTOR Data as a Service / TruSpeed Repair is the intended first commercial
+     provider for exact VIN labor times and OEM procedures. Credentials live in
+     shop settings on this machine, never in this file and never in the repo. */
+  motor: {
+    id: "motor", name: "MOTOR", get active(){ return !!db.settings.providers.motor.enabled; },
+    identifyVehicle:   notLicensed("MOTOR vehicle identification"),
+    searchOperations:  notLicensed("MOTOR Estimated Work Times"),
+    getOperation:      notLicensed("MOTOR Estimated Work Times"),
+    searchProcedures:  notLicensed("MOTOR service procedures"),
+    getSpecifications: notLicensed("MOTOR specifications"),
+    getMaintenance:    notLicensed("MOTOR maintenance schedules"),
+    getFluids:         notLicensed("MOTOR fluids and capacities"),
+    getTSBs:           notLicensed("MOTOR technical service bulletins"),
+    getWiring:         notLicensed("MOTOR wiring diagrams")
+  },
+  mitchell: { id:"mitchell", name:"Mitchell ProDemand", get active(){ return !!db.settings.providers.mitchell.enabled; },
+    searchOperations: notLicensed("Mitchell ProDemand labor") },
+  alldata:  { id:"alldata",  name:"ALLDATA", get active(){ return !!db.settings.providers.alldata.enabled; },
+    searchProcedures: notLicensed("ALLDATA repair information") }
+};
+function notLicensed(what){
+  return async () => { throw new Error(what + " is not connected. Add a licensed subscription in Settings before quoting from it."); };
+}
+
+/* ---------- VIN ---------- */
+/* I, O and Q are not used in a VIN precisely so they cannot be confused with
+   1 and 0, so their presence is a typo every time. */
+function normalizeVin(raw){
+  const v = String(raw == null ? "" : raw).toUpperCase().replace(/[\s\-_.]/g, "");
+  if (!v)              return {ok:false, vin:v, reason:"Enter or scan a VIN."};
+  if (v.length !== 17) return {ok:false, vin:v, reason:"A VIN is 17 characters. This one is " + v.length + "."};
+  if (/[IOQ]/.test(v)) return {ok:false, vin:v, reason:"A VIN never contains the letters I, O or Q. Check for a 1 or a 0."};
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(v)) return {ok:false, vin:v, reason:"A VIN is letters and digits only."};
+  return {ok:true, vin:v, check:vinCheckDigit(v)};
+}
+/* The ninth-position check digit is computed and REPORTED, never used to
+   reject: it is not applied uniformly by every manufacturer or market, and a
+   shop with the car in the bay should not be told its VIN is invalid by a rule
+   the vehicle never followed. vPIC gets the final say. */
+function vinCheckDigit(v){
+  const val = c => "0123456789".indexOf(c) >= 0 ? +c : ("ABCDEFGHJKLMNPRSTUVWXYZ".indexOf(c) % 9) + 1;
+  const wt = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+  let sum = 0; for (let i = 0; i < 17; i++) sum += val(v[i]) * wt[i];
+  const r = sum % 11, expected = r === 10 ? "X" : String(r);
+  return {expected, actual:v[8], matches:expected === v[8]};
+}
+
+const VPIC_URL = "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/";
+async function vpicDecode(vin, opt){
+  opt = opt || {};
+  const timeout = opt.timeout || 9000, tries = opt.tries || 2;
+  let last;
+  for (let attempt = 1; attempt <= tries; attempt++){
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeout);
+    try {
+      const res = await fetch(VPIC_URL + encodeURIComponent(vin) + "?format=json", {signal:ac.signal});
+      clearTimeout(timer);
+      if (!res.ok) throw new Error("NHTSA returned " + res.status);
+      const body = await res.json();
+      const row = body && body.Results && body.Results[0];
+      if (!row) throw new Error("NHTSA returned no result for this VIN.");
+      return row;
+    } catch (e) { clearTimeout(timer); last = e; }
+  }
+  throw new Error((last && last.name === "AbortError") ? "NHTSA did not answer in time." : (last ? last.message : "VIN lookup failed."));
+}
+
+/* Keep every field that came back and is not blank, for diagnostics and audit,
+   plus the handful the app actually reasons about. */
+function normalizeDecode(raw, vin){
+  const g = k => { const x = raw[k]; return (x == null || x === "" || x === "Not Applicable") ? "" : String(x).trim(); };
+  const kept = {}; Object.keys(raw).forEach(k => { const x = raw[k]; if (x != null && x !== "") kept[k] = x; });
+  const d = {
+    vin: vin,
+    year: g("ModelYear"), make: g("Make"), model: g("Model"),
+    series: g("Series") || g("Series2"), trim: g("Trim") || g("Trim2"),
+    bodyClass: g("BodyClass"), manufacturer: g("Manufacturer"),
+    engineManufacturer: g("EngineManufacturer"),
+    engineModel: g("EngineModel") || g("EngineConfiguration"),
+    cylinders: g("EngineCylinders"),
+    displacementL: g("DisplacementL"), displacementCC: g("DisplacementCC"),
+    fuelType: g("FuelTypePrimary"), driveType: g("DriveType"),
+    transmission: [g("TransmissionStyle"), g("TransmissionSpeeds") ? g("TransmissionSpeeds") + "-speed" : ""].filter(Boolean).join(" "),
+    gvwrClass: g("GVWR"), vehicleType: g("VehicleType"),
+    cabConfiguration: g("BodyCabType"), plantCountry: g("PlantCountry"), plant: g("PlantCity"),
+    electrification: g("ElectrificationLevel"),
+    errorCode: g("ErrorCode"), errorText: g("ErrorText"),
+    provider: Providers.vehicle.name, decodedAt: new Date().toISOString(),
+    raw: kept, warnings: []
+  };
+  /* vPIC reports trouble in ErrorCode: 0 is clean, anything else is a note the
+     service writer should see rather than a reason to refuse the car. */
+  if (d.errorCode && d.errorCode !== "0") d.warnings.push(d.errorText || ("NHTSA error code " + d.errorCode));
+  if (!d.year || !d.make || !d.model) d.warnings.push("NHTSA did not return a complete year, make and model. Fill in what is missing by hand.");
+  return d;
+}
+
+/* VIN identity does not change, so a decode is cached in the book: the second
+   scan of the same car costs nothing and works with the internet off. */
+async function decodeVin(vin, opt){
+  opt = opt || {};
+  const n = normalizeVin(vin);
+  if (!n.ok) throw new Error(n.reason);
+  if (!opt.force && db.vinCache[n.vin]) return db.vinCache[n.vin];
+  const raw = await Providers.vehicle.decodeVin(n.vin);
+  const d = normalizeDecode(raw, n.vin);
+  if (!n.check.matches && !/check digit/i.test(d.errorText || ""))
+    d.warnings.push("Check digit (9th character) does not calculate. Worth re-reading the VIN, though some vehicles legitimately differ.");
+  db.vinCache[n.vin] = d; save();
+  return d;
+}
+
+/* ---------- what we know about the vehicle in the bay ---------- */
+/* Typed year, make and model still works with no VIN at all; a decode simply
+   fills in more of the same shape. */
+function vehicleProfile(v){
+  if (!v) return null;
+  const d = (v.vin && db.vinCache[v.vin]) || v.decoded || null;
+  const p = {
+    year: +((d && d.year) || v.year) || 0,
+    make: String((d && d.make) || v.make || "").trim(),
+    model: String((d && d.model) || v.model || "").trim(),
+    series: (d && d.series) || "", trim: (d && d.trim) || "",
+    bodyClass: (d && d.bodyClass) || "", vehicleType: (d && d.vehicleType) || "",
+    cylinders: +((d && d.cylinders) || 0) || 0, displacementL: +((d && d.displacementL) || 0) || 0,
+    fuelType: (d && d.fuelType) || "", driveType: (d && d.driveType) || "",
+    transmission: (d && d.transmission) || "", gvwrClass: (d && d.gvwrClass) || "",
+    decoded: !!d, vin: v.vin || ""
+  };
+  p.diesel = /diesel/i.test(p.fuelType);
+  p.fourWd = /4wd|4x4|awd|all.?wheel|four.?wheel/i.test(p.driveType);
+  p.twoWd  = !p.fourWd && /4x2|rwd|fwd|rear.?wheel|front.?wheel/i.test(p.driveType);
+  p.m3 = m3Generation(p);
+  p.truck = truckProfile(p);
+  return p;
+}
+
+/* BMW M3 generations, by the years the seed catalog itself names. Cylinder
+   count from the VIN settles a boundary year rather than a guess from free
+   text: an S54 E46 and an S65 E9x are not the same car and must never share a
+   labor time. */
+const M3_GENS = [
+  {key:"E30",         from:1988, to:1991, engine:"S14",     cyl:4},
+  {key:"E36",         from:1995, to:1999, engine:"S50/S52", cyl:6},
+  {key:"E46",         from:2001, to:2006, engine:"S54",     cyl:6},
+  {key:"E90/E92/E93", from:2008, to:2013, engine:"S65",     cyl:8},
+  {key:"F80",         from:2015, to:2018, engine:"S55",     cyl:6},
+  {key:"G80/G81",     from:2021, to:2026, engine:"S58",     cyl:6}
+];
+function m3Generation(p){
+  if (!/bmw/i.test(p.make)) return null;
+  const isM3 = /\bM3\b/i.test(p.model) || /\bM3\b/i.test(p.series) || /\bM3\b/i.test(p.trim);
+  if (!isM3) return null;
+  const byYear = M3_GENS.filter(g => p.year >= g.from && p.year <= g.to);
+  if (byYear.length === 1) return byYear[0];
+  if (byYear.length > 1 && p.cylinders){ const c = byYear.find(g => g.cyl === p.cylinders); if (c) return c; }
+  return byYear[0] || null;
+}
+
+/* A 3/4-ton diesel 4WD and a half-ton gas 2WD share a body style and almost no
+   labor times, so the seed rows that say so are matched on what the VIN
+   actually established, and flagged when it did not. */
+function truckProfile(p){
+  const text = (p.model + " " + p.series + " " + p.trim).toLowerCase();
+  const looksTruck = /truck/i.test(p.vehicleType) || /pickup/i.test(p.bodyClass) ||
+    /\b(f-?150|f-?250|f-?350|silverado|sierra|ram|tundra|titan|colorado|canyon|ranger|tacoma|frontier|super ?duty)\b/.test(text);
+  if (!looksTruck) return null;
+  const cls = /class (\d)/i.exec(p.gvwrClass);
+  const gvwrClassNum = cls ? +cls[1] : 0;
+  const hdByModel = /\b(2500|3500|f-?250|f-?350|super ?duty)\b/.test(text);
+  return {
+    hd: gvwrClassNum >= 2 || hdByModel,
+    halfTon: (gvwrClassNum === 1 && !hdByModel) || /\b(1500|f-?150)\b/.test(text),
+    knownWeight: gvwrClassNum > 0 || hdByModel,
+    diesel: p.diesel, fourWd: p.fourWd, twoWd: p.twoWd
+  };
+}
+
+/* ---------- matching a vehicle to the catalog ---------- */
+const CLS = {EXACT:"EXACT_SEED_MATCH", GEN:"GENERATION_MATCH", TRUCK:"TRUCK_CLASS_MATCH",
+             GENERAL:"GENERAL_MATCH", UNIVERSAL:"UNIVERSAL", CONFIG:"NEEDS_CONFIGURATION"};
+const CLS_RANK = {EXACT_SEED_MATCH:100, GENERATION_MATCH:90, TRUCK_CLASS_MATCH:80, GENERAL_MATCH:50, UNIVERSAL:40, NEEDS_CONFIGURATION:30};
+const CLS_LABEL = {EXACT_SEED_MATCH:"Exact match", GENERATION_MATCH:"This generation", TRUCK_CLASS_MATCH:"This truck class",
+                   GENERAL_MATCH:"General", UNIVERSAL:"Any vehicle", NEEDS_CONFIGURATION:"Confirm configuration"};
+
+function seedM3Gen(row){
+  const m = /BMW M3 ([A-Z0-9/]+?)(?: xDrive)? \(/.exec(row.scope);
+  return m ? m[1] : null;
+}
+function seedIsXdrive(row){ return /xDrive/i.test(row.scope); }
+
+/* Returns a classification, or null when the row genuinely does not belong to
+   this vehicle. Nothing is dropped for being generic: a universal oil change
+   does not stop being available because the car is an M3, and a row we cannot
+   confirm is shown as NEEDS_CONFIGURATION rather than quietly hidden. A job the
+   service writer cannot see is a job that gets missed. */
+function classifyRow(row, p){
+  if (db.catalog.disabled[row.id]) return null;
+  if (!p) return {cls: (row.sec === "BMW M3" || row.sec === "Truck & Fleet") ? CLS.CONFIG : CLS.UNIVERSAL, why:""};
+
+  if (row.sec === "BMW M3"){
+    if (!p.m3) return null;
+    if (seedM3Gen(row) !== p.m3.key) return null;
+    if (seedIsXdrive(row)){
+      if (p.fourWd)     return {cls:CLS.EXACT,  why:"xDrive confirmed by VIN"};
+      if (p.driveType)  return null;
+      return {cls:CLS.CONFIG, why:"xDrive only. Confirm this car is all-wheel drive"};
+    }
+    return {cls: p.decoded ? CLS.EXACT : CLS.GEN, why: p.m3.key + " " + p.m3.engine};
+  }
+
+  if (row.sec === "Truck & Fleet"){
+    if (!p.truck) return null;
+    const sc = row.scope.toLowerCase();
+    const needDiesel = /diesel/.test(sc), needHd = /3\/4|1-ton|hd /.test(sc),
+          needHalf = /1\/2-ton/.test(sc), need4wd = /4wd/.test(sc), need2wd = /2wd/.test(sc);
+    const unmet = [];
+    if (needDiesel && !p.truck.diesel){ if (p.fuelType) return null; unmet.push("diesel"); }
+    if (needHd && !p.truck.hd){         if (p.truck.knownWeight) return null; unmet.push("3/4- or 1-ton"); }
+    if (needHalf && !p.truck.halfTon){  if (p.truck.knownWeight) return null; unmet.push("1/2-ton"); }
+    if (need4wd && !p.truck.fourWd){    if (p.driveType) return null; unmet.push("4WD"); }
+    if (need2wd && !p.truck.twoWd){     if (p.driveType) return null; unmet.push("2WD"); }
+    if (unmet.length) return {cls:CLS.CONFIG, why:"Confirm " + unmet.join(" and ")};
+    return {cls:CLS.TRUCK, why:row.scope};
+  }
+
+  /* General and menu rows: honour the configuration the scope names when the
+     VIN settled it, otherwise offer the row and say what to confirm. */
+  const sc = row.scope.toLowerCase();
+  if (/bmw|euro/.test(sc) && p.make && !/bmw|mini|mercedes|audi|volkswagen|porsche|volvo/i.test(p.make)) return null;
+  if (/diesel/.test(sc) && p.fuelType && !p.diesel) return null;
+  if (/gasoline|gas /.test(sc) && p.diesel) return null;
+  if (/4-cylinder/.test(sc) && p.cylinders && p.cylinders !== 4) return null;
+  if (/i6|v6/.test(sc) && p.cylinders && p.cylinders !== 6) return null;
+  if (/manual/.test(sc) && p.transmission && /automatic|cvt/i.test(p.transmission)) return null;
+  if (/automatic/.test(sc) && p.transmission && /manual/i.test(p.transmission)) return null;
+  if (/awd|4wd/.test(sc) && p.driveType && !p.fourWd) return null;
+  const cfg = [];
+  if (/manual|automatic/.test(sc) && !p.transmission) cfg.push("transmission type");
+  if (/awd|4wd|fwd|rwd/.test(sc) && !p.driveType) cfg.push("drive type");
+  if (cfg.length) return {cls:CLS.CONFIG, why:"Confirm " + cfg.join(" and ")};
+  if (/^all$|^most|passenger|light truck/.test(sc)) return {cls:CLS.UNIVERSAL, why:""};
+  return {cls:CLS.GENERAL, why:row.scope};
+}
+
+/* A service writer types what the customer said, not what the catalog calls
+   it. These are the words that actually come across the counter. */
+const ALIASES = {
+  "lof":["oil change","lube oil filter","oil service","oil and filter"],
+  "oil change":["lof","oil service"],
+  "r&r":["remove","replace","replacement"],
+  "cab":["cabin air filter","cabin filter"],
+  "serp":["serpentine","accessory belt","drive belt"],
+  "serp belt":["serpentine belt","accessory belt","drive belt"],
+  "belt":["serpentine","accessory belt","drive belt"],
+  "plugs":["spark plug","ignition"],
+  "hub":["wheel bearing","hub assembly"],
+  "wheel bearing":["hub"],
+  "thrust arm":["control arm"],
+  "control arm":["thrust arm"],
+  "shocks":["shock absorber","strut"],
+  "struts":["strut","shock"],
+  "tranny":["transmission"],
+  "trans":["transmission"],
+  "diff":["differential"],
+  "tcase":["transfer case"],
+  "ac":["a/c","air conditioning","hvac"],
+  "brakes":["brake","pad","rotor"],
+  "alignment":["align","four-wheel"],
+  "vanos":["variable valve timing"],
+  "rod bearings":["rod bearing"]
+};
+function expandQuery(q){
+  const base = String(q || "").toLowerCase().trim();
+  if (!base) return [];
+  const words = base.split(/\s+/).filter(Boolean);
+  const terms = new Set([base].concat(words));
+  Object.keys(ALIASES).forEach(k => {
+    if (base === k || words.indexOf(k) >= 0 || base.indexOf(k) >= 0) ALIASES[k].forEach(a => terms.add(a));
+  });
+  return Array.from(terms);
+}
+function rowHaystack(row){
+  return (row.id + " " + row.sec + " " + row.cat + " " + row.scope + " " + row.svc + " " + row.note).toLowerCase();
+}
+/* Score: what the vehicle is worth first, then how well the words fit, so an
+   exact generation job outranks a general one that happens to word-match. */
+function searchCatalog(profile, query, opt){
+  opt = opt || {};
+  const terms = expandQuery(query);
+  const out = [];
+  SEED.forEach(row => {
+    if (opt.section && row.sec !== opt.section) return;
+    const c = classifyRow(row, profile);
+    if (!c) return;
+    let words = 0;
+    if (terms.length){
+      const hay = rowHaystack(row);
+      const svc = row.svc.toLowerCase();
+      const hits = terms.filter(t => hay.indexOf(t) >= 0);
+      if (!hits.length) return;
+      const phrase = terms[0];
+      words = hits.length * 4
+            + (svc.indexOf(phrase) >= 0 ? 25 : 0)          /* the words, in the name of the job */
+            + (svc.indexOf(phrase) === 0 ? 15 : 0)         /* and at the front of it */
+            + (row.id.toLowerCase() === phrase ? 200 : 0); /* someone typed a Service ID */
+    }
+    /* Word fit dominates when there is a query; the vehicle then breaks ties.
+       With no query the list is purely what suits the car in the bay. */
+    out.push({row, cls:c.cls, why:c.why, score: words * 200 + CLS_RANK[c.cls]});
+  });
+  out.sort((a,b) => b.score - a.score || a.row.svc.localeCompare(b.row.svc));
+  return out;
+}
+
+/* ---------- price ---------- */
+/* The one rule that costs real money if it is wrong: a Fixed row is a menu
+   price the shop advertises, and multiplying it by the door rate would quote a
+   $30 tire repair at $120. Fixed never touches the rate. */
+function isFixed(row){ return row.bill === "F"; }
+function shopRate(){ return Number(db.settings.laborRate) || 0; }
+function overrideFor(id){ const o = db.catalog.overrides[id]; return (o && o.active !== false) ? o : null; }
+/* The seed row is never edited. An override sits beside it and is layered on
+   top, so the shop can always see what the catalog said before anyone touched
+   it, and removing the override restores it exactly. */
+function effectiveSeed(row){
+  const ov = overrideFor(row.id);
+  return {
+    hours: (ov && ov.hours != null) ? Number(ov.hours) : row.hrs,
+    price: (ov && ov.price != null) ? Number(ov.price) : row.fix,
+    source: ov ? SRC_OVERRIDE : SRC_SEED,
+    override: ov || null
+  };
+}
+function seedCharge(row){
+  const e = effectiveSeed(row);
+  return isFixed(row) ? (Number(e.price) || 0) : (Number(e.hours) || 0) * shopRate();
+}
+function isFinal(o){ return !!o && (o.status === "Invoiced" || o.status === "Paid"); }
+/* A draft follows the current door rate; an invoice keeps the rate it was
+   written at. A line the shop typed a rate into by hand is that shop decision
+   and is never recalculated. Lines saved before this version carry no
+   rateSource and are left exactly as they were. */
+function effRate(line, order){
+  if (line.bill === "F") return 0;
+  if (line.rateSource === "shop" && !isFinal(order)) return shopRate();
+  return Number(line.rate) || 0;
+}
+function lineHours(line){ return Number(line.billedHours != null ? line.billedHours : line.hours) || 0; }
+function lineAmount(line, order){
+  return line.bill === "F" ? (Number(line.price) || 0) : lineHours(line) * effRate(line, order);
+}
+/* Called when an order is saved: an order that has become an invoice stops
+   moving, whatever the shop does to its rate afterwards. */
+function freezeIfFinal(o){
+  if (!isFinal(o)) return;
+  (o.labor || []).forEach(l => { if (l.rateSource === "shop"){ l.rate = shopRate(); l.rateSource = "locked"; } });
+}
+
+/* ---------- the audit trail ---------- */
+/* An override is a person deciding to charge something other than what the
+   catalog says. That is a defensible decision; an unexplained one is not. So
+   the name and the reason are part of the record, not a nicety. */
+function requireAuthorization(what){
+  if (!db.settings.requireOverrideReason) return {ok:true, who:(db.settings.lastTech || "shop"), reason:""};
+  if (db.settings.managerPin){
+    const pin = prompt("Manager PIN to " + what + ":");
+    if (pin == null) return {ok:false};
+    if (String(pin) !== String(db.settings.managerPin)){ alert("That PIN does not match. Nothing was changed."); return {ok:false}; }
+  }
+  const who = prompt("Who is authorizing this?", db.settings.lastTech || "");
+  if (who == null || !who.trim()) return {ok:false};
+  const reason = prompt("Reason (this is kept with the record):", "");
+  if (reason == null || !reason.trim()){ alert("A reason is required. Nothing was changed."); return {ok:false}; }
+  db.settings.lastTech = who.trim();
+  return {ok:true, who:who.trim(), reason:reason.trim()};
+}
+function audit(action, ref, from, to, who, reason){
+  db.audit.push({at:new Date().toISOString(), action, ref, from, to, who, reason});
+  if (db.audit.length > 2000) db.audit = db.audit.slice(-2000);
+}
+
 function go(v){view=v;document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v||(v==="vehDetail"&&b.dataset.view==="vehicles")));render();}
 $("#newWO").onclick=()=>editOrder(null);
 $("#brandTop").onclick=()=>go("dash");
 
 function render(){$("#brandTop").innerHTML=esc(db.settings.shopName).replace(/(Inc\.?)$/i,'<span> $1</span>')||"JZD<span> Inc.</span>";
-  if(view==="dash")renderDash();else if(view==="orders")renderOrders();else if(view==="customers")renderCustomers();else if(view==="vehicles")renderVehicles();else if(view==="vehDetail")renderVehicleDetail(detailVeh);else if(view==="catalog")renderCatalog();else renderSettings();}
+  if(view==="dash")renderDash();else if(view==="orders")renderOrders();else if(view==="customers")renderCustomers();else if(view==="vehicles")renderVehicles();else if(view==="vehDetail")renderVehicleDetail(detailVeh);else if(view==="services")renderServices();else if(view==="catalog")renderCatalog();else renderSettings();}
 
 /* ---------- dashboard ---------- */
 function renderDash(){const os=vals(db.orders).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
@@ -370,7 +1076,9 @@ function renderVehicleDetail(id){const v=db.vehicles[id];if(!v){go("vehicles");r
     <div><h3>Owner</h3>${esc(custName(v.customerId))}<br>${esc(c.phone||"")}<br>${esc(c.email||"")}</div>
     <div><h3>History</h3>${hist.length} visit${hist.length===1?"":"s"}<br>Total billed: <b>${money(spent)}</b></div>
     ${v.notes?`<div><h3>Notes</h3>${esc(v.notes)}</div>`:""}
-  </div></div>
+  </div>
+  ${(v.vin&&db.vinCache[v.vin])?decodedCard(db.vinCache[v.vin]):""}
+  </div>
   <div class="card"><h2 style="margin-top:0">Service History</h2>
   ${hist.length?`<table><thead><tr><th>#</th><th>Date</th><th>Mileage</th><th>Work performed</th><th>Status</th><th class="right">Total</th></tr></thead><tbody>
   ${hist.map(o=>{const t=orderTotals(o);const work=o.complaint||(o.labor||[]).map(l=>l.desc).filter(Boolean).join(", ")||"—";return `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${o.invoiceNo||"—"}</b></td><td>${esc(o.date||"")}</td><td>${esc(o.mileageOut||o.mileageIn||"")}</td><td>${esc(work).slice(0,70)}</td><td><span class="pill st-${(o.status||"Estimate").replace(/\s/g,"")}">${esc((o.status||"").replace("InProgress","In Progress"))}</span></td><td class="right">${money(t.total)}</td></tr>`;}).join("")}
@@ -385,6 +1093,66 @@ function renderCatalog(){const lab=vals(db.catalog.labor).sort((a,b)=>(a.desc||"
   ${par.length?`<table><thead><tr><th>Part</th><th>Price</th><th></th></tr></thead><tbody>${par.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${money(p.price)}</td><td class="right"><button class="sm" onclick="editCatItem('parts','${p.id}')">Edit</button></td></tr>`).join("")}</tbody></table>`:`<div class="empty">No saved parts yet. Add parts you use often (oil filter, brake pads…) so they drop into work orders instantly.</div>`}</div>
   <div class="card"><p class="muted" style="margin:0">Tip: on any work order you can also click <b>Save lines to catalog</b> to add whatever you just entered.</p></div>`;
 }
+
+/* The shipped catalog, browsable. Rows are never edited in place — an override
+   sits beside the seed value so the shop can always see what it started as. */
+let svcQuery="", svcSection="All";
+function renderServices(){
+  const q=svcQuery.toLowerCase().trim();
+  const list=SEED.filter(r=>(svcSection==="All"||r.sec===svcSection)&&(!q||rowHaystack(r).indexOf(q)>=0));
+  const secs=["All"].concat(SECTIONS);
+  $("#app").innerHTML=`
+  <div class="card"><div class="toolbar"><h2 style="margin:0">Service Catalog</h2><span class="muted">${SEED.length} jobs</span><div class="grow"></div>
+    <span class="muted" style="font-size:12px">Shop rate ${money(shopRate())}/hr</span></div>
+  <input id="svcQ" value="${esc(svcQuery)}" placeholder="Search service, category, scope or Service ID">
+  <div class="tabs">${secs.map(t=>`<button class="${t===svcSection?"on":""}" onclick="svcSection='${t}';renderServices()">${esc(t)}</button>`).join("")}</div>
+  <table><thead><tr><th>Service</th><th>Scope</th><th>Hours</th><th class="right">Charge</th><th></th></tr></thead><tbody>
+  ${list.map(r=>{const e=effectiveSeed(r);const dis=!!db.catalog.disabled[r.id];
+    return `<tr style="${dis?"opacity:.45":""}">
+      <td><b>${esc(r.svc)}</b><div class="sub" style="font-size:11.5px;color:var(--muted)">
+        <span class="badge ${e.source===SRC_OVERRIDE?"b-override":"b-seed"}">${esc(e.source)}</span>
+        ${r.ver?`<span class="badge b-verify">VERIFY</span>`:""}
+        ${esc(r.id)} · ${esc(r.cat)}</div></td>
+      <td>${esc(r.scope)}</td>
+      <td>${isFixed(r)?"<i>menu</i>":esc(e.hours)+" hr"}</td>
+      <td class="right"><b>${money(seedCharge(r))}</b></td>
+      <td class="right"><button class="sm" onclick="overrideSeed('${r.id}')">Override…</button>
+        ${e.override?`<button class="sm" onclick="clearSeedOverride('${r.id}')">Undo</button>`:""}
+        <button class="sm" onclick="toggleSeed('${r.id}')">${dis?"Enable":"Disable"}</button></td></tr>`;}).join("")}
+  </tbody></table>
+  ${list.length?"":`<div class="empty">Nothing matches that.</div>`}
+  <p class="muted" style="font-size:12px;margin-bottom:0">This is the shop own curated catalog — not Mitchell, ALLDATA, MOTOR or an OEM
+  labor guide. Jobs marked VERIFY depend on the exact vehicle: check them against this VIN in an approved labor guide before quoting.</p>
+  </div>`;
+  const el=$("#svcQ");
+  el.oninput=()=>{const at=el.selectionStart;svcQuery=el.value;renderServices();const n=$("#svcQ");n.focus();n.setSelectionRange(at,at);};
+}
+function overrideSeed(id){
+  const row=SEED_BY_ID[id]; if(!row) return;
+  const fixed=isFixed(row), e=effectiveSeed(row);
+  const cur_v=fixed?e.price:e.hours;
+  const raw=prompt(fixed?`Menu price for "${row.svc}" ($):`:`Labor hours for "${row.svc}":`, String(cur_v));
+  if(raw==null) return;
+  const n=Number(raw);
+  if(!isFinite(n)||n<0){ alert("That is not a number."); return; }
+  const auth=requireAuthorization(fixed?"change this menu price":"change this labor time");
+  if(!auth.ok) return;
+  db.catalog.overrides[id]={hours:fixed?null:n, price:fixed?n:null, who:auth.who, reason:auth.reason, at:new Date().toISOString(), active:true};
+  audit("catalog-override", id+" "+row.svc, cur_v, n, auth.who, auth.reason);
+  save(); renderServices();
+}
+function clearSeedOverride(id){
+  const o=db.catalog.overrides[id]; if(!o) return;
+  if(!confirm("Remove the override and go back to the catalog value?")) return;
+  const row=SEED_BY_ID[id];
+  audit("catalog-override-removed", id+" "+(row?row.svc:""), (o.hours!=null?o.hours:o.price), "catalog value", db.settings.lastTech||"shop", "override removed");
+  delete db.catalog.overrides[id]; save(); renderServices();
+}
+function toggleSeed(id){
+  if(db.catalog.disabled[id]) delete db.catalog.disabled[id];
+  else db.catalog.disabled[id]=true;
+  save(); renderServices();
+}
 function editCatItem(kind,id){const store=db.catalog[kind];const it=id?store[id]:(kind==="labor"?{id:uid("cl"),desc:"",hours:"",rate:db.settings.laborRate}:{id:uid("cp"),name:"",price:""});
   $("#recSheet").innerHTML=`<div class="sheet-head"><h2>${id?"Edit":"Add"} ${kind==="labor"?"Labor":"Part"}</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
   ${kind==="labor"?`<label>Description</label><input id="ci_desc" value="${esc(it.desc)}"><div class="row"><div><label>Default hours</label><input id="ci_hours" value="${esc(it.hours)}"></div><div><label>Rate/hr</label><input id="ci_rate" value="${esc(it.rate)}"></div></div>`:`<label>Part name</label><input id="ci_name" value="${esc(it.name)}"><label>Price</label><input id="ci_price" value="${esc(it.price)}">`}
@@ -394,7 +1162,7 @@ function editCatItem(kind,id){const store=db.catalog[kind];const it=id?store[id]
 }
 function delCatItem(kind,id){if(!confirm("Delete this catalog item?"))return;delete db.catalog[kind][id];save();closeRec();render();}
 function catSelect(kind){const items=vals(db.catalog[kind]);if(!items.length)return "";const opts=items.map(it=>`<option value="${it.id}">${esc(kind==="labor"?it.desc:it.name)}</option>`).join("");return `<select class="sm" style="max-width:230px" onchange="insertCat('${kind}',this.value);this.selectedIndex=0"><option value="">Insert saved ${kind}…</option>${opts}</select>`;}
-function insertCat(kind,id){if(!id)return;pullWO();const it=db.catalog[kind][id];if(!it)return;if(kind==="labor")cur.labor.push({desc:it.desc,hours:it.hours||"",rate:it.rate||db.settings.laborRate});else cur.parts.push({desc:it.name,qty:"1",price:it.price||""});renderLines();updateTotals();}
+function insertCat(kind,id){if(!id)return;pullWO();const it=db.catalog[kind][id];if(!it)return;if(kind==="labor")cur.labor.push({desc:it.desc,hours:it.hours||"",rate:it.rate||shopRate(),bill:"H",rateSource:"manual",source:SRC_MANUAL});else cur.parts.push({desc:it.name,qty:"1",price:it.price||""});renderLines();updateTotals();}
 function saveLinesToCatalog(kind){pullWO();const store=db.catalog[kind];let n=0;if(kind==="labor"){cur.labor.forEach(l=>{if(!l.desc)return;const ex=vals(store).find(x=>(x.desc||"").toLowerCase()===l.desc.toLowerCase());if(ex){ex.hours=l.hours;ex.rate=l.rate;}else{const id=uid("cl");store[id]={id,desc:l.desc,hours:l.hours,rate:l.rate};}n++;});}else{cur.parts.forEach(p=>{if(!p.desc)return;const ex=vals(store).find(x=>(x.name||"").toLowerCase()===p.desc.toLowerCase());if(ex){ex.price=p.price;}else{const id=uid("cp");store[id]={id,name:p.desc,price:p.price};}n++;});}save();alert(n?`Saved ${n} ${kind} item(s) to the catalog.`:"Nothing to save — add a line first.");drawWO();}
 
 /* ---------- settings ---------- */
@@ -402,18 +1170,35 @@ function renderSettings(){const s=db.settings;
   $("#app").innerHTML=`<div class="card"><h2>Shop Settings</h2>
   <div class="row"><div><label>Shop name</label><input id="s_shopName" value="${esc(s.shopName)}"></div><div><label>Tagline</label><input id="s_tagline" value="${esc(s.tagline)}"></div></div>
   <div class="row"><div><label>Address</label><input id="s_addr" value="${esc(s.addr)}"></div><div><label>Phone</label><input id="s_phone" value="${esc(s.phone)}"></div><div><label>Email</label><input id="s_email" value="${esc(s.email)}"></div></div>
-  <div class="row"><div><label>Default labor rate ($/hr)</label><input id="s_laborRate" type="number" step="1" value="${s.laborRate}"></div><div><label>Sales tax rate (%)</label><input id="s_taxRate" type="number" step="0.01" value="${s.taxRate}"></div><div><label>Next invoice #</label><input id="s_nextInvoice" type="number" step="1" value="${s.nextInvoice}"></div></div>
+  <div class="row"><div><label>Shop labor rate ($/hr)</label><input id="s_laborRate" type="number" step="0.5" value="${s.laborRate}">
+    <div class="muted" style="font-size:11.5px;margin-top:3px">Working range ${money(s.rateMin)}–${money(s.rateMax)}. Outside it just asks once — it is your shop.</div></div>
+  <div><label>Sales tax rate (%)</label><input id="s_taxRate" type="number" step="0.01" value="${s.taxRate}"></div><div><label>Next invoice #</label><input id="s_nextInvoice" type="number" step="1" value="${s.nextInvoice}"></div></div>
   <div class="chk" style="margin-top:10px"><label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="s_taxLabor" ${s.taxLabor?"checked":""} style="width:auto"> Charge sales tax on labor too (default: parts only)</label></div>
+  <div class="chk" style="margin-top:8px"><label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="s_reqOv" ${s.requireOverrideReason?"checked":""} style="width:auto"> Ask who and why before a catalog labor time or menu price is overridden</label></div>
+  <div class="row"><div><label>Manager PIN for overrides (optional)</label><input id="s_pin" value="${esc(s.managerPin)}" placeholder="leave blank for none"></div></div>
   <label>Invoice footer / terms</label><textarea id="s_terms">${esc(s.terms)}</textarea>
   <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveSettings()">Save Settings</button></div>
   </div>
+  ${providerCard()}
+  ${auditCard()}
   <div class="card"><h3>Backup</h3><p class="muted" style="margin-top:0">Your data lives in this browser. Export a backup regularly, or to move to another computer.</p>
   <div class="toolbar"><button onclick="exportData()">Export backup (.json)</button><button onclick="document.getElementById('impFile').click()">Import backup</button><input type="file" id="impFile" accept=".json" style="display:none"><button onclick="openRestore()">Restore from backup…</button><button onclick="showWhere()">Where is my data?</button></div>
   <p class="muted" style="margin:10px 0 0;font-size:12px">JZD Shop Manager <span id="verLbl"></span> — every change is written straight to disk and read back to prove it landed, and a copy of the previous book is kept before each change.</p></div>`;
   const vl=document.getElementById("verLbl"); if(vl) vl.textContent = "v"+JZD_VERSION;
   $("#impFile").onchange=importData;
 }
-function saveSettings(){const g=id=>$("#"+id).value;db.settings.shopName=g("s_shopName")||"JZD Inc.";db.settings.tagline=g("s_tagline");db.settings.addr=g("s_addr");db.settings.phone=g("s_phone");db.settings.email=g("s_email");db.settings.laborRate=Number(g("s_laborRate"))||0;db.settings.taxRate=Number(g("s_taxRate"))||0;db.settings.nextInvoice=parseInt(g("s_nextInvoice"))||1001;db.settings.taxLabor=$("#s_taxLabor").checked;db.settings.terms=g("s_terms");save();render();alert("Settings saved.");}
+function saveSettings(){const g=id=>$("#"+id).value;db.settings.shopName=g("s_shopName")||"JZD Inc.";db.settings.tagline=g("s_tagline");db.settings.addr=g("s_addr");db.settings.phone=g("s_phone");db.settings.email=g("s_email");
+  const rate=Number(g("s_laborRate"))||0;
+  /* The range is guidance, not a cage: a rate outside it is confirmed once and
+     then accepted, because a shop that raises its door rate is not an error. */
+  if(rate<db.settings.rateMin||rate>db.settings.rateMax){
+    if(!confirm(`${money(rate)}/hr is outside your working range of ${money(db.settings.rateMin)}–${money(db.settings.rateMax)}.\n\nUse it anyway?`))return;
+  }
+  const prevRate=db.settings.laborRate;
+  db.settings.laborRate=rate;
+  db.settings.requireOverrideReason=$("#s_reqOv").checked;
+  db.settings.managerPin=g("s_pin").trim();
+  if(rate!==prevRate)audit("shop-rate",'$/hr',prevRate,rate,db.settings.lastTech||"shop","shop rate changed in Settings");db.settings.taxRate=Number(g("s_taxRate"))||0;db.settings.nextInvoice=parseInt(g("s_nextInvoice"))||1001;db.settings.taxLabor=$("#s_taxLabor").checked;db.settings.terms=g("s_terms");save();render();alert("Settings saved.");}
 function exportData(){const b=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="jzd-shop-backup.json";a.click();}
 function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.settings)throw 0;db=Object.assign({},DEFAULT,d,{settings:Object.assign({},DEFAULT.settings,d.settings)});save();render();alert("Backup imported.");}catch(err){alert("That isn't a valid JZD Shop backup file.");}};r.readAsText(f);}
 
@@ -432,24 +1217,86 @@ function delCustomer(id){if(!confirm("Delete this customer? Their vehicles stay 
 function closeRec(){$("#recOverlay").classList.remove("on");}
 
 /* ---------- vehicle editor ---------- */
-function editVehicle(id,presetCustomer,then){const v=id?db.vehicles[id]:{id:uid("v"),customerId:presetCustomer||"",year:"",make:"",model:"",vin:"",plate:"",color:"",mileage:"",notes:""};
+/* The VIN is the fastest true thing a service writer has: one field, one
+   button, and the car identifies itself. It is deliberately NOT a wizard — the
+   rest of the form stays on screen and stays editable, because a decode that
+   comes back thin or not at all must never stop someone booking the work. */
+function editVehicle(id,presetCustomer,then){
+  const v=id?JSON.parse(JSON.stringify(db.vehicles[id])):{id:uid("v"),customerId:presetCustomer||"",year:"",make:"",model:"",vin:"",plate:"",color:"",mileage:"",notes:""};
   const custOpts=vals(db.customers).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${c.id===v.customerId?"selected":""}>${esc(c.name)}</option>`).join("");
   $("#recSheet").innerHTML=`<div class="sheet-head"><h2>${id?"Edit":"Add"} Vehicle</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
-  <label>Owner</label><select id="v_cust"><option value="">— select customer —</option>${custOpts}</select>
+  <label>VIN</label>
+  <div class="vinbar">
+    <input id="v_vin" style="flex:1;min-width:230px" value="${esc(v.vin)}" placeholder="17 characters — paste or scan" autocomplete="off" spellcheck="false">
+    <button class="primary" id="v_decode">Decode VIN</button>
+  </div>
+  <div id="v_decoded"></div>
+  <label style="margin-top:12px">Owner</label><select id="v_cust"><option value="">— select customer —</option>${custOpts}</select>
   <div class="row"><div><label>Year</label><input id="v_year" value="${esc(v.year)}"></div><div><label>Make</label><input id="v_make" value="${esc(v.make)}"></div><div><label>Model</label><input id="v_model" value="${esc(v.model)}"></div></div>
   <div class="row"><div><label>Color</label><input id="v_color" value="${esc(v.color)}"></div><div><label>Plate</label><input id="v_plate" value="${esc(v.plate)}"></div><div><label>Mileage</label><input id="v_mileage" value="${esc(v.mileage)}"></div></div>
-  <label>VIN</label><input id="v_vin" value="${esc(v.vin)}">
   <label>Notes</label><textarea id="v_notes">${esc(v.notes)}</textarea>
   <div class="toolbar" style="margin-top:14px"><button class="green" id="v_save">Save Vehicle</button>${id?`<button class="danger" onclick="delVehicle('${id}')">Delete</button>`:""}</div>`;
-  $("#v_save").onclick=()=>{v.customerId=$("#v_cust").value;v.year=$("#v_year").value;v.make=$("#v_make").value;v.model=$("#v_model").value;v.color=$("#v_color").value;v.plate=$("#v_plate").value;v.mileage=$("#v_mileage").value;v.vin=$("#v_vin").value;v.notes=$("#v_notes").value;if(!v.make&&!v.model){alert("Enter at least a make or model.");return;}db.vehicles[v.id]=v;save();closeRec();if(then)then(v.id);else render();};
+
+  const paint=()=>{
+    const n=normalizeVin($("#v_vin").value);
+    const d=n.ok?db.vinCache[n.vin]:null;
+    $("#v_decoded").innerHTML = d ? decodedCard(d) : "";
+  };
+  $("#v_decode").onclick=()=>runDecode(v);
+  $("#v_vin").onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); runDecode(v); } };
+  $("#v_vin").onblur=paint;
+  paint();
+
+  $("#v_save").onclick=()=>{
+    v.customerId=$("#v_cust").value;v.year=$("#v_year").value;v.make=$("#v_make").value;v.model=$("#v_model").value;
+    v.color=$("#v_color").value;v.plate=$("#v_plate").value;v.mileage=$("#v_mileage").value;v.notes=$("#v_notes").value;
+    const n=normalizeVin($("#v_vin").value);
+    if($("#v_vin").value.trim() && !n.ok){ alert(n.reason); return; }
+    v.vin=n.ok?n.vin:"";
+    if(!v.make&&!v.model){alert("Enter at least a make or model, or decode a VIN.");return;}
+    db.vehicles[v.id]=v;save();closeRec();if(then)then(v.id);else render();
+  };
   $("#recOverlay").classList.add("on");
+}
+/* Decoding must never freeze the window or lose what is already typed. */
+async function runDecode(v){
+  const btn=$("#v_decode"), field=$("#v_vin");
+  const n=normalizeVin(field.value);
+  if(!n.ok){ $("#v_decoded").innerHTML=`<div class="verifynote">${esc(n.reason)}</div>`; return; }
+  field.value=n.vin;
+  btn.disabled=true; const was=btn.textContent; btn.textContent="Decoding…";
+  try{
+    const d=await decodeVin(n.vin);
+    if(!$("#v_decoded")) return;                       /* sheet closed while waiting */
+    $("#v_decoded").innerHTML=decodedCard(d);
+    if(d.year && !$("#v_year").value.trim())  $("#v_year").value=d.year;
+    if(d.make && !$("#v_make").value.trim())  $("#v_make").value=d.make;
+    if(d.model && !$("#v_model").value.trim())$("#v_model").value=d.model;
+  }catch(err){
+    if(!$("#v_decoded")) return;
+    $("#v_decoded").innerHTML=`<div class="verifynote"><b>Could not decode this VIN.</b><br>${esc(err.message)}<br>
+      The VIN is kept. Fill in year, make and model below and carry on — nothing here needs the internet.</div>`;
+  }finally{ if(btn&&btn.isConnected){btn.disabled=false; btn.textContent=was;} }
+}
+function decodedCard(d){
+  const line=[d.year,d.make,d.model,d.series,d.trim].filter(Boolean).join(" ");
+  const bits=[
+    d.cylinders?d.cylinders+"-cyl":"", d.displacementL?d.displacementL+"L":"",
+    d.fuelType, d.driveType, d.transmission, d.bodyClass
+  ].filter(Boolean).join(" · ");
+  const warn=(d.warnings||[]).map(w=>`<div class="decwarn">⚠ ${esc(w)}</div>`).join("");
+  return `<div class="decoded"><span class="badge b-vehicle">${SRC_VEHICLE}</span>
+    <b style="margin-left:6px">${esc(line||"Vehicle identified")}</b>
+    ${bits?`<div style="margin-top:4px">${esc(bits)}</div>`:""}
+    ${d.gvwrClass?`<div class="muted" style="font-size:12px;margin-top:3px">${esc(d.gvwrClass)}</div>`:""}
+    ${warn}</div>`;
 }
 function delVehicle(id){if(!confirm("Delete this vehicle?"))return;delete db.vehicles[id];save();closeRec();render();}
 
 /* ---------- work order editor ---------- */
 let cur=null;
 function editOrder(id,preset){
-  cur=id?JSON.parse(JSON.stringify(db.orders[id])):{id:uid("o"),invoiceNo:null,customerId:"",vehicleId:"",date:todayStr(),status:"Estimate",complaint:"",mileageIn:"",mileageOut:"",labor:[{desc:"",hours:"",rate:db.settings.laborRate}],parts:[{desc:"",qty:"1",price:""}],notes:""};
+  cur=id?JSON.parse(JSON.stringify(db.orders[id])):{id:uid("o"),invoiceNo:null,customerId:"",vehicleId:"",date:todayStr(),status:"Estimate",complaint:"",mileageIn:"",mileageOut:"",labor:[],parts:[{desc:"",qty:"1",price:""}],notes:""};
   if(!id&&preset){cur.customerId=preset.customerId||"";cur.vehicleId=preset.vehicleId||"";const pv=db.vehicles[cur.vehicleId];if(pv&&pv.mileage)cur.mileageIn=pv.mileage;}
   drawWO();$("#woOverlay").classList.add("on");
 }
@@ -476,7 +1323,8 @@ function drawWO(){const o=cur;
   <h3 style="margin-top:16px">Labor</h3>
   <div class="linerow"><div class="lbl">Description</div><div class="lbl">Hours</div><div class="lbl">Rate/hr</div><div class="lbl right">Amount</div><div></div></div>
   <div id="laborRows"></div>
-  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><button class="sm" onclick="addLine('labor')">+ Labor line</button>${catSelect('labor')}<button class="sm" onclick="saveLinesToCatalog('labor')">Save lines to catalog</button></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><button class="sm primary" onclick="openJobs()">+ Add job</button><button class="sm" onclick="addLine('labor')">+ Blank line</button>${catSelect('labor')}<button class="sm" onclick="saveLinesToCatalog('labor')">Save lines to catalog</button></div>
+  <div id="verifyBanner"></div>
 
   <h3 style="margin-top:16px">Parts</h3>
   <div class="linerow"><div class="lbl">Part / Description</div><div class="lbl">Qty</div><div class="lbl">Price</div><div class="lbl right">Amount</div><div></div></div>
@@ -506,20 +1354,80 @@ function drawWO(){const o=cur;
   ["o_veh","o_date","o_status","o_mIn","o_mOut","o_complaint","o_notes"].forEach(id=>{const el=$("#"+id);if(el)el.onchange=pullWO;});
 }
 function renderLines(){const o=cur;
-  $("#laborRows").innerHTML=(o.labor||[]).map((l,i)=>`<div class="linerow"><input data-k="labor" data-i="${i}" data-f="desc" value="${esc(l.desc)}" placeholder="e.g. Replace front brakes"><input data-k="labor" data-i="${i}" data-f="hours" value="${esc(l.hours)}" inputmode="decimal"><input data-k="labor" data-i="${i}" data-f="rate" value="${esc(l.rate)}" inputmode="decimal"><div class="right">${money((Number(l.hours)||0)*(Number(l.rate)||0))}</div><button class="x" onclick="delLine('labor',${i})">✕</button></div>`).join("");
+  $("#laborRows").innerHTML=(o.labor||[]).map((l,i)=>laborRow(l,i,o)).join("");
   $("#partsRows").innerHTML=(o.parts||[]).map((p,i)=>`<div class="linerow"><input data-k="parts" data-i="${i}" data-f="desc" value="${esc(p.desc)}" placeholder="e.g. Brake pads (front)"><input data-k="parts" data-i="${i}" data-f="qty" value="${esc(p.qty)}" inputmode="decimal"><input data-k="parts" data-i="${i}" data-f="price" value="${esc(p.price)}" inputmode="decimal"><div class="right">${money((Number(p.qty)||0)*(Number(p.price)||0))}</div><button class="x" onclick="delLine('parts',${i})">✕</button></div>`).join("");
-  $("#woSheet").querySelectorAll("input[data-k]").forEach(inp=>inp.oninput=()=>{const k=inp.dataset.k,i=+inp.dataset.i,f=inp.dataset.f;cur[k][i][f]=inp.value;updateTotals();});
+  $("#woSheet").querySelectorAll("input[data-k]").forEach(inp=>inp.oninput=()=>{
+    const k=inp.dataset.k,i=+inp.dataset.i,f=inp.dataset.f;
+    cur[k][i][f]=inp.value;
+    /* Typing a rate over the shop rate makes it this shop decision for this
+       line, so it stops following the door rate from then on. */
+    if(k==="labor"&&f==="rate")cur.labor[i].rateSource="manual";
+    updateTotals();
+  });
+  drawVerifyBanner();
+}
+/* A labor line shows the number AND where the number came from. The second
+   row is not decoration: a service writer quoting a customer needs to know in
+   one glance whether this is a menu price, a catalog time, or someone hand
+   overriding the catalog, and whether the job still needs checking. */
+function laborRow(l,i,o){
+  const fixed=l.bill==="F";
+  const amt=lineAmount(l,o);
+  const locked=!!l.serviceId;                 /* catalog rows change through the audited path */
+  const hoursCell=fixed
+    ? `<input value="—" disabled title="Menu price — not charged by the hour">`
+    : `<input data-k="labor" data-i="${i}" data-f="${l.billedHours!=null?"billedHours":"hours"}" value="${esc(l.billedHours!=null?l.billedHours:l.hours)}" inputmode="decimal" ${locked?"readonly title='Use Override to change a catalog time'":""}>`;
+  const rateCell=fixed
+    ? `<input data-k="labor" data-i="${i}" data-f="price" value="${esc(l.price)}" inputmode="decimal" ${locked?"readonly title='Use Override to change a menu price'":""}>`
+    : `<input data-k="labor" data-i="${i}" data-f="rate" value="${esc(effRate(l,o))}" inputmode="decimal" ${locked?"readonly title='Hourly lines follow the shop rate'":""}>`;
+  return `<div class="lineblk">
+    <div class="linerow">
+      <input data-k="labor" data-i="${i}" data-f="desc" value="${esc(l.desc)}" placeholder="e.g. Replace front brakes">
+      ${hoursCell}${rateCell}
+      <div class="right">${money(amt)}</div>
+      <button class="x" onclick="delLine('labor',${i})">✕</button>
+    </div>
+    ${lineMeta(l,i,o)}
+  </div>`;
+}
+function lineMeta(l,i,o){
+  if(!l.serviceId && !l.source) return "";
+  const bits=[];
+  const src=l.source||SRC_MANUAL;
+  const cl=src===SRC_OVERRIDE?"b-override":src===SRC_SEED?"b-seed":"b-manual";
+  bits.push(`<span class="badge ${cl}">${esc(src)}</span>`);
+  if(l.cls) bits.push(`<span class="badge b-cls">${esc(CLS_LABEL[l.cls]||l.cls)}</span>`);
+  if(l.verify) bits.push(`<span class="badge b-verify">VERIFY</span>`);
+  if(l.bill==="F") bits.push(`<span>menu price — not multiplied by the door rate</span>`);
+  if(l.overlap) bits.push(`<span>overlap ${l.overlap>0?"+":""}${esc(l.overlap)} hr → ${esc(lineHours(l))} hr billed</span>`);
+  if(l.override) bits.push(`<span>overridden by ${esc(l.override.who)}: ${esc(l.override.reason)}</span>`);
+  if(l.serviceId){
+    bits.push(`<button class="sm" onclick="overrideLine(${i})">Override…</button>`);
+    if(l.override) bits.push(`<button class="sm" onclick="clearLineOverride(${i})">Undo override</button>`);
+    bits.push(`<span class="muted">${esc(l.serviceId)}</span>`);
+  }
+  return `<div class="linemeta">${bits.join("")}</div>`;
+}
+/* Every job on the order that the catalog says to check, gathered in one place
+   above the total, because that is where someone looks before they quote. */
+function drawVerifyBanner(){
+  const el=$("#verifyBanner"); if(!el) return;
+  const need=(cur.labor||[]).filter(l=>l.verify&&!l.verified);
+  el.innerHTML=need.length?`<div class="verifynote"><b>Verify before you quote.</b>
+    ${need.length===1?"One job on this order carries":need.length+" jobs on this order carry"} a shop-catalog time that
+    depends on the exact vehicle: ${esc(need.map(l=>l.desc).join("; "))}.<br>
+    Check the labor time against this VIN and configuration in an approved labor guide before the customer is given a price.</div>`:"";
 }
 function updateTotals(){const t=orderTotals(cur);$("#tLabor").textContent=money(t.labor);$("#tParts").textContent=money(t.parts);$("#tTax").textContent=money(t.tax);$("#tTotal").textContent=money(t.total);
-  // update per-line amount displays
-  cur.labor.forEach((l,i)=>{const row=$("#laborRows").children[i];if(row)row.children[3].textContent=money((Number(l.hours)||0)*(Number(l.rate)||0));});
+  const lrows=$("#laborRows").querySelectorAll(".linerow");
+  cur.labor.forEach((l,i)=>{const row=lrows[i];if(row)row.children[3].textContent=money(lineAmount(l,cur));});
   cur.parts.forEach((p,i)=>{const row=$("#partsRows").children[i];if(row)row.children[3].textContent=money((Number(p.qty)||0)*(Number(p.price)||0));});}
-function addLine(k){pullWO();if(k==="labor")cur.labor.push({desc:"",hours:"",rate:db.settings.laborRate});else cur.parts.push({desc:"",qty:"1",price:""});renderLines();updateTotals();}
+function addLine(k){pullWO();if(k==="labor")cur.labor.push({desc:"",hours:"",rate:shopRate(),bill:"H",rateSource:"shop",source:SRC_MANUAL});else cur.parts.push({desc:"",qty:"1",price:""});renderLines();updateTotals();}
 function delLine(k,i){pullWO();cur[k].splice(i,1);renderLines();updateTotals();}
 function pullWO(){const g=id=>{const el=$("#"+id);return el?el.value:undefined;};if(g("o_cust")!==undefined)cur.customerId=g("o_cust");if(g("o_veh")!==undefined)cur.vehicleId=g("o_veh");if(g("o_date")!==undefined)cur.date=g("o_date");if(g("o_status")!==undefined)cur.status=g("o_status");if(g("o_mIn")!==undefined)cur.mileageIn=g("o_mIn");if(g("o_mOut")!==undefined)cur.mileageOut=g("o_mOut");if(g("o_complaint")!==undefined)cur.complaint=g("o_complaint");if(g("o_notes")!==undefined)cur.notes=g("o_notes");}
 function quickCustomer(){pullWO();editCustomer(null,cid=>{cur.customerId=cid;cur.vehicleId="";drawWO();});}
 function quickVehicle(){pullWO();editVehicle(null,cur.customerId,vid=>{const v=db.vehicles[vid];if(v&&!cur.customerId)cur.customerId=v.customerId;cur.vehicleId=vid;drawWO();});}
-function saveOrder(){pullWO();if(!cur.customerId){alert("Select a customer.");return;}if(!cur.invoiceNo){cur.invoiceNo=db.settings.nextInvoice++;}db.orders[cur.id]=JSON.parse(JSON.stringify(cur));save();closeWO();render();}
+function saveOrder(){pullWO();if(!cur.customerId){alert("Select a customer.");return;}if(!cur.invoiceNo){cur.invoiceNo=db.settings.nextInvoice++;}freezeIfFinal(cur);db.orders[cur.id]=JSON.parse(JSON.stringify(cur));save();closeWO();render();}
 function delOrder(id){if(!confirm("Delete this work order?"))return;delete db.orders[id];save();closeWO();render();}
 function closeWO(){$("#woOverlay").classList.remove("on");cur=null;}
 
@@ -527,7 +1435,10 @@ function closeWO(){$("#woOverlay").classList.remove("on");cur=null;}
 function printDoc(kind){pullWO();const o=cur,s=db.settings,c=db.customers[o.customerId]||{},v=db.vehicles[o.vehicleId]||{},t=orderTotals(o);
   if(!o.invoiceNo&&kind==="Invoice"){o.invoiceNo=db.settings.nextInvoice++;db.orders[o.id]=JSON.parse(JSON.stringify(o));save();}
   const num=o.invoiceNo||"(draft)";
-  const laborRows=(o.labor||[]).filter(l=>l.desc||l.hours||l.rate).map(l=>`<tr><td>${esc(l.desc)||"Labor"}</td><td>${esc(l.hours)||0} hr</td><td>${money(l.rate)}</td><td style="text-align:right">${money((Number(l.hours)||0)*(Number(l.rate)||0))}</td></tr>`).join("");
+  const laborRows=(o.labor||[]).filter(l=>l.desc||l.hours||l.rate||l.price).map(l=>{
+    const fixed=l.bill==="F";
+    return `<tr><td>${esc(l.desc)||"Labor"}</td><td>${fixed?"—":esc(lineHours(l))+" hr"}</td><td>${fixed?"Menu price":money(effRate(l,o))}</td><td style="text-align:right">${money(lineAmount(l,o))}</td></tr>`;
+  }).join("");
   const partsRows=(o.parts||[]).filter(p=>p.desc||p.price).map(p=>`<tr><td>${esc(p.desc)||"Part"}</td><td>${esc(p.qty)||1}</td><td>${money(p.price)}</td><td style="text-align:right">${money((Number(p.qty)||0)*(Number(p.price)||0))}</td></tr>`).join("");
   $("#printArea").innerHTML=`<div class="inv">
     <div class="top"><div><div class="shop">${esc(s.shopName)}</div><div>${esc(s.tagline||"")}</div><div class="muted">${esc(s.addr||"")}${s.phone?" · "+esc(s.phone):""}${s.email?" · "+esc(s.email):""}</div></div>
@@ -549,9 +1460,139 @@ function printDoc(kind){pullWO();const o=cur,s=db.settings,c=db.customers[o.cust
   window.print();
 }
 
+/* What is actually answering questions right now, and what would answer them
+   if the shop bought a licence. Stated plainly so nobody quotes a seed time
+   believing a labor guide produced it. */
+function providerCard(){
+  const rows=[
+    ["NHTSA vPIC","Vehicle identification from VIN","Live — free, no account",true],
+    ["Shop seed catalog",SEED.length+" curated labor and menu jobs","Live — this shop own data",true],
+    ["MOTOR / TruSpeed Repair","Exact VIN labor times, OEM procedures, specs, TSBs, wiring",db.settings.providers.motor.enabled?"Enabled":"Not connected — needs a licensed subscription",db.settings.providers.motor.enabled],
+    ["Mitchell ProDemand","Labor and parts content",db.settings.providers.mitchell.enabled?"Enabled":"Not connected — integration is for approved partners",db.settings.providers.mitchell.enabled],
+    ["ALLDATA","OEM repair information",db.settings.providers.alldata.enabled?"Enabled":"Not connected — needs a shop subscription",db.settings.providers.alldata.enabled]
+  ];
+  return `<div class="card"><h3 style="margin-top:0">Where repair data comes from</h3>
+  <table><thead><tr><th>Source</th><th>Provides</th><th>Status</th></tr></thead><tbody>
+  ${rows.map(r=>`<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])}</td><td>${r[3]?`<span class="badge b-vehicle">${esc(r[2])}</span>`:`<span class="muted">${esc(r[2])}</span>`}</td></tr>`).join("")}
+  </tbody></table>
+  <p class="muted" style="font-size:12px;margin-bottom:0">The shop catalog is curated shop data. It is never labelled as MOTOR, Mitchell,
+  ALLDATA or OEM warranty time, and no part of this program will print those names over it. When a licensed subscription exists, its
+  credentials belong in this machine settings — never in a shared file — and its exact times take priority over the catalog.</p></div>`;
+}
+function auditCard(){
+  const a=db.audit.slice(-25).reverse();
+  return `<div class="card"><h3 style="margin-top:0">Override history</h3>
+  ${a.length?`<table><thead><tr><th>When</th><th>What</th><th>From</th><th>To</th><th>Who</th><th>Reason</th></tr></thead><tbody>
+  ${a.map(e=>`<tr><td>${esc(String(e.at).slice(0,16).replace("T"," "))}</td><td>${esc(e.ref)}</td><td>${esc(e.from)}</td><td>${esc(e.to)}</td><td>${esc(e.who)}</td><td>${esc(e.reason)}</td></tr>`).join("")}
+  </tbody></table>`:`<div class="empty">No labor time or price has been overridden yet. When one is, who did it and why is recorded here.</div>`}</div>`;
+}
+
+/* ---------- add a job from the catalog ----------
+   The whole point of the VIN is this screen: the vehicle is known, so the
+   catalog arrives already sorted by how well each job fits THIS car, and the
+   writer types what the customer actually said. */
+let jobQuery="", jobTab="Recommended";
+function openJobs(){ pullWO(); jobQuery=""; jobTab="Recommended"; drawJobs(); $("#jobOverlay").classList.add("on");
+  setTimeout(()=>{const q=$("#jobSearch"); if(q) q.focus();},30); }
+function closeJobs(){ $("#jobOverlay").classList.remove("on"); }
+function setJobTab(t){ jobTab=t; drawJobs(); setTimeout(()=>{const q=$("#jobSearch"); if(q){q.focus(); q.setSelectionRange(q.value.length,q.value.length);} },10); }
+function currentProfile(){ return vehicleProfile(db.vehicles[cur&&cur.vehicleId]); }
+function drawJobs(){
+  const p=currentProfile();
+  const tabs=["Recommended"].concat(SECTIONS);
+  const res=searchCatalog(p, jobQuery, jobTab==="Recommended"?{}:{section:jobTab});
+  const head=p?`<span class="badge b-vehicle">${SRC_VEHICLE}</span> <b>${esc([p.year,p.make,p.model,p.series].filter(Boolean).join(" "))}</b>`
+              :`<span class="muted">No vehicle selected — showing the catalog unfiltered. Pick a vehicle for jobs matched to it.</span>`;
+  $("#jobSheet").innerHTML=`
+  <div class="sheet-head"><h2>Add a job</h2><div class="grow"></div><button onclick="closeJobs()">Close</button></div>
+  <div style="margin-bottom:4px">${head}</div>
+  <input id="jobSearch" value="${esc(jobQuery)}" placeholder="Search — oil change, LOF, brakes, plugs, rod bearings, MENU-TIRE-001…" autocomplete="off">
+  <div class="tabs">${tabs.map(t=>`<button class="${t===jobTab?"on":""}" onclick="setJobTab('${t.replace(/'/g,"")}')">${esc(t)}</button>`).join("")}</div>
+  <div class="linerow" style="font-size:11px;color:var(--muted)"><div>Service</div><div>Hours</div><div>Price</div><div class="right">Add</div></div>
+  <div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:8px">
+    ${res.length?res.map(r=>jobRowHtml(r)).join(""):`<div class="empty">Nothing in the catalog matches that${p?" for this vehicle":""}.</div>`}
+  </div>
+  <div class="muted" style="font-size:11.5px;margin-top:10px">
+    ${res.length} of ${SEED.length} catalog jobs${p?" match this vehicle":""}. Times and menu prices are this shop own curated catalog —
+    they are not Mitchell, ALLDATA, MOTOR or OEM warranty times. No licensed labor guide is connected.
+  </div>`;
+  const q=$("#jobSearch");
+  q.oninput=()=>{ jobQuery=q.value; const at=q.selectionStart; drawJobs(); const n=$("#jobSearch"); n.focus(); n.setSelectionRange(at,at); };
+}
+function jobRowHtml(r){
+  const row=r.row, e=effectiveSeed(row), fixed=isFixed(row);
+  const charge=seedCharge(row);
+  return `<div class="jobrow" onclick="addJob('${row.id}')">
+    <div>
+      <div class="svc">${esc(row.svc)}</div>
+      <div class="sub">
+        <span class="badge ${e.source===SRC_OVERRIDE?"b-override":"b-seed"}">${esc(e.source)}</span>
+        <span class="badge b-cls">${esc(CLS_LABEL[r.cls]||r.cls)}</span>
+        ${row.ver?`<span class="badge b-verify">VERIFY</span>`:""}
+        <span>${esc(row.cat)} · ${esc(row.scope)}</span>
+        ${r.why?`<span>· ${esc(r.why)}</span>`:""}
+      </div>
+    </div>
+    <div>${fixed?"—":esc(e.hours)+" hr"}</div>
+    <div>${fixed?"menu":money(shopRate())+"/hr"}</div>
+    <div class="right"><b>${money(charge)}</b></div>
+  </div>`;
+}
+/* Adding a job snapshots everything the price was built from. A later change
+   to the catalog, the door rate or an override must not silently rewrite a
+   quote the customer has already been given. */
+function addJob(serviceId){
+  const row=SEED_BY_ID[serviceId]; if(!row) return;
+  const p=currentProfile();
+  const c=classifyRow(row,p);
+  const e=effectiveSeed(row);
+  const fixed=isFixed(row);
+  const line={
+    desc:row.svc, serviceId:row.id, bill:fixed?"F":"H",
+    hours:fixed?"":e.hours, billedHours:fixed?null:e.hours, overlap:0,
+    rate:fixed?0:shopRate(), rateSource:fixed?"fixed":"shop",
+    price:fixed?e.price:0,
+    source:e.source, cls:(c&&c.cls)||CLS.UNIVERSAL, verify:!!row.ver, verified:false,
+    provenance:{provider:"Shop seed catalog", operationId:row.id, sourceType:e.source,
+                sourceHours:row.hrs, sourcePrice:row.fix, section:row.sec, scope:row.scope,
+                notes:row.note, confidence:row.conf, reference:row.src, fetchedAt:new Date().toISOString()}
+  };
+  if(e.override) line.override={who:e.override.who, reason:e.override.reason, at:e.override.at, scope:"catalog"};
+  cur.labor=(cur.labor||[]).filter(l=>l.desc||l.hours||l.price||l.serviceId);
+  cur.labor.push(line);
+  renderLines(); updateTotals(); closeJobs();
+}
+/* Overriding a catalog number is allowed and expected — the catalog is a
+   starting point, not a court order. It just may not happen anonymously. */
+function overrideLine(i){
+  const l=cur.labor[i]; if(!l) return;
+  const fixed=l.bill==="F";
+  const cur_v=fixed?l.price:lineHours(l);
+  const raw=prompt(fixed?"Menu price for this job ($):":"Billed hours for this job:", String(cur_v));
+  if(raw==null) return;
+  const n=Number(raw);
+  if(!isFinite(n)||n<0){ alert("That is not a number."); return; }
+  const auth=requireAuthorization(fixed?"change this menu price":"change this labor time");
+  if(!auth.ok) return;
+  if(fixed){ l.price=n; } else { l.billedHours=n; l.overlap=+(n-(Number(l.hours)||0)).toFixed(2); }
+  l.source=SRC_OVERRIDE;
+  l.override={who:auth.who, reason:auth.reason, at:new Date().toISOString(), scope:"line", from:cur_v, to:n};
+  audit("labor-override", (cur.invoiceNo?"#"+cur.invoiceNo+" ":"")+(l.serviceId||l.desc), cur_v, n, auth.who, auth.reason);
+  save(); renderLines(); updateTotals();
+}
+function clearLineOverride(i){
+  const l=cur.labor[i]; if(!l||!l.serviceId) return;
+  const row=SEED_BY_ID[l.serviceId]; if(!row) return;
+  const e=effectiveSeed(row);
+  if(l.bill==="F") l.price=e.price; else { l.billedHours=e.hours; l.overlap=0; }
+  l.source=e.source; delete l.override;
+  renderLines(); updateTotals();
+}
+
 /* close overlays on backdrop click */
 $("#woOverlay").addEventListener("mousedown",e=>{if(e.target===$("#woOverlay"))closeWO();});
 $("#recOverlay").addEventListener("mousedown",e=>{if(e.target===$("#recOverlay"))closeRec();});
+$("#jobOverlay").addEventListener("mousedown",e=>{if(e.target===$("#jobOverlay"))closeJobs();});
 
 /* Nothing is drawn until the book has actually been read off the disk. The
    old version rendered an empty shop first and filled it in afterwards, which
