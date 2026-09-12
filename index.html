@@ -216,6 +216,73 @@
   .inv .sumcell{border:1px solid #999;border-radius:5px;padding:6px 12px;font-size:12.5px}
   .inv .sumcell b{font-size:17px;display:block}
   @page{margin:14mm}
+  /* The shop floor is read from across a bay and worked with gloves on, so the
+     controls that run the clock are big, and every state is a word as well as a
+     colour. */
+  .wrap.wide{max-width:1720px}
+  .kanban{display:grid;grid-template-columns:repeat(8,minmax(152px,1fr));gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:16px}
+  .kcol{background:#e9edf2;border-radius:10px;padding:6px;min-height:160px}
+  .khead{font-size:11.5px;font-weight:800;letter-spacing:.04em;color:var(--steel);padding:4px 6px 8px;display:flex;justify-content:space-between}
+  .khead span{background:#fff;border-radius:10px;padding:0 7px}
+  .kempty{color:var(--muted);text-align:center;padding:10px}
+  .kcard{background:#fff;border:1px solid var(--line);border-left:5px solid #9fb0c2;border-radius:8px;padding:8px 9px;margin-bottom:7px;cursor:pointer;font-size:12.5px}
+  .kcard:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}
+  .kcard.pri-High{border-left-color:#c9770a}
+  .kcard.pri-Urgent{border-left-color:#c0392b}
+  .ktop{display:flex;align-items:center;gap:6px}
+  .kveh{font-weight:700;font-size:14px;margin-top:2px}
+  .ksub{color:var(--muted);font-size:11.5px}
+  .kline{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px}
+  .kjob{margin-top:4px;background:#f3f6fa;border-radius:5px;padding:3px 6px}
+  .kwarn{margin-top:5px;display:flex;gap:4px;flex-wrap:wrap}
+  .psb{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.03em;padding:2px 7px;border-radius:4px;border:1px solid transparent}
+  .ps-ok{background:#e3f3ea;color:#146c41;border-color:#bfe0cc}
+  .ps-part{background:#fdf0dc;color:#8a5200;border-color:#efd3a6}
+  .ps-wait{background:#fbe3e0;color:#a3291b;border-color:#f0c2bb}
+  .ps-none{background:#eef1f5;color:#55606e;border-color:#dde3ea}
+  .jst{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;background:#eef1f5;color:#4a5663}
+  .js-InProgress,.js-Diagnosing{background:#fff2da;color:#a86a00}
+  .js-Paused{background:#fdf0dc;color:#8a5200}
+  .js-QCRequired{background:#e6f0ff;color:#1f6feb}
+  .js-QCPassed,.js-Completed{background:#e3f5ea;color:#187a4b}
+  .js-QCFailed{background:#fbe3e0;color:#a3291b}
+  .bigbtn{min-height:44px;min-width:104px;font-weight:800;font-size:14px;letter-spacing:.03em;border-radius:9px;padding:6px 14px;margin:2px 4px 2px 0}
+  .bigbtn.blue{background:var(--accent);border-color:#1559c8;color:#fff}
+  .bigbtn.green{background:var(--accent2);border-color:#146a40;color:#fff}
+  .bigbtn.amber{background:#c9770a;border-color:#a86200;color:#fff}
+  .jdone{font-weight:800;color:var(--accent2);font-size:13px;padding:0 6px}
+  .jobctl{display:inline-flex;flex-wrap:wrap;align-items:center}
+  .clk-hrs{font-size:12px;color:var(--ink)}
+  .running{color:#a86a00;font-weight:800;font-size:12px}
+  .wstrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;margin-bottom:12px}
+  .wcell{background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 10px;text-align:center}
+  .wcell b{display:block;font-size:22px;line-height:1.1}
+  .wcell span{font-size:11px;color:var(--muted)}
+  .wcell.h b{color:var(--steel)}
+  .baygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-bottom:16px}
+  .baycard{background:#fff;border:1px solid var(--line);border-top:5px solid #187a4b;border-radius:10px;padding:10px}
+  .baycard.busy{border-top-color:#c9770a}
+  .baycard.double{border-top-color:#c0392b}
+  .bayocc{background:#f7f9fc;border-radius:7px;padding:7px;margin-bottom:6px;cursor:pointer}
+  .balance{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12.5px}
+  .balance .bar{flex:0 0 260px;height:14px;background:#eef1f5;border-radius:7px;overflow:hidden;display:flex}
+  .balance .bar i{display:block;height:100%}
+  .b-ready{background:#1f6feb}.b-active{background:#c9770a}.b-wait{background:#c0392b}
+  .qcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff}
+  .qjob{font-size:16px;font-weight:700;margin:4px 0}
+  .qbtns{margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+  .qsec.q-NOW{border-left:5px solid #c9770a}
+  .qsec.q-NEXT{border-left:5px solid #1f6feb}
+  .qsec.q-WAITING{border-left:5px solid #c0392b}
+  .qsec.q-COMPLETED{border-left:5px solid #187a4b}
+  .qcrow{border:1px solid var(--line);border-radius:8px;padding:6px 9px;margin-bottom:5px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .qcrow .qclabel{flex:1;min-width:200px;font-weight:600}
+  .prodsum{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 16px;margin-bottom:10px}
+  .prodtech{font-size:14px;margin-top:4px}
+  .tlk{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#eef1f5;color:#4a5663;text-transform:uppercase}
+  .tl-Repair,.tl-Partinstalled{background:#e3f3ea;color:#146c41}
+  .tl-DTC,.tl-Diagnosis{background:#e6f0ff;color:#1f4fa8}
+  .tl-Declinedwork,.tl-QCFail,.tl-Comebackrecheck{background:#fbe3e0;color:#a3291b}
 </style>
 </head>
 <body>
@@ -225,7 +292,7 @@
     <button data-view="dash" class="on">Dashboard</button>
     <button data-view="orders">Work Orders</button>
     <button data-view="schedule">Schedule</button>
-    <button data-view="board">Shop Board</button>
+    <button data-view="board">Shop Floor</button>
     <button data-view="customers">Customers</button>
     <button data-view="vehicles">Vehicles</button>
     <button data-view="parts">Parts</button>
@@ -565,13 +632,28 @@ const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;
    not know the law. taxParts defaults true because the version before this one
    always taxed parts, and a silent change to that would rewrite what every
    existing draft charges. */
+/* Names and the wording on a job that counts as each service. The intervals are
+   deliberately empty: a shop sets its own, and nothing here is a manufacturer
+   schedule. */
+const DEFAULT_MAINT_ITEMS = [
+  {id:"oil", name:"Oil service", match:"oil change|oil service|oil and filter|oil & filter|engine oil", miles:null, months:null, active:true},
+  {id:"brakefluid", name:"Brake fluid", match:"brake fluid", miles:null, months:null, active:true},
+  {id:"coolant", name:"Coolant", match:"coolant (flush|exchange|service|replace|drain)|cooling system (flush|service)", miles:null, months:null, active:true},
+  {id:"plugs", name:"Spark plugs", match:"spark plug", miles:null, months:null, active:true},
+  {id:"trans", name:"Transmission service", match:"transmission (fluid|service|flush)|dct (fluid|service)|atf", miles:null, months:null, active:true},
+  {id:"diff", name:"Differential service", match:"differential (fluid|service)|diff fluid|gear oil", miles:null, months:null, active:true},
+  {id:"tcase", name:"Transfer-case service", match:"transfer case (fluid|service)", miles:null, months:null, active:true},
+  {id:"fuelfilter", name:"Fuel filter", match:"fuel filter", miles:null, months:null, active:true},
+  {id:"airfilter", name:"Engine air filter", match:"engine air filter|(^|[^n] )air filter", miles:null, months:null, active:true},
+  {id:"cabin", name:"Cabin filter", match:"cabin (air )?filter|microfilter", miles:null, months:null, active:true}
+];
 const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:112.50,rateMin:100,rateMax:125,taxRate:8.25,taxLabor:false,taxParts:true,taxFees:false,partsMarkup:40,nextInvoice:1001,nextEstimate:1,nextRO:1,nextInspection:1,nextPO:1000,fees:[],techs:[],
   /* Markup by what the part cost, which is how a shop actually prices: a $6
      clip and a $600 compressor cannot carry the same percentage. These are
      starting numbers, not rules - every tier is editable in Settings. */
   markupMatrix:[{upTo:10,pct:100},{upTo:25,pct:80},{upTo:50,pct:65},{upTo:100,pct:55},{upTo:250,pct:45},{upTo:500,pct:35},{upTo:null,pct:28}],
   inventoryUnits:["each","quart","gallon","liter","ounce","foot","set","pair"],
-  bays:["Bay 1","Bay 2","Alignment Rack","Outside"],dayStart:8,dayEnd:18,slotMinutes:30,thresholds:{treadMonitor:5,treadUrgent:3,padMonitor:4,padUrgent:2,moistureMonitor:2,moistureUrgent:3},terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},appointments:{},recommendations:{},parts:{},vendors:{},purchaseOrders:{},movements:[],catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[],inspections:{},attachments:{}};
+  bays:["Bay 1","Bay 2","Bay 3","Alignment Rack","Diagnostic","Outside","Detail","Waiting Area"],qcRequired:true,timerWarnHours:10,dueSoonMiles:1000,dueSoonDays:30,maintItems:DEFAULT_MAINT_ITEMS,dayStart:8,dayEnd:18,slotMinutes:30,thresholds:{treadMonitor:5,treadUrgent:3,padMonitor:4,padUrgent:2,moistureMonitor:2,moistureUrgent:3},terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},appointments:{},recommendations:{},parts:{},vendors:{},purchaseOrders:{},movements:[],catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[],inspections:{},attachments:{},timeSessions:[],qcRecords:{},roadTests:{},diagnostics:{},comebacks:{},maintenance:{records:[],overrides:{}}};
 let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot() */
 /* ---------- where the book actually lives ----------------------------------
 
@@ -598,7 +680,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.6.0";
+const JZD_VERSION = "2.7.0";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -614,8 +696,10 @@ function shapeDb(d){
      is filled in here, never rejected: an unreadable book is an emergency, but
      an OLD book is just a book. Shop settings the owner has already chosen —
      the door rate above all — are kept exactly as found. */
+  const baseSettings = JSON.parse(JSON.stringify(DEFAULT.settings));   /* never hand out DEFAULT's own arrays */
+  const m = d.maintenance || {};
   return Object.assign({}, DEFAULT, d, {
-    settings: Object.assign({}, DEFAULT.settings, d.settings, {
+    settings: Object.assign({}, baseSettings, d.settings, {
       providers: Object.assign({}, DEFAULT.settings.providers, (d.settings||{}).providers)
     }),
     catalog: Object.assign({labor:{},parts:{},overrides:{},disabled:{}}, d.catalog||{}),
@@ -628,7 +712,13 @@ function shapeDb(d){
     parts: d.parts || {},
     vendors: d.vendors || {},
     purchaseOrders: d.purchaseOrders || {},
-    movements: Array.isArray(d.movements) ? d.movements : []
+    movements: Array.isArray(d.movements) ? d.movements : [],
+    timeSessions: Array.isArray(d.timeSessions) ? d.timeSessions : [],
+    qcRecords: d.qcRecords || {},
+    roadTests: d.roadTests || {},
+    diagnostics: d.diagnostics || {},
+    comebacks: d.comebacks || {},
+    maintenance: {records: Array.isArray(m.records) ? m.records : [], overrides: m.overrides || {}}
   });
 }
 
@@ -1986,26 +2076,31 @@ document.addEventListener("input",e=>{
    four jobs can have one finished, one waiting on a part and two not started,
    and the RO is still just "In Progress". Keeping them separate is what makes
    the shop board tell the truth. */
-const JOB_STATES = ["Not Started","Diagnosing","Waiting Approval","Waiting Parts","Ready","In Progress","Completed","Unable to Complete","Deferred"];
+const JOB_STATES = ["Not Started","Diagnosing","Waiting Approval","Waiting Parts","Ready","In Progress","Paused","Completed",
+                    "QC Required","QC Passed","QC Failed","Deferred","Unable to Complete"];
 const PART_STATES = ["Needed","Quote Requested","Ordered","Backordered","Shipped","Received","Installed","Returned","Cancelled"];
 const PART_HELD = ["Needed","Quote Requested","Ordered","Backordered","Shipped"];   /* not yet in the building */
 const REC_STATES = ["Proposed","Awaiting Approval","Approved","Declined","Deferred","Completed"];
 const SEVERITIES = ["Monitor","Needs Attention","Urgent"];
 
 function jobState(l){ return l.jobState || "Not Started"; }
+/* The older direct calls still work, and now run the same clock as the floor. */
 function startJob(o,i){
   const l=o.labor[i]; if(!l) return;
-  l.jobState="In Progress"; l.startedAt=l.startedAt||new Date().toISOString();
-  l.tech=l.tech||db.settings.lastTech||"";
+  const r=jobStart(o,l,l.tech||db.settings.lastTech||"");
+  if(!r.ok){ moveJob(o,l,"In Progress"); l.startedAt=l.startedAt||new Date().toISOString(); }
 }
 function completeJob(o,i){
   const l=o.labor[i]; if(!l) return;
-  l.jobState="Completed"; l.completedAt=new Date().toISOString();
+  const at=new Date().toISOString();
+  closeSessions(o,l,"complete",at);
+  l.completedAt=at;
+  moveJob(o,l,"Completed",{at,by:l.tech||""});
 }
 /* Clock time is recorded because it is useful. It is never allowed anywhere
    near the billed hours: what the shop sold and what the job took are two
    different numbers and conflating them is how a shop loses money quietly. */
-function jobsDone(o){ return (o.labor||[]).filter(l=>jobState(l)==="Completed").length; }
+function jobsDone(o){ return (o.labor||[]).filter(l=>JOB_DONE.indexOf(jobState(l))>=0).length; }
 function jobsTotal(o){ return (o.labor||[]).length; }
 
 /* ---------- parts, on order ---------- */
@@ -2280,40 +2375,744 @@ function retireRec(id){
 }
 
 
+/* =====================================================================
+   THE SHOP FLOOR
+   Everything below is about the car while it is physically in the building:
+   which bay, whose hands, how long the job has actually taken, whether it
+   passed a second look, and what this vehicle has been in for before.
+
+   Two rules run through all of it.
+
+   SOLD HOURS AND CLOCK HOURS NEVER TOUCH. What the customer was charged for
+   comes off the labor line and is never edited by a timer; what the job took
+   comes from time sessions a technician started and stopped. Efficiency is
+   one divided by the other, and it is only honest because neither can leak
+   into the other.
+
+   HISTORY IS SURFACED, NOT CONCLUDED. A comeback is linked to the earlier job
+   without blaming anyone; a repeated concern is listed with its mileages
+   without claiming the cause is the same; a maintenance item with no record
+   says UNKNOWN rather than assuming somebody else did it.
+   ===================================================================== */
+
+const HOLD_REASONS = ["Waiting Customer","Waiting Parts","Waiting Diagnostic Information","Waiting Technician","Waiting Bay","Waiting Sublet","Other"];
+const JOB_DONE = ["Completed","QC Passed"];
+const JOB_CLOSED = ["Deferred","Unable to Complete"];
+const PRIORITIES = ["Normal","High","Urgent"];
+const BOARD_COLUMNS = ["CHECKED IN","DIAGNOSIS","AWAITING APPROVAL","WAITING ON PARTS","READY TO WORK","IN PROGRESS","QUALITY CONTROL","READY FOR PICKUP"];
+const QC_ITEMS = [
+  {key:"visual",    label:"Repair visually verified"},
+  {key:"fluids",    label:"Fluid levels checked"},
+  {key:"leaks",     label:"Leaks checked"},
+  {key:"fasteners", label:"Fasteners / critical hardware checked"},
+  {key:"lights",    label:"Warning lights checked"},
+  {key:"codes",     label:"Codes checked (where applicable)"},
+  {key:"roadtest",  label:"Road test completed (where applicable)"},
+  {key:"concern",   label:"Repair concern verified"},
+  {key:"torque",    label:"Wheels torqued (where applicable)"},
+  {key:"underhood", label:"Underhood items rechecked"},
+  {key:"covers",    label:"Protective covers / tools removed"},
+  {key:"clean",     label:"Vehicle clean enough for delivery"}
+];
+const MEAS_TYPES = [["Voltage","V"],["Resistance","ohm"],["Pressure","psi"],["Temperature","°F"],["Vacuum","inHg"],
+  ["Compression","psi"],["Leak-down","%"],["Fuel pressure","psi"],["Boost pressure","psi"],["Current draw","A"],["Scan value",""],["Custom",""]];
+const DTC_STATUSES = ["Active","Pending","Stored","Permanent","History","Cleared"];
+const DTC_PHASES = ["Before repair","After repair"];
+const ROAD_KINDS = ["Pre-Repair","Post-Repair"];
+const COMEBACK_FINDINGS = ["Undetermined","Workmanship issue","Failed part","Unrelated issue"];
+const WARRANTY_DECISIONS = ["Pending","Covered — shop warranty","Covered — supplier warranty","Goodwill","Not covered","Not applicable"];
+
+function floorNow(){ return new Date().toISOString(); }
+function findLine(o, lineId){ return ((o && o.labor) || []).find(l => l.id === lineId) || null; }
+function hrs(ms){ return (Number(ms) || 0) / 3600000; }
+function fmtHrs(h){ return (Math.round((Number(h) || 0) * 10) / 10).toFixed(1); }
+function dayOf(iso){ return String(iso || "").slice(0, 10); }
+function numOrNull(v){ const n = Number(String(v == null ? "" : v).replace(/[^0-9.\-]/g, "")); return (String(v == null ? "" : v).trim() === "" || !isFinite(n)) ? null : n; }
+
+/* ---------- job state, with a memory ---------- */
+function moveJob(o, l, to, opts){
+  opts = opts || {};
+  const from = jobState(l);
+  if (from === to && !opts.force) return false;
+  l.jobState = to;
+  (l.stateHistory = l.stateHistory || []).push({at:opts.at || floorNow(), from, to, by:opts.by || "", note:opts.note || ""});
+  return true;
+}
+
+/* ---------- clock time ---------- */
+function sessionsFor(o, l){ return (db.timeSessions || []).filter(s => s.orderId === o.id && s.lineId === l.id); }
+function openSessionsOf(tech){ return (db.timeSessions || []).filter(s => !s.end && s.tech === tech); }
+function openSessionOn(o, l){ return (db.timeSessions || []).find(s => !s.end && s.orderId === o.id && s.lineId === l.id) || null; }
+function sessionMs(s, nowMs){
+  const a = Date.parse(s.start), b = s.end ? Date.parse(s.end) : (nowMs || Date.now());
+  return (isFinite(a) && isFinite(b) && b > a) ? b - a : 0;
+}
+function closeSessions(o, l, reason, at){
+  let n = 0;
+  (db.timeSessions || []).forEach(s => {
+    if (!s.end && s.orderId === o.id && s.lineId === l.id){ s.end = at || floorNow(); s.endReason = reason || ""; n++; }
+  });
+  return n;
+}
+/* Actual clock hours on one job, optionally for one technician. */
+function clockHours(o, l, tech){
+  return hrs(sessionsFor(o, l).filter(s => !tech || s.tech === tech).reduce((t, s) => t + sessionMs(s), 0));
+}
+function soldHours(l){ return lineHours(l); }
+function isRunning(o, l){ return !!openSessionOn(o, l); }
+/* A timer left running over a lunch break or overnight is the commonest way
+   clock time goes wrong, so anything open longer than the shop's limit is
+   called out wherever the job appears. */
+function staleSessions(){
+  const lim = (Number(db.settings.timerWarnHours) || 10) * 3600000;
+  return (db.timeSessions || []).filter(s => !s.end && sessionMs(s) > lim);
+}
+
+function jobStart(o, l, tech, opts){
+  opts = opts || {};
+  const who = String(tech || l.tech || "").trim();
+  if (!who) return {ok:false, reason:"Pick the technician first."};
+  const at = opts.at || floorNow();
+  if (!l.tech) l.tech = who;
+  if ((db.settings.techs || []).indexOf(who) < 0) db.settings.techs.push(who);
+  db.settings.lastTech = who;
+  /* One technician, one running clock. Starting a job pauses whatever else
+     they had going, rather than letting two clocks double their hours. */
+  const paused = [];
+  openSessionsOf(who).forEach(s => {
+    if (s.orderId === o.id && s.lineId === l.id) return;
+    s.end = at; s.endReason = "started another job";
+    const oo = s.orderId === o.id ? o : db.orders[s.orderId];
+    const ll = oo && findLine(oo, s.lineId);
+    if (ll && (jobState(ll) === "In Progress" || jobState(ll) === "Diagnosing")){
+      ll.pausedFrom = jobState(ll);
+      moveJob(oo, ll, "Paused", {by:who, at, note:"paused — " + who + " started another job"});
+    }
+    paused.push(s);
+  });
+  if (!openSessionOn(o, l)) db.timeSessions.push({id:uid("ts"), orderId:o.id, lineId:l.id, tech:who, start:at, end:null, endReason:""});
+  if (!l.startedAt) l.startedAt = at;
+  const diag = opts.diagnosing || (jobState(l) === "Paused" ? l.pausedFrom === "Diagnosing" : jobState(l) === "Diagnosing");
+  releaseHold(l, at);
+  moveJob(o, l, diag ? "Diagnosing" : "In Progress", {by:who, at, note:opts.note || ""});
+  return {ok:true, paused};
+}
+function jobPause(o, l, opts){
+  opts = opts || {};
+  const at = opts.at || floorNow();
+  closeSessions(o, l, "pause", at);
+  const st = jobState(l);
+  if (st === "In Progress" || st === "Diagnosing") l.pausedFrom = st;
+  moveJob(o, l, "Paused", {by:opts.by || l.tech || "", at, note:opts.note || ""});
+  if (opts.reason) setHold(o, l, opts.reason, opts.holdNote || "", opts.by, at);
+  return true;
+}
+function jobResume(o, l, tech, opts){
+  return jobStart(o, l, tech || l.tech, Object.assign({}, opts || {}, {diagnosing: l.pausedFrom === "Diagnosing"}));
+}
+function qcNeeded(l){ return (l && l.qcRequired != null) ? !!l.qcRequired : db.settings.qcRequired !== false; }
+function jobFinish(o, l, opts){
+  opts = opts || {};
+  const at = opts.at || floorNow();
+  closeSessions(o, l, "complete", at);
+  if (opts.work != null) l.workPerformed = String(opts.work).trim();
+  l.completedAt = at;
+  releaseHold(l, at);
+  const to = qcNeeded(l) ? "QC Required" : "Completed";
+  moveJob(o, l, to, {by:opts.by || l.tech || "", at, note:opts.note || "work complete"});
+  return to;
+}
+function assignJob(o, l, tech, by){
+  const who = String(tech || "").trim();
+  const was = l.tech || "";
+  if (was === who) return false;
+  l.tech = who;
+  if (who && (db.settings.techs || []).indexOf(who) < 0) db.settings.techs.push(who);
+  (l.stateHistory = l.stateHistory || []).push({at:floorNow(), from:jobState(l), to:jobState(l), by:by || "",
+    note:who ? ("assigned to " + who + (was ? " (was " + was + ")" : "")) : ("unassigned from " + was)});
+  return true;
+}
+
+/* ---------- holds ---------- */
+function setHold(o, l, reason, note, by, at){
+  if (HOLD_REASONS.indexOf(reason) < 0) reason = "Other";
+  at = at || floorNow();
+  releaseHold(l, at);
+  if (openSessionOn(o, l)) jobPause(o, l, {by, at, note:"paused — on hold"});
+  l.hold = {reason, note:note || "", by:by || "", at};
+  (l.holdHistory = l.holdHistory || []).push({reason, note:note || "", by:by || "", at, releasedAt:null});
+  return l.hold;
+}
+function releaseHold(l, at){
+  if (!l.hold) return false;
+  const h = (l.holdHistory || []).slice().reverse().find(x => !x.releasedAt);
+  if (h) h.releasedAt = at || floorNow();
+  l.hold = null;
+  return true;
+}
+
+/* ---------- parts, per job ----------
+   Parts can be tied to the job they are for. A part that is not tied to any
+   job still belongs to the car, so until somebody says otherwise it counts
+   against every job on the ticket - saying "ready" when it is not would send
+   a technician to a lift for nothing. */
+function partReady(x){
+  const st = partState(x);
+  if (st === "Received" || st === "Installed") return true;
+  if (st === "Needed" && x.partId && db.parts[x.partId]){
+    const p = db.parts[x.partId];
+    if (p.tracked === false) return false;
+    return stockShortfall(x) === 0 && partOnHand(x.partId) >= (Number(x.qty) || 0);
+  }
+  return false;
+}
+function jobParts(o, l){
+  const live = (o.parts || []).filter(x => x.desc && partState(x) !== "Cancelled" && partState(x) !== "Returned");
+  const mine = live.filter(x => x.jobLineId === l.id);
+  if (mine.length) return mine;
+  return live.filter(x => !x.jobLineId || !findLine(o, x.jobLineId));
+}
+function jobPartsState(o, l){
+  const list = jobParts(o, l);
+  if (!list.length) return "NO PARTS REQUIRED";
+  const ready = list.filter(partReady).length;
+  if (ready === list.length) return "ALL PARTS READY";
+  return ready ? "PARTIAL PARTS" : "WAITING PARTS";
+}
+
+/* ---------- where each job, and each car, stands ---------- */
+function jobBucket(o, l){
+  const st = jobState(l);
+  if (JOB_CLOSED.indexOf(st) >= 0) return "closed";
+  if (JOB_DONE.indexOf(st) >= 0) return "completed";
+  if (st === "QC Required") return "qc";
+  if (st === "Paused" && l.hold) return l.hold.reason === "Waiting Parts" ? "parts" : "waiting";
+  if (st === "In Progress" || st === "Paused" || st === "QC Failed") return "inProgress";
+  if (st === "Diagnosing") return "diagnosis";
+  const ost = canonStatus(o.status);
+  if (st === "Waiting Approval" || ost === "Estimate" || ost === "Awaiting Approval") return "approval";
+  if (st === "Waiting Parts" || (l.hold && l.hold.reason === "Waiting Parts")) return "parts";
+  const ps = jobPartsState(o, l);
+  if (ps === "WAITING PARTS" || ps === "PARTIAL PARTS") return "parts";
+  if (l.hold) return "waiting";
+  return "ready";
+}
+function onFloor(o){
+  if (!o || isDead(o) || o.deliveredAt) return false;
+  if (canonStatus(o.status) === "Paid / Closed") return false;
+  return !!((o.checkin && o.checkin.at) || o.bay || canonStatus(o.status) !== "Estimate");
+}
+function floorOrders(){ return vals(db.orders).filter(onFloor); }
+function boardColumn(o){
+  if (isFinal(o)) return "READY FOR PICKUP";
+  const b = (o.labor || []).map(l => jobBucket(o, l));
+  if (b.indexOf("inProgress") >= 0) return "IN PROGRESS";
+  if (b.indexOf("diagnosis") >= 0) return "DIAGNOSIS";
+  /* A ticket-level authorization question only holds the car up while there is
+     still work to do. Once every job is finished the car is ready to go, and the
+     card carries the ADDITIONAL AUTH warning instead. */
+  const workLeft = !b.length || b.some(x => ["completed","closed","qc"].indexOf(x) < 0);
+  if (b.indexOf("approval") >= 0 || (workLeft && (canonStatus(o.status) === "Awaiting Approval" || needsAdditionalAuth(o)))) return "AWAITING APPROVAL";
+  if (b.indexOf("parts") >= 0) return "WAITING ON PARTS";
+  if (b.indexOf("ready") >= 0 || b.indexOf("waiting") >= 0) return "READY TO WORK";
+  if (b.indexOf("qc") >= 0) return "QUALITY CONTROL";
+  if (b.length && b.every(x => x === "completed" || x === "closed")) return "READY FOR PICKUP";
+  return "CHECKED IN";
+}
+function timeInShopMs(o, nowMs){
+  const start = (o.checkin && o.checkin.at) || ((o.history || [])[0] || {}).at || o.date;
+  const a = Date.parse(start);
+  const end = o.deliveredAt ? Date.parse(o.deliveredAt) : (nowMs || Date.now());
+  return isFinite(a) && end > a ? end - a : 0;
+}
+function fmtDuration(ms){
+  const h = ms / 3600000;
+  if (h < 1) return Math.max(0, Math.round(ms / 60000)) + "m";
+  if (h < 48) return fmtHrs(h) + "h";
+  return (Math.round(h / 24 * 10) / 10) + "d";
+}
+function orderWarnings(o){
+  const w = [];
+  (o.labor || []).forEach(l => { if (l.hold) w.push("HOLD: " + l.hold.reason); });
+  if (needsAdditionalAuth(o)) w.push("ADDITIONAL AUTH");
+  const lim = (Number(db.settings.timerWarnHours) || 10) * 3600000;
+  (o.labor || []).forEach(l => { const s = openSessionOn(o, l); if (s && sessionMs(s) > lim) w.push("TIMER LEFT RUNNING"); });
+  (o.labor || []).forEach(l => { if (jobState(l) === "In Progress" && (l.stateHistory || []).slice(-1)[0] && /QC/.test((l.stateHistory || []).slice(-1)[0].note || "")) w.push("QC FAILED — REWORK"); });
+  if (o.comebackId && db.comebacks[o.comebackId]) w.push("COMEBACK / RECHECK");
+  return Array.from(new Set(w));
+}
+function orderPartsSummary(o){
+  const live = (o.parts || []).filter(x => x.desc && partState(x) !== "Cancelled" && partState(x) !== "Returned");
+  if (!live.length) return "NO PARTS REQUIRED";
+  const ready = live.filter(partReady).length;
+  return ready === live.length ? "ALL PARTS READY" : ready ? "PARTIAL PARTS" : "WAITING PARTS";
+}
+function currentJob(o){
+  const jobs = o.labor || [];
+  return jobs.find(l => isRunning(o, l)) || jobs.find(l => ["In Progress","Diagnosing","Paused"].indexOf(jobState(l)) >= 0)
+      || jobs.find(l => jobBucket(o, l) === "ready") || jobs.find(l => ["completed","closed"].indexOf(jobBucket(o, l)) < 0) || null;
+}
+
+/* ---------- bays ----------
+   A bay is not stored as a list of cars; a car says which bay it is in, so the
+   two can never disagree. */
+function bayOccupants(bay){ return vals(db.orders).filter(o => o.bay === bay && onFloor(o)); }
+function assignBay(o, bay, opts){
+  opts = opts || {};
+  if (!bay){ releaseBay(o, opts.by); return {ok:true}; }
+  const others = bayOccupants(bay).filter(x => x.id !== o.id);
+  if (others.length && !opts.override) return {ok:false, conflict:others};
+  const at = opts.at || floorNow();
+  if (o.bay && o.bay !== bay) (o.bayHistory = o.bayHistory || []).push({bay:o.bay, from:o.bayAt, to:at, tech:o.bayTech || "", by:opts.by || ""});
+  if (o.bay !== bay) o.bayAt = at;
+  o.bay = bay;
+  if (opts.tech != null) o.bayTech = opts.tech;
+  if (opts.note != null) o.bayNote = opts.note;
+  o.bayShared = others.length > 0;
+  return {ok:true, shared:others.length > 0};
+}
+function releaseBay(o, by){
+  if (!o.bay) return false;
+  (o.bayHistory = o.bayHistory || []).push({bay:o.bay, from:o.bayAt, to:floorNow(), tech:o.bayTech || "", by:by || ""});
+  o.bay = ""; o.bayAt = null; o.bayTech = ""; o.bayNote = ""; o.bayShared = false;
+  return true;
+}
+function markDelivered(o, by){
+  const at = floorNow();
+  (o.labor || []).forEach(l => closeSessions(o, l, "vehicle delivered", at));
+  releaseBay(o, by);
+  o.deliveredAt = at; o.deliveredBy = by || "";
+  (o.history = o.history || []).push({at, from:canonStatus(o.status), to:canonStatus(o.status), note:"vehicle delivered" + (by ? " by " + by : "")});
+}
+
+/* ---------- quality control ---------- */
+function qcItemsFor(l){
+  return QC_ITEMS.concat(((l && l.qcExtra) || []).filter(Boolean).map((t, i) => ({key:"x" + i, label:t, custom:true})));
+}
+function recordQC(o, opts){
+  opts = opts || {};
+  const at = opts.at || floorNow();
+  const items = (opts.items || []).map(i => ({key:i.key, label:i.label, state:i.state || "", note:i.note || ""}));
+  const failed = items.filter(i => i.state === "Fail");
+  const result = opts.result === "Fail" || failed.length ? "Fail" : "Pass";
+  const rec = {id:uid("qc"), orderId:o.id, vehicleId:o.vehicleId || "", lineIds:(opts.lineIds || []).slice(),
+    by:opts.by || "", at, result, items, notes:opts.notes || "", roadTestId:opts.roadTestId || "",
+    roadTestResult:opts.roadTestResult || "", failedItems:failed.map(i => i.label),
+    returnTo:result === "Fail" ? (opts.returnTo === "Diagnosing" ? "Diagnosing" : "In Progress") : ""};
+  db.qcRecords[rec.id] = rec;
+  rec.lineIds.forEach(id => {
+    const l = findLine(o, id); if (!l) return;
+    (l.qcIds = l.qcIds || []).push(rec.id);
+    if (result === "Pass"){
+      moveJob(o, l, "QC Passed", {by:rec.by, at, note:"QC passed"});
+      l.qcPassedAt = at;
+    } else {
+      moveJob(o, l, "QC Failed", {by:rec.by, at, note:"QC failed: " + (rec.failedItems.join(", ") || rec.notes || "see QC record")});
+      l.qcFailures = (l.qcFailures || 0) + 1;
+      moveJob(o, l, rec.returnTo, {by:rec.by, at, note:"sent back after QC failure"});
+    }
+  });
+  return rec;
+}
+function qcFor(o){ return vals(db.qcRecords).filter(r => r.orderId === o.id).sort((a, b) => String(a.at).localeCompare(String(b.at))); }
+
+/* ---------- wheel torque ----------
+   A torque figure is written down by a person or supplied by a licensed data
+   source. This program never proposes one. */
+function torqueJob(l){ return /wheel|tire|tyre|brake|rotor|pad|caliper|hub|bearing|lug|rotate|mount|balance|axle|knuckle/i.test(String(l.desc || "")); }
+function recordTorque(l, t){
+  const r = Object.assign({id:uid("tq"), position:"All wheels", spec:"", unit:"ft-lb", specSource:"", specUnknown:false,
+    actual:"", confirmed:false, tech:"", at:floorNow(), note:""}, t || {});
+  if (r.specUnknown || String(r.spec).trim() === ""){ r.specUnknown = true; r.spec = ""; }
+  (l.torque = l.torque || []).push(r);
+  return r;
+}
+
+/* ---------- road tests ---------- */
+function recordRoadTest(o, fields){
+  const r = Object.assign({id:uid("rt"), orderId:o.id, vehicleId:o.vehicleId || "", lineId:"", kind:"Post-Repair", tech:"",
+    at:floorNow(), mileageStart:"", mileageEnd:"", symptoms:"", steering:"", braking:"", vibration:"", noise:"",
+    powertrain:"", warningLights:"", notes:"", result:""}, fields || {});
+  if (ROAD_KINDS.indexOf(r.kind) < 0) r.kind = "Post-Repair";
+  db.roadTests[r.id] = r;
+  return r;
+}
+function roadTestsFor(o){ return vals(db.roadTests).filter(r => r.orderId === o.id).sort((a, b) => String(a.at).localeCompare(String(b.at))); }
+
+/* ---------- diagnosis ----------
+   A code is a clue, not an answer. Recording one never fills in a root cause,
+   and never creates a repair. */
+function diagFor(o, create){
+  let d = vals(db.diagnostics).find(x => x.orderId === o.id) || null;
+  if (!d && create){
+    const at = floorNow();
+    d = {id:uid("dx"), orderId:o.id, vehicleId:o.vehicleId || "", lineId:"", concern:o.complaint || "",
+      symptomVerified:"", observations:"", tests:"", measurements:[], dtcs:[], rootCause:"", recommendedRepair:"",
+      postVerification:"", tech:db.settings.lastTech || "", createdAt:at, updatedAt:at};
+    db.diagnostics[d.id] = d;
+  }
+  return d;
+}
+function addMeasurement(d, m){
+  const x = Object.assign({id:uid("ms"), type:"Custom", label:"", value:"", unit:"", spec:"", specSource:"", tech:"", at:floorNow(), note:""}, m || {});
+  if (String(x.spec).trim() && !String(x.specSource).trim()) x.specSource = "entered by technician";
+  d.measurements.push(x); d.updatedAt = x.at;
+  return x;
+}
+function addDTC(d, c){
+  const x = Object.assign({id:uid("dtc"), module:"", code:"", description:"", status:"Stored", freezeFrame:"", phase:"Before repair", tech:"", at:floorNow()}, c || {});
+  x.code = String(x.code || "").toUpperCase().trim();
+  if (DTC_STATUSES.indexOf(x.status) < 0) x.status = "Stored";
+  if (DTC_PHASES.indexOf(x.phase) < 0) x.phase = "Before repair";
+  d.dtcs.push(x); d.updatedAt = x.at;
+  return x;
+}
+function diagnosed(d){ return !!(d && String(d.rootCause || "").trim()); }
+
+/* ---------- comebacks and rechecks ---------- */
+function flagComeback(o, f){
+  f = f || {};
+  const prior = db.orders[f.priorOrderId];
+  const pl = prior ? findLine(prior, f.priorLineId) : null;
+  const pp = prior ? (prior.parts || []).find(x => x.id === f.priorPartLineId) : null;
+  const c = Object.assign({id:uid("cb"), orderId:o.id, vehicleId:o.vehicleId || "", at:floorNow(), by:"",
+    priorOrderId:f.priorOrderId || "", priorTicket:prior ? ticketNo(prior) : "",
+    priorLineId:f.priorLineId || "", priorJob:pl ? pl.desc : "",
+    priorPartLineId:f.priorPartLineId || "", priorPart:pp ? (pp.desc + (pp.partNo ? " · " + pp.partNo : "")) : "",
+    priorDate:prior ? (prior.date || "") : "", priorMileage:prior ? (prior.mileageOut || prior.mileageIn || "") : "",
+    priorTech:pl ? (pl.tech || "") : "", currentMileage:o.mileageIn || "",
+    sameConcern:"Unknown", finding:"Undetermined", diagnosticOutcome:"", correctiveAction:"",
+    supplierClaim:"", warrantyDecision:"Pending", notes:""}, f);
+  if (COMEBACK_FINDINGS.indexOf(c.finding) < 0) c.finding = "Undetermined";
+  if (WARRANTY_DECISIONS.indexOf(c.warrantyDecision) < 0) c.warrantyDecision = "Pending";
+  db.comebacks[c.id] = c;
+  o.comebackId = c.id;
+  return c;
+}
+function comebackFor(o){ return (o && o.comebackId && db.comebacks[o.comebackId]) || null; }
+function milesSince(c){
+  const a = numOrNull(c.priorMileage), b = numOrNull(c.currentMileage);
+  return (a != null && b != null) ? b - a : null;
+}
+
+/* ---------- a vehicle's technical history ---------- */
+function installedParts(vehicleId){
+  const out = [];
+  vals(db.orders).filter(o => o.vehicleId === vehicleId && !isDead(o)).forEach(o => {
+    (o.parts || []).forEach(x => {
+      if (!x.desc) return;
+      const st = partState(x);
+      const fitted = st === "Installed" || (isFinal(o) && st !== "Returned" && st !== "Cancelled");
+      if (!fitted) return;
+      const cat = x.partId && db.parts[x.partId];
+      const job = x.jobLineId ? findLine(o, x.jobLineId) : null;
+      const po = x.poId && db.purchaseOrders[x.poId];
+      out.push({orderId:o.id, ticket:ticketNo(o), lineId:x.id, desc:x.desc,
+        partNo:x.partNo || (cat && cat.sku) || "", brand:x.brand || (cat && cat.brand) || "",
+        at:x.installedAt || o.date || "", date:dayOf(x.installedAt || o.date),
+        mileage:o.mileageOut || o.mileageIn || "", job:job ? job.desc : "",
+        vendor:x.vendor || (po ? vendorName(po.vendorId) : "") || (cat && cat.defaultVendorId ? vendorName(cat.defaultVendorId) : ""),
+        qty:x.qty, core:(x.core && x.core.required) ? ("core " + x.core.status) : "", warranty:x.warranty || ""});
+    });
+  });
+  return out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+}
+function vehicleTimeline(vehicleId){
+  const ev = [];
+  const push = (at, kind, title, detail, extra) => {
+    if (!at) return;
+    const e = Object.assign({at:String(at), kind, title:title || "", detail:detail || "", mileage:"", ticket:"", tech:"", orderId:""}, extra || {});
+    e.hay = [e.kind, e.title, e.detail, e.mileage, e.ticket, e.tech, dayOf(e.at), e.extraHay || ""].join(" ").toLowerCase();
+    ev.push(e);
+  };
+  const orders = vals(db.orders).filter(o => o.vehicleId === vehicleId);
+  vals(db.appointments).filter(a => a.vehicleId === vehicleId).forEach(a =>
+    push((a.date || "") + (a.time ? "T" + a.time : ""), "Appointment", a.concern || "Appointment", a.status, {tech:a.tech || ""}));
+  orders.forEach(o => {
+    const base = {orderId:o.id, ticket:ticketNo(o), mileage:o.mileageIn || o.mileageOut || ""};
+    const ci = o.checkin || {};
+    push(ci.at || o.date, ci.at ? "Check-in" : "Visit", o.complaint || "Visit", (ci.at ? "checked in by " + (ci.by || "—") : ""), base);
+    if (isDead(o)) return;
+    (o.labor || []).forEach(l => {
+      const done = JOB_DONE.indexOf(jobState(l)) >= 0 || jobState(l) === "QC Required" || isFinal(o);
+      if (!done || !l.desc) return;
+      push(l.completedAt || o.date, "Repair", l.desc, l.workPerformed || "", Object.assign({}, base, {tech:l.tech || "", mileage:o.mileageOut || o.mileageIn || ""}));
+      (l.torque || []).forEach(t => push(t.at, "Torque", l.desc, (t.specUnknown ? "SPEC UNKNOWN / VERIFY" : t.spec + " " + t.unit) + (t.confirmed ? " · confirmed" : ""), Object.assign({}, base, {tech:t.tech})));
+    });
+  });
+  vals(db.inspections).filter(i => i.vehicleId === vehicleId).forEach(i => {
+    const s = inspSummary(i);
+    push(i.completedAt || i.startedAt, "Inspection", "Multipoint inspection #" + (i.no || ""), s.Urgent + " urgent · " + s["Needs Attention"] + " attention · " + s.Monitor + " monitor",
+      {orderId:i.orderId, mileage:i.mileage || "", tech:i.tech || ""});
+  });
+  vals(db.diagnostics).filter(d => d.vehicleId === vehicleId).forEach(d => {
+    const o = db.orders[d.orderId] || {};
+    const base = {orderId:d.orderId, ticket:o.id ? ticketNo(o) : "", mileage:o.mileageIn || "", tech:d.tech || ""};
+    push(d.updatedAt || d.createdAt, "Diagnosis", diagnosed(d) ? d.rootCause : "Diagnosis — no root cause recorded",
+      [d.concern, d.recommendedRepair].filter(Boolean).join(" · "),
+      Object.assign({}, base, {extraHay:(d.measurements || []).map(m => m.type + " " + m.label + " " + m.value + m.unit).join(" ") + " " + d.observations + " " + d.tests}));
+    (d.dtcs || []).forEach(c => push(c.at, "DTC", c.code + (c.module ? " (" + c.module + ")" : ""), [c.description || "no description entered", c.status, c.phase].join(" · "), Object.assign({}, base, {tech:c.tech || d.tech || ""})));
+  });
+  installedParts(vehicleId).forEach(p => push(p.at, "Part installed", p.desc, [p.partNo, p.brand, p.vendor, p.job].filter(Boolean).join(" · "), {orderId:p.orderId, ticket:p.ticket, mileage:p.mileage}));
+  vals(db.recommendations).filter(r => r.vehicleId === vehicleId).forEach(r =>
+    push(r.at, (r.status === "Declined" || r.status === "Deferred") ? "Declined work" : "Recommendation", r.desc, r.status + (r.reason ? " · " + r.reason : ""), {orderId:r.orderId, mileage:r.mileage || ""}));
+  vals(db.comebacks).filter(c => c.vehicleId === vehicleId).forEach(c =>
+    push(c.at, "Comeback / recheck", "Linked to " + (c.priorTicket || "earlier visit") + (c.priorJob ? " — " + c.priorJob : ""),
+      ["same concern: " + c.sameConcern, c.finding, c.correctiveAction].filter(Boolean).join(" · "), {orderId:c.orderId, mileage:c.currentMileage || ""}));
+  vals(db.qcRecords).filter(q => q.vehicleId === vehicleId).forEach(q =>
+    push(q.at, "QC " + q.result, "Quality control " + (q.result === "Pass" ? "passed" : "failed"), (q.failedItems || []).join(", ") + (q.notes ? " · " + q.notes : ""), {orderId:q.orderId, tech:q.by}));
+  vals(db.roadTests).filter(r => r.vehicleId === vehicleId).forEach(r =>
+    push(r.at, "Road test", r.kind + " road test", [r.symptoms, r.notes, r.result].filter(Boolean).join(" · "), {orderId:r.orderId, tech:r.tech, mileage:r.mileageStart || ""}));
+  vals(db.attachments).filter(a => a.vehicleId === vehicleId).forEach(a =>
+    push(a.at, "Photo", a.caption || a.name, a.custVisible ? "customer-visible" : "internal", {orderId:a.orderId || ""}));
+  return ev.sort((a, b) => b.at.localeCompare(a.at));
+}
+function searchVehicleHistory(vehicleId, q){
+  const t = String(q || "").toLowerCase().trim();
+  if (!t) return [];
+  return vehicleTimeline(vehicleId).filter(e => e.hay.indexOf(t) >= 0);
+}
+
+/* The same trouble coming back is worth seeing. What caused it each time is a
+   technician's call, so this lists the visits and draws no conclusion. */
+const CONCERN_TOPICS = [
+  ["Coolant leak / overheating", /coolant|antifreeze|overheat|running hot|water pump|radiator|expansion tank/i],
+  ["Oil leak", /oil leak|leaking oil|oil seep|valve cover|oil filter housing|oil pan|rear main/i],
+  ["Check engine light", /check engine|engine light|\bcel\b|\bmil\b/i],
+  ["Misfire / rough running", /misfire|rough idle|runs rough|stumbl|hesitat/i],
+  ["Brakes", /brake|pedal|rotor|caliper/i],
+  ["Vibration", /vibrat|shimmy|shake|wobble/i],
+  ["Noise", /noise|clunk|rattle|squeak|squeal|grind|knock|whine|hum\b/i],
+  ["No start / battery / charging", /no start|won'?t start|dead battery|battery|charging|alternator|starter/i],
+  ["Transmission / driveline", /transmission|shift|slipp|\bdct\b|clutch|u-?joint|driveshaft|transfer case|differential/i],
+  ["Steering / alignment", /steering|pulls?\b|alignment|wander|death wobble/i],
+  ["A/C / heat", /a\/c|\bac\b|air condition|heater|blows warm|blows hot/i],
+  ["Electrical", /electrical|short|fuse|wiring|intermittent/i],
+  ["Suspension", /suspension|ball joint|control arm|bushing|strut|shock|tie rod/i],
+  ["Fuel / turbo", /fuel|injector|turbo|boost|def\b|regen/i]
+];
+function repeatedConcerns(vehicleId){
+  const hits = {};
+  vals(db.orders).filter(o => o.vehicleId === vehicleId && !isDead(o)).forEach(o => {
+    const ci = o.checkin || {};
+    const d = diagFor(o, false);
+    const text = Array.from(new Set([o.complaint, ci.leaks, ci.noises, ci.drivability, ci.warningsReported, d && d.concern]
+      .map(x => String(x || "").trim()).filter(Boolean))).join(" · ");
+    if (!text) return;
+    CONCERN_TOPICS.forEach(([name, re]) => {
+      if (!re.test(text)) return;
+      (hits[name] = hits[name] || []).push({orderId:o.id, ticket:ticketNo(o), date:o.date || dayOf(ci.at), mileage:o.mileageIn || o.mileageOut || "", text});
+    });
+  });
+  return Object.keys(hits).filter(k => hits[k].length >= 2).map(k => ({
+    topic:k,
+    visits:hits[k].sort((a, b) => (numOrNull(a.mileage) || 0) - (numOrNull(b.mileage) || 0) || String(a.date).localeCompare(String(b.date)))
+  }));
+}
+
+/* ---------- maintenance ----------
+   Intervals are the shop's to set, per shop and per vehicle. Nothing here is a
+   manufacturer schedule, and nothing assumes a service was done elsewhere: no
+   record means UNKNOWN. */
+function maintItems(){ return (db.settings.maintItems || []).filter(m => m && m.active !== false); }
+function maintInterval(vehicleId, item){
+  const ov = ((db.maintenance.overrides || {})[vehicleId] || {})[item.id];
+  const src = ov || item;
+  return {miles:numOrNull(src.miles), months:numOrNull(src.months), vehicleSpecific:!!ov};
+}
+function maintRegex(item){
+  try { return new RegExp(item.match || item.name, "i"); } catch(e){ return new RegExp(String(item.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); }
+}
+function maintHistory(vehicleId, item){
+  const re = maintRegex(item);
+  const out = [];
+  vals(db.orders).filter(o => o.vehicleId === vehicleId && !isDead(o)).forEach(o => {
+    (o.labor || []).forEach(l => {
+      if (!re.test(String(l.desc || ""))) return;
+      const done = JOB_DONE.indexOf(jobState(l)) >= 0 || jobState(l) === "QC Required" || isFinal(o);
+      if (!done) return;
+      out.push({date:dayOf(l.completedAt) || o.date || "", mileage:o.mileageOut || o.mileageIn || "", source:"this shop · " + ticketNo(o), orderId:o.id, job:l.desc});
+    });
+  });
+  (db.maintenance.records || []).filter(r => r.vehicleId === vehicleId && r.itemId === item.id)
+    .forEach(r => out.push({date:r.date || "", mileage:r.mileage || "", source:r.source || "recorded by hand", manual:true, id:r.id}));
+  return out.sort((a, b) => String(b.date).localeCompare(String(a.date)) || (numOrNull(b.mileage) || 0) - (numOrNull(a.mileage) || 0));
+}
+function vehicleMileage(vehicleId){
+  const v = db.vehicles[vehicleId] || {};
+  let best = numOrNull(v.mileage);
+  vals(db.orders).filter(o => o.vehicleId === vehicleId).forEach(o => {
+    [o.mileageIn, o.mileageOut].forEach(m => { const n = numOrNull(m); if (n != null && (best == null || n > best)) best = n; });
+  });
+  return best;
+}
+function addMonthsIso(day, months){
+  const d = new Date(String(day).slice(0, 10) + "T12:00:00");
+  if (!isFinite(d.getTime())) return null;
+  const whole = Math.floor(months), frac = months - whole;
+  d.setMonth(d.getMonth() + whole);
+  if (frac) d.setDate(d.getDate() + Math.round(frac * 30.44));
+  return d;
+}
+function maintStatus(vehicleId, item, opts){
+  opts = opts || {};
+  const iv = maintInterval(vehicleId, item);
+  const hist = maintHistory(vehicleId, item);
+  const last = hist[0] || null;
+  const res = {item, interval:iv, last, history:hist, state:"", note:"", dueMileage:null, dueDate:null, milesLeft:null, daysLeft:null};
+  if (iv.miles == null && iv.months == null){ res.state = "NO INTERVAL SET"; res.note = "No interval configured"; return res; }
+  if (!last){ res.state = "UNKNOWN"; res.note = "SERVICE HISTORY UNKNOWN"; return res; }
+  const mileage = opts.mileage != null ? numOrNull(opts.mileage) : vehicleMileage(vehicleId);
+  const today = opts.today ? new Date(String(opts.today).slice(0, 10) + "T12:00:00") : new Date();
+  const soonMiles = Number(db.settings.dueSoonMiles) || 1000, soonDays = Number(db.settings.dueSoonDays) || 30;
+  let known = false, now = false, soon = false;
+  if (iv.miles != null){
+    const lm = numOrNull(last.mileage);
+    if (lm != null && mileage != null){
+      known = true;
+      res.dueMileage = lm + iv.miles; res.milesLeft = res.dueMileage - mileage;
+      if (res.milesLeft <= 0) now = true; else if (res.milesLeft <= soonMiles) soon = true;
+    }
+  }
+  if (iv.months != null && last.date){
+    const due = addMonthsIso(last.date, iv.months);
+    if (due){
+      known = true;
+      res.dueDate = dayOf(due.toISOString()); res.daysLeft = Math.round((due - today) / 86400000);
+      if (res.daysLeft <= 0) now = true; else if (res.daysLeft <= soonDays) soon = true;
+    }
+  }
+  if (!known){ res.state = "UNKNOWN"; res.note = "last service has no " + (iv.miles != null ? "mileage" : "date") + " recorded"; return res; }
+  res.state = now ? "DUE NOW" : soon ? "DUE SOON" : "NOT DUE";
+  return res;
+}
+function vehicleMaintenance(vehicleId, opts){ return maintItems().map(m => maintStatus(vehicleId, m, opts)); }
+
+/* ---------- workload and production ----------
+   Definitions, so the numbers mean the same thing to everybody:
+   SOLD hours are the labor hours on the ticket. CLOCK hours are the time
+   sessions technicians actually ran on a job. SOLD COMPLETED counts a job the
+   moment its work is finished (whether or not QC has signed it off yet).
+   EFFICIENCY is sold hours completed divided by the clock hours recorded on
+   those same completed jobs - never shop-open hours, never idle time. */
+function shopWorkload(day){
+  day = day || todayStr();
+  const w = {vehicles:0, jobsReady:0, jobsWaiting:0, jobsInProgress:0, jobsDiagnosis:0, jobsQC:0,
+    soldReady:0, soldInProgress:0, soldDiagnosis:0, soldWaitingParts:0, soldAwaitingApproval:0, soldWaitingOther:0, soldQC:0, soldCompletedToday:0,
+    columns:{}};
+  BOARD_COLUMNS.forEach(c => w.columns[c] = 0);
+  floorOrders().forEach(o => {
+    w.vehicles++;
+    w.columns[boardColumn(o)]++;
+    (o.labor || []).forEach(l => {
+      const b = jobBucket(o, l), h = soldHours(l);
+      if (b === "ready"){ w.jobsReady++; w.soldReady += h; }
+      else if (b === "inProgress"){ w.jobsInProgress++; w.soldInProgress += h; }
+      else if (b === "diagnosis"){ w.jobsDiagnosis++; w.soldDiagnosis += h; }
+      else if (b === "parts"){ w.jobsWaiting++; w.soldWaitingParts += h; }
+      else if (b === "approval"){ w.jobsWaiting++; w.soldAwaitingApproval += h; }
+      else if (b === "waiting"){ w.jobsWaiting++; w.soldWaitingOther += h; }
+      else if (b === "qc"){ w.jobsQC++; w.soldQC += h; }
+    });
+  });
+  vals(db.orders).filter(o => !isDead(o)).forEach(o => (o.labor || []).forEach(l => {
+    const b = jobBucket(o, l);
+    if ((b === "completed" || b === "qc") && dayOf(l.completedAt) === day) w.soldCompletedToday += soldHours(l);
+  }));
+  ["soldReady","soldInProgress","soldDiagnosis","soldWaitingParts","soldAwaitingApproval","soldWaitingOther","soldQC","soldCompletedToday"].forEach(k => w[k] = r2(w[k]));
+  return w;
+}
+function allTechs(){
+  const s = new Set((db.settings.techs || []).filter(Boolean));
+  vals(db.orders).forEach(o => (o.labor || []).forEach(l => { if (l.tech) s.add(l.tech); }));
+  (db.timeSessions || []).forEach(x => { if (x.tech) s.add(x.tech); });
+  return Array.from(s);
+}
+function techWorkload(tech, day){
+  day = day || todayStr();
+  const r = {tech, current:null, ready:0, active:0, waiting:0, qc:0, completedToday:0,
+    assigned:0, completed:0, remaining:0, jobsWaiting:0, jobsParts:0, jobsDiagnosis:0, jobsQC:0, jobsReady:0, jobs:[]};
+  const run = openSessionsOf(tech)[0];
+  if (run){
+    const o = db.orders[run.orderId], l = o && findLine(o, run.lineId);
+    if (o && l) r.current = {orderId:o.id, lineId:l.id, ticket:ticketNo(o), vehicle:vehLabel(o.vehicleId), job:l.desc, bay:o.bay || "", since:run.start};
+  }
+  floorOrders().forEach(o => (o.labor || []).forEach(l => {
+    if (l.tech !== tech) return;
+    const b = jobBucket(o, l), h = soldHours(l);
+    if (b === "closed") return;
+    r.jobs.push({o, l, bucket:b});
+    r.assigned += h;
+    if (b === "completed" || b === "qc") r.completed += h;
+    if (b === "ready"){ r.ready += h; r.jobsReady++; }
+    if (b === "inProgress" || b === "diagnosis") r.active += h;
+    if (b === "diagnosis") r.jobsDiagnosis++;
+    if (b === "parts" || b === "approval" || b === "waiting"){ r.waiting += h; r.jobsWaiting++; }
+    if (b === "parts") r.jobsParts++;
+    if (b === "qc"){ r.qc += h; r.jobsQC++; }
+  }));
+  vals(db.orders).filter(o => !isDead(o)).forEach(o => (o.labor || []).forEach(l => {
+    const b = jobBucket(o, l);
+    if (l.tech === tech && (b === "completed" || b === "qc") && dayOf(l.completedAt) === day) r.completedToday += soldHours(l);
+  }));
+  r.remaining = r.assigned - r.completed;
+  ["ready","active","waiting","qc","completedToday","assigned","completed","remaining"].forEach(k => r[k] = r2(r[k]));
+  return r;
+}
+/* Production over a period, inclusive of both days. */
+function techProduction(tech, from, to){
+  from = from || todayStr(); to = to || from;
+  const r = {tech, jobsCompleted:0, sold:0, clock:0, avgClock:null, efficiency:null, clockAllJobs:0};
+  vals(db.orders).filter(o => !isDead(o)).forEach(o => (o.labor || []).forEach(l => {
+    const b = jobBucket(o, l);
+    if (l.tech !== tech || (b !== "completed" && b !== "qc")) return;
+    const d = dayOf(l.completedAt);
+    if (!d || d < from || d > to) return;
+    r.jobsCompleted++;
+    r.sold += soldHours(l);
+    r.clock += clockHours(o, l, tech);
+  }));
+  (db.timeSessions || []).filter(s => s.tech === tech).forEach(s => {
+    const d = dayOf(s.start);
+    if (d >= from && d <= to) r.clockAllJobs += hrs(sessionMs(s));
+  });
+  r.sold = r2(r.sold);
+  r.efficiency = r.clock > 0 ? Math.round(r.sold / r.clock * 1000) / 10 : null;
+  r.avgClock = r.jobsCompleted ? r.clock / r.jobsCompleted : null;
+  return r;
+}
+function dailyProduction(day){
+  day = day || todayStr();
+  return {day, workload:shopWorkload(day), techs:allTechs().map(t => techProduction(t, day, day)).filter(t => t.jobsCompleted || t.clockAllJobs)};
+}
+function shopMetrics(from, to){
+  const m = {from, to, sold:0, clock:0, efficiency:null, jobsCompleted:0, vehicles:0, avgDaysInShop:null,
+    comebacks:0, qcFailures:0, waitingParts:0, waitingApproval:0};
+  allTechs().forEach(t => { const p = techProduction(t, from, to); m.sold += p.sold; m.clock += p.clock; m.jobsCompleted += p.jobsCompleted; });
+  m.sold = r2(m.sold);
+  m.efficiency = m.clock > 0 ? Math.round(m.sold / m.clock * 1000) / 10 : null;
+  const within = iso => { const d = dayOf(iso); return d && d >= from && d <= to; };
+  const stays = [];
+  vals(db.orders).filter(o => !isDead(o)).forEach(o => {
+    if (within((o.checkin && o.checkin.at) || o.date)) m.vehicles++;
+    const out = o.deliveredAt || (o.finalized && o.finalized.at);
+    if (out && within(out) && o.checkin && o.checkin.at) stays.push((Date.parse(out) - Date.parse(o.checkin.at)) / 86400000);
+  });
+  m.avgDaysInShop = stays.length ? Math.round(stays.reduce((s, x) => s + x, 0) / stays.length * 10) / 10 : null;
+  m.comebacks = vals(db.comebacks).filter(c => within(c.at)).length;
+  m.qcFailures = vals(db.qcRecords).filter(q => q.result === "Fail" && within(q.at)).length;
+  const w = shopWorkload(to);
+  m.waitingParts = floorOrders().reduce((s, o) => s + (o.labor || []).filter(l => jobBucket(o, l) === "parts").length, 0);
+  m.waitingApproval = floorOrders().reduce((s, o) => s + (o.labor || []).filter(l => jobBucket(o, l) === "approval").length, 0);
+  m.workload = w;
+  return m;
+}
+
+
 /* ---------- the shop board ----------
    One screen that answers the only question the owner asks all day: where is
    every car, and what is stopping it. */
 let boardQuery="";
-function renderBoard(){
-  const q=boardQuery.toLowerCase().trim();
-  const all=vals(db.orders).filter(o=>!isDead(o));
-  const live=all.filter(o=>canonStatus(o.status)!=="Paid / Closed");
-  const match=o=>!q||searchHay(o).indexOf(q)>=0;
-  const groups=[
-    ["Awaiting Approval", o=>canonStatus(o.status)==="Awaiting Approval"||needsAdditionalAuth(o)],
-    ["Waiting Parts",     o=>waitingOnParts(o)||canonStatus(o.status)==="Waiting on Parts"],
-    ["In Progress",       o=>canonStatus(o.status)==="In Progress"],
-    ["Ready",             o=>jobsTotal(o)>0&&jobsDone(o)===jobsTotal(o)&&canonStatus(o.status)!=="Completed"],
-    ["Completed",         o=>canonStatus(o.status)==="Completed"],
-    ["Ready for Invoice", o=>canonStatus(o.status)==="Completed"&&orderTotals(o).total>0],
-    ["Estimates",         o=>canonStatus(o.status)==="Estimate"]
-  ];
-  const seen={};
-  const sections=groups.map(([name,fn])=>{
-    const list=live.filter(o=>fn(o)&&match(o)&&!seen[o.id]);
-    list.forEach(o=>seen[o.id]=1);
-    if(!list.length) return "";
-    return `<div class="card"><div class="toolbar"><h2 style="margin:0">${esc(name)}</h2><span class="muted">${list.length}</span></div>${boardRows(list)}</div>`;
-  }).join("");
-  $("#app").innerHTML=`
-  <div class="toolbar"><h2 style="margin:0">Shop Board</h2>
-    <input class="search" id="bq" placeholder="Customer, VIN, plate, RO #, invoice #, year/make/model…" value="${esc(boardQuery)}">
-    <div class="grow"></div><button class="primary" onclick="editOrder(null)">+ New Work Order</button></div>
-  ${sections||`<div class="card"><div class="empty">${q?"Nothing matches that.":"Nothing open."}</div></div>`}
-  ${q?searchOtherResults(q,seen):""}`;
-  const el=$("#bq");
-  el.oninput=()=>{const at=el.selectionStart;boardQuery=el.value;renderBoard();const n=$("#bq");n.focus();n.setSelectionRange(at,at);};
-}
 /* Everything a writer might type at the counter, in one string per ticket. */
 function searchHay(o){
   const v=db.vehicles[o.vehicleId]||{}, c=db.customers[o.customerId]||{};
@@ -2367,7 +3166,7 @@ function renderTechView(){
   const v=db.vehicles[o.vehicleId]||{}, ci=shapeCheckin(o), insp=inspectionFor(o);
   const out=partsOutstanding(o);
   $("#app").innerHTML=`
-  <div class="toolbar"><button onclick="go('board')">← Shop board</button><h2 style="margin:0">${esc(ticketNo(o))} — shop copy</h2>
+  <div class="toolbar"><button onclick="go('board')">← Shop floor</button><h2 style="margin:0">${esc(ticketNo(o))} — shop copy</h2>
     <div class="grow"></div><button class="sm" onclick="editOrder('${o.id}')">Full ticket</button></div>
   <div class="card"><div style="display:flex;gap:20px;flex-wrap:wrap">
     <div><b style="font-size:16px">${esc(vehLabel(o.vehicleId))}</b><div class="muted">VIN ${esc(v.vin||"—")} · ${esc(v.plate||"—")}</div>
@@ -2387,10 +3186,9 @@ function renderTechView(){
       ${l.finding?`<div class="muted">Found: ${esc(l.finding)}</div>`:""}
       ${l.workPerformed?`<div class="muted">Done: ${esc(l.workPerformed)}</div>`:""}</td>
       <td>${l.bill==="F"?"menu":esc(lineHours(l))+" hr"}</td>
-      <td>${esc(l.tech||"—")}</td>
-      <td>${esc(jobState(l))}</td>
-      <td class="right">${jobState(l)!=="Completed"?`<button class="sm" onclick="techJob('${o.id}',${i},'start')">Start</button>
-        <button class="sm primary" onclick="techJob('${o.id}',${i},'done')">Complete</button>`:`<span class="muted">done</span>`}</td></tr>`).join("")}
+      <td>${esc(l.tech||"—")}<div>${psBadge(jobPartsState(o,l))}</div></td>
+      <td>${stateChip(jobState(l))}<div>${clockLine(o,l)}</div></td>
+      <td class="right">${jobControls(o,l)}</td></tr>`).join("")}
     </tbody></table>`:`<div class="empty">No jobs on this ticket yet.</div>`}
   </div>
   ${(o.parts||[]).length?`<div class="card"><h2 style="margin-top:0">Parts</h2>
@@ -2409,6 +3207,885 @@ function techJob(orderId,i,which){
     completeJob(o,i);
   }
   save(); renderTechView();
+}
+
+
+
+/* ---------- acting on a job from wherever it is on screen ----------
+   The same START / PAUSE / RESUME / COMPLETE buttons appear on the ticket, the
+   board, the technician queue and the shop copy. When the ticket is open the
+   change is made to the open ticket and written straight through, so nothing
+   typed on the sheet is lost and nothing done on the floor waits for Save. */
+function floorTarget(orderId){
+  const inSheet = !!(cur && cur.id === orderId && $("#woOverlay").classList.contains("on"));
+  if (inSheet) pullWO();
+  const o = inSheet ? cur : db.orders[orderId];
+  if (o) shapeOrder(o);
+  return {o, inSheet};
+}
+function commitFloor(o, inSheet){
+  if (inSheet){
+    if (!db.orders[cur.id]) ensureNumber(cur, "estimate");
+    db.orders[cur.id] = JSON.parse(JSON.stringify(cur));
+    save(); drawWO();
+  } else { save(); render(); }
+}
+function askTech(current){
+  const list = allTechs();
+  const t = prompt("Which technician?" + (list.length ? "\n" + list.join(", ") : ""), current || db.settings.lastTech || "");
+  return (t == null || !t.trim()) ? null : t.trim();
+}
+function floorAct(orderId, lineId, act){
+  const {o, inSheet} = floorTarget(orderId);
+  if (!o) return;
+  if (inSheet && !cur.customerId){ alert("Pick a customer for this ticket first."); return; }
+  const l = findLine(o, lineId);
+  if (!l) return;
+  if (act === "start" || act === "diagnose" || act === "resume"){
+    const tech = l.tech || askTech("");
+    if (!tech) return;
+    const r = act === "resume" ? jobResume(o, l, tech) : jobStart(o, l, tech, {diagnosing:act === "diagnose"});
+    if (!r.ok){ alert(r.reason); return; }
+  } else if (act === "pause"){
+    const pick = prompt("Pausing " + (l.desc || "this job") + ".\nOn hold for a reason? Enter a number, or leave blank for a plain pause.\n\n" +
+      HOLD_REASONS.map((h, i) => (i + 1) + ". " + h).join("\n"), "");
+    if (pick == null) return;
+    const n = parseInt(pick, 10);
+    jobPause(o, l, {by:l.tech, reason:(isFinite(n) && HOLD_REASONS[n - 1]) ? HOLD_REASONS[n - 1] : ""});
+  } else if (act === "complete"){
+    const work = prompt("Work performed on this job (prints on the invoice):", l.workPerformed || "");
+    if (work == null) return;
+    jobFinish(o, l, {by:l.tech, work});
+  } else if (act === "hold"){
+    const pick = prompt("Hold reason — enter a number:\n\n" + HOLD_REASONS.map((h, i) => (i + 1) + ". " + h).join("\n"), "2");
+    if (pick == null) return;
+    const n = parseInt(pick, 10);
+    if (!(isFinite(n) && HOLD_REASONS[n - 1])) return;
+    const note = prompt("Note (optional):", "") || "";
+    setHold(o, l, HOLD_REASONS[n - 1], note, db.settings.lastTech || "");
+  } else if (act === "release"){
+    releaseHold(l);
+  } else if (act === "assign"){
+    const t = askTech(l.tech);
+    if (t == null) return;
+    assignJob(o, l, t, db.settings.lastTech || "");
+  } else if (act === "qc"){
+    commitFloor(o, inSheet);
+    openQC(orderId, lineId);
+    return;
+  }
+  commitFloor(o, inSheet);
+}
+function floorAssign(orderId, lineId, tech){
+  const {o, inSheet} = floorTarget(orderId);
+  const l = o && findLine(o, lineId); if (!l) return;
+  assignJob(o, l, tech, db.settings.lastTech || "");
+  commitFloor(o, inSheet);
+}
+function floorSetBay(orderId, bay){
+  const {o, inSheet} = floorTarget(orderId);
+  if (!o) return;
+  if (inSheet && !cur.customerId){ alert("Pick a customer for this ticket first."); drawWO(); return; }
+  const by = db.settings.lastTech || "";
+  let r = assignBay(o, bay, {by});
+  if (!r.ok){
+    const who = r.conflict.map(x => ticketNo(x) + " " + vehLabel(x.vehicleId)).join(", ");
+    if (!confirm(bay + " already has " + who + " in it.\n\nPut this vehicle in " + bay + " as well?")){ if (inSheet) drawWO(); else render(); return; }
+    r = assignBay(o, bay, {by, override:true});
+  }
+  commitFloor(o, inSheet);
+}
+function floorSetOrderField(orderId, field, value){
+  const {o, inSheet} = floorTarget(orderId);
+  if (!o) return;
+  o[field] = value;
+  commitFloor(o, inSheet);
+}
+function floorDeliver(orderId){
+  const {o, inSheet} = floorTarget(orderId);
+  if (!o) return;
+  const open = (o.labor || []).filter(l => ["completed","closed"].indexOf(jobBucket(o, l)) < 0);
+  if (open.length && !confirm(open.length + " job(s) on this ticket are not finished.\n\nMark the vehicle delivered anyway?")) return;
+  const by = prompt("Delivered by:", db.settings.lastTech || "");
+  if (by == null) return;
+  markDelivered(o, by.trim());
+  commitFloor(o, inSheet);
+  if (inSheet) closeWO();
+}
+
+/* ---------- small pieces used everywhere ---------- */
+function psBadge(ps){
+  const cls = ps === "ALL PARTS READY" ? "ps-ok" : ps === "NO PARTS REQUIRED" ? "ps-none" : ps === "PARTIAL PARTS" ? "ps-part" : "ps-wait";
+  return `<span class="psb ${cls}">${esc(ps)}</span>`;
+}
+function stateChip(st){ return `<span class="jst js-${String(st).replace(/[^A-Za-z]/g, "")}">${esc(st)}</span>`; }
+function jobControls(o, l){
+  const st = jobState(l), running = isRunning(o, l);
+  const b = (act, label, cls) => `<button class="bigbtn ${cls || ""}" onclick="event.stopPropagation();floorAct('${o.id}','${l.id}','${act}')">${label}</button>`;
+  if (JOB_CLOSED.indexOf(st) >= 0) return stateChip(st);
+  if (running) return b("pause", "PAUSE", "amber") + b("complete", "COMPLETE", "green");
+  if (st === "Paused" || st === "In Progress" || st === "Diagnosing") return b("resume", "RESUME", "blue") + b("complete", "COMPLETE", "green");
+  if (st === "QC Required") return b("qc", "QC CHECK", "blue");
+  if (JOB_DONE.indexOf(st) >= 0) return `<span class="jdone">${st === "QC Passed" ? "QC PASSED" : "DONE"}</span>`;
+  return b("start", "START", "blue") + b("diagnose", "DIAGNOSE", "");
+}
+function clockLine(o, l){
+  const run = openSessionOn(o, l);
+  return `<span class="clk-hrs"><b>${fmtHrs(soldHours(l))}</b> sold · <b>${fmtHrs(clockHours(o, l))}</b> clock${run ? ` · <span class="running">RUNNING since ${esc(String(run.start).slice(11, 16))}${run.tech ? " (" + esc(run.tech) + ")" : ""}</span>` : ""}</span>`;
+}
+function workloadStrip(w){
+  const cell = (n, label, cls) => `<div class="wcell ${cls || ""}"><b>${n}</b><span>${label}</span></div>`;
+  return `<div class="wstrip">
+    ${cell(w.vehicles, "vehicles in shop")}${cell(w.jobsReady, "jobs ready")}${cell(w.jobsInProgress, "in progress")}
+    ${cell(w.jobsWaiting, "jobs waiting")}${cell(w.jobsQC, "awaiting QC")}
+    ${cell(fmtHrs(w.soldReady), "sold hr ready", "h")}${cell(fmtHrs(w.soldInProgress), "sold hr in progress", "h")}
+    ${cell(fmtHrs(w.soldWaitingParts), "sold hr waiting parts", "h")}${cell(fmtHrs(w.soldAwaitingApproval), "sold hr awaiting approval", "h")}
+    ${cell(fmtHrs(w.soldCompletedToday), "sold hr completed today", "h")}</div>`;
+}
+function staleBanner(){
+  const st = staleSessions();
+  if (!st.length) return "";
+  return `<div class="authbox warn" style="margin-top:0;margin-bottom:12px"><b>TIMER LEFT RUNNING</b>
+    ${st.map(s => { const o = db.orders[s.orderId]; const l = o && findLine(o, s.lineId);
+      return `<div class="authline">${esc(s.tech)} — ${o ? esc(ticketNo(o) + " " + vehLabel(o.vehicleId)) : "?"}${l ? " · " + esc(l.desc) : ""} · running since ${esc(String(s.start).slice(0, 16).replace("T", " "))}
+        ${o && l ? `<button class="sm" onclick="floorAct('${o.id}','${l.id}','pause')">Pause it</button>` : ""}</div>`; }).join("")}</div>`;
+}
+
+/* ---------- the shop floor screen ---------- */
+let floorTab = "board", queueTech = "", prodFrom = "", prodTo = "";
+function renderBoard(){
+  const tabs = [["board","Board"],["bays","Bays"],["dispatch","Dispatch"],["queue","Tech queue"],["production","Production"]];
+  let body = "";
+  if (floorTab === "bays") body = baysTab();
+  else if (floorTab === "dispatch") body = dispatchTab();
+  else if (floorTab === "queue") body = queueTab();
+  else if (floorTab === "production") body = productionTab();
+  else body = boardTab();
+  $("#app").innerHTML = `
+  <div class="toolbar"><h2 style="margin:0">Shop Floor</h2>
+    <div class="tabs" style="margin:0">${tabs.map(([k, t]) => `<button class="${k === floorTab ? "on" : ""}" onclick="floorTab='${k}';renderBoard()">${t}</button>`).join("")}</div>
+    ${floorTab === "board" ? `<input class="search" id="bq" placeholder="Customer, VIN, plate, RO #…" value="${esc(boardQuery)}">` : ""}
+    <div class="grow"></div><button class="primary" onclick="editOrder(null)">+ New Work Order</button></div>
+  ${staleBanner()}
+  ${body}`;
+  const el = $("#bq");
+  if (el) el.oninput = () => { const at = el.selectionStart; boardQuery = el.value; renderBoard(); const n = $("#bq"); n.focus(); n.setSelectionRange(at, at); };
+}
+function boardTab(){
+  const q = boardQuery.toLowerCase().trim();
+  const match = o => !q || searchHay(o).indexOf(q) >= 0;
+  const cols = {};
+  BOARD_COLUMNS.forEach(c => cols[c] = []);
+  const seen = {};
+  const pri = {Urgent:0, High:1, Normal:2};
+  floorOrders().filter(match).forEach(o => { seen[o.id] = 1; cols[boardColumn(o)].push(o); });
+  const w = shopWorkload();
+  return `${workloadStrip(w)}
+  <div class="kanban">${BOARD_COLUMNS.map(c => `<div class="kcol">
+    <div class="khead">${esc(c)} <span>${cols[c].length}</span></div>
+    ${cols[c].sort((a, b) => (pri[a.priority || "Normal"] - pri[b.priority || "Normal"]) || (timeInShopMs(b) - timeInShopMs(a))).map(o => floorCard(o, c)).join("") || `<div class="kempty">—</div>`}
+  </div>`).join("")}</div>
+  ${q ? searchOtherResults(q, seen) : ""}`;
+}
+function floorCard(o, col){
+  const v = db.vehicles[o.vehicleId] || {};
+  const jobs = o.labor || [];
+  const cj = currentJob(o);
+  const techs = Array.from(new Set(jobs.map(l => l.tech).filter(Boolean)));
+  const sold = jobs.reduce((s, l) => s + soldHours(l), 0);
+  const done = jobs.filter(l => ["completed","closed"].indexOf(jobBucket(o, l)) >= 0).length;
+  const insp = inspectionFor(o);
+  const warn = orderWarnings(o);
+  return `<div class="kcard pri-${esc(o.priority || "Normal")}" onclick="editOrder('${o.id}')">
+    <div class="ktop"><b>${esc(ticketNo(o))}</b>${o.priority && o.priority !== "Normal" ? ` <span class="badge b-verify">${esc(o.priority.toUpperCase())}</span>` : ""}
+      <span class="grow"></span><span class="muted" title="time in shop">${fmtDuration(timeInShopMs(o))}</span></div>
+    <div class="kveh">${esc(vehLabel(o.vehicleId))}</div>
+    <div class="ksub">${esc(custName(o.customerId))}${v.vin ? " · …" + esc(String(v.vin).slice(-8)) : ""}${o.mileageIn ? " · " + esc(o.mileageIn) + " mi" : ""}</div>
+    <div class="kline"><span>Tech <b>${esc(techs.join(", ") || "—")}</b></span><span>Bay <b>${esc(o.bay || "—")}</b></span></div>
+    ${cj ? `<div class="kjob">${esc(cj.desc || "job")} · ${esc(jobState(cj))}</div>` : ""}
+    <div class="kline"><span><b>${fmtHrs(sold)}</b> sold hr</span><span><b>${done}/${jobs.length}</b> jobs</span></div>
+    <div class="kline">${psBadge(orderPartsSummary(o))}${insp ? `<span class="psb ${insp.state === "Completed" ? "ps-ok" : "ps-part"}">MPI ${esc(insp.state.toUpperCase())}</span>` : ""}</div>
+    ${warn.length ? `<div class="kwarn">${warn.map(x => `<span class="badge b-verify">${esc(x)}</span>`).join(" ")}</div>` : ""}
+    ${col === "READY FOR PICKUP" ? `<button class="sm green" style="margin-top:6px" onclick="event.stopPropagation();floorDeliver('${o.id}')">Mark delivered</button>` : ""}
+  </div>`;
+}
+function baysTab(){
+  const bays = db.settings.bays || [];
+  const unbayed = floorOrders().filter(o => !o.bay);
+  const chooser = bay => unbayed.length ? `<select class="sm" onchange="if(this.value)floorSetBay(this.value,'${esc(bay).replace(/'/g, "")}')">
+      <option value="">Put a vehicle here…</option>${unbayed.map(o => `<option value="${o.id}">${esc(ticketNo(o) + " " + vehLabel(o.vehicleId))}</option>`).join("")}</select>` : "";
+  return `<div class="baygrid">${bays.map(bay => {
+    const occ = bayOccupants(bay);
+    return `<div class="baycard ${occ.length > 1 ? "double" : occ.length ? "busy" : "free"}">
+      <div class="toolbar" style="margin:0 0 6px"><b style="font-size:15px">${esc(bay)}</b><div class="grow"></div>
+        <span class="psb ${occ.length > 1 ? "ps-wait" : occ.length ? "ps-part" : "ps-ok"}">${occ.length > 1 ? "DOUBLE-BOOKED" : occ.length ? "OCCUPIED" : "AVAILABLE"}</span></div>
+      ${occ.map(o => `<div class="bayocc" onclick="editOrder('${o.id}')">
+        <b>${esc(ticketNo(o))}</b> ${esc(vehLabel(o.vehicleId))}
+        <div class="muted" style="font-size:12px">${esc(custName(o.customerId))} · tech ${esc(o.bayTech || Array.from(new Set((o.labor || []).map(l => l.tech).filter(Boolean))).join(", ") || "—")}
+          · since ${esc(String(o.bayAt || "").slice(0, 16).replace("T", " ") || "—")}${o.bayNote ? " · " + esc(o.bayNote) : ""}</div>
+        <div class="muted" style="font-size:12px">${esc(boardColumn(o))}</div>
+        <button class="sm" onclick="event.stopPropagation();floorSetBay('${o.id}','')">Release bay</button>
+        <button class="sm" onclick="event.stopPropagation();bayNoteDialog('${o.id}')">Tech / note…</button></div>`).join("")}
+      ${chooser(bay)}
+    </div>`; }).join("")}</div>
+  ${unbayed.length ? `<div class="card"><h3>In the shop without a bay</h3>
+    <table><tbody>${unbayed.map(o => `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${esc(ticketNo(o))}</b></td><td>${esc(vehLabel(o.vehicleId))}</td><td>${esc(boardColumn(o))}</td>
+      <td class="right"><select class="sm" onclick="event.stopPropagation()" onchange="if(this.value)floorSetBay('${o.id}',this.value)"><option value="">Assign bay…</option>
+      ${bays.map(b => `<option value="${esc(b)}">${esc(b)}${bayOccupants(b).length ? " (occupied)" : ""}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table></div>` : ""}
+  <p class="muted" style="font-size:12px">Bays are set up in Settings. A bay already holding a vehicle asks before a second one goes in.</p>`;
+}
+function bayNoteDialog(orderId){
+  const {o, inSheet} = floorTarget(orderId);
+  if (!o) return;
+  const t = prompt("Technician in this bay:", o.bayTech || "");
+  if (t == null) return;
+  const n = prompt("Bay note (optional):", o.bayNote || "");
+  if (n == null) return;
+  o.bayTech = t.trim(); o.bayNote = n.trim();
+  commitFloor(o, inSheet);
+}
+function techSelect(orderId, lineId, current){
+  return `<select class="sm" style="max-width:130px" onclick="event.stopPropagation()" onchange="floorAssign('${orderId}','${lineId}',this.value)">
+    <option value="">— unassigned —</option>${allTechs().map(t => `<option ${t === current ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
+}
+function dispatchTab(){
+  const techs = allTechs();
+  const rows = techs.map(t => techWorkload(t));
+  const max = Math.max(1, ...rows.map(r => r.ready + r.active + r.waiting));
+  const unassigned = [];
+  floorOrders().forEach(o => (o.labor || []).forEach(l => {
+    if (!l.tech && ["completed","closed"].indexOf(jobBucket(o, l)) < 0) unassigned.push({o, l});
+  }));
+  return `${workloadStrip(shopWorkload())}
+  ${techs.length ? "" : `<div class="card"><div class="empty">No technicians yet — add them in Settings, or type a name on a job.</div></div>`}
+  ${rows.map(r => `<div class="card">
+    <div class="toolbar" style="margin-bottom:6px"><h2 style="margin:0">${esc(r.tech)}</h2>
+      ${r.current ? `<span class="running">ON THE CLOCK — ${esc(r.current.ticket)} ${esc(r.current.vehicle)} · ${esc(r.current.job)}${r.current.bay ? " · " + esc(r.current.bay) : ""}</span>` : `<span class="muted">not on a job</span>`}
+      <div class="grow"></div><button class="sm" onclick="queueTech='${esc(r.tech).replace(/'/g, "")}';floorTab='queue';renderBoard()">Open queue</button></div>
+    <div class="balance"><div class="bar"><i class="b-ready" style="width:${r.ready / max * 100}%"></i><i class="b-active" style="width:${r.active / max * 100}%"></i><i class="b-wait" style="width:${r.waiting / max * 100}%"></i></div>
+      <span><b>${fmtHrs(r.ready)}</b> ready · <b>${fmtHrs(r.active)}</b> active · <b>${fmtHrs(r.waiting)}</b> waiting · <b>${fmtHrs(r.completedToday)}</b> completed today</span></div>
+    <div class="kline" style="margin:6px 0"><span>Assigned <b>${fmtHrs(r.assigned)}</b> sold hr</span><span>Completed <b>${fmtHrs(r.completed)}</b></span><span>Remaining <b>${fmtHrs(r.remaining)}</b></span>
+      <span>Waiting jobs <b>${r.jobsWaiting}</b></span><span>Waiting parts <b>${r.jobsParts}</b></span><span>Diagnostic <b>${r.jobsDiagnosis}</b></span><span>Awaiting QC <b>${r.jobsQC}</b></span></div>
+    ${r.jobs.length ? `<table><tbody>${r.jobs.map(({o, l, bucket}) => `<tr class="clk" onclick="editOrder('${o.id}')">
+      <td><b>${esc(ticketNo(o))}</b> ${esc(vehLabel(o.vehicleId))}<div class="muted" style="font-size:12px">${esc(l.desc)}</div></td>
+      <td>${stateChip(jobState(l))}${l.hold ? ` <span class="badge b-verify">${esc(l.hold.reason)}</span>` : ""}</td>
+      <td>${fmtHrs(soldHours(l))} hr</td><td>${esc(o.bay || "—")}</td>
+      <td class="right">${techSelect(o.id, l.id, l.tech)}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">Nothing assigned.</div>`}
+  </div>`).join("")}
+  <div class="card"><h2 style="margin-top:0">Unassigned jobs <span class="muted">${unassigned.length}</span></h2>
+    ${unassigned.length ? `<table><tbody>${unassigned.map(({o, l}) => `<tr class="clk" onclick="editOrder('${o.id}')">
+      <td><b>${esc(ticketNo(o))}</b> ${esc(vehLabel(o.vehicleId))}<div class="muted" style="font-size:12px">${esc(l.desc)}</div></td>
+      <td>${stateChip(jobState(l))}</td><td>${fmtHrs(soldHours(l))} hr</td><td>${psBadge(jobPartsState(o, l))}</td>
+      <td class="right">${techSelect(o.id, l.id, "")}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">Every open job has a technician.</div>`}</div>
+  <p class="muted" style="font-size:12px">Nothing here dispatches itself. It shows who has work and who needs it; the service writer decides.</p>`;
+}
+function queueGroups(tech){
+  const g = {NOW:[], NEXT:[], WAITING:[], COMPLETED:[]};
+  const pri = {Urgent:0, High:1, Normal:2};
+  floorOrders().forEach(o => (o.labor || []).forEach(l => {
+    if (l.tech !== tech) return;
+    const b = jobBucket(o, l), st = jobState(l);
+    const running = (db.timeSessions || []).some(s => !s.end && s.orderId === o.id && s.lineId === l.id && s.tech === tech);
+    if (b === "closed") return;
+    if (running || ((st === "In Progress" || st === "Diagnosing") && !l.hold)) g.NOW.push({o, l});
+    else if (b === "ready" || (st === "Paused" && !l.hold)) g.NEXT.push({o, l});
+    else if (b === "parts" || b === "approval" || b === "waiting") g.WAITING.push({o, l});
+    else if (b === "completed" || b === "qc") g.COMPLETED.push({o, l});
+    else g.NEXT.push({o, l});
+  }));
+  g.NEXT.sort((a, b) => (pri[a.o.priority || "Normal"] - pri[b.o.priority || "Normal"]) || (timeInShopMs(b.o) - timeInShopMs(a.o)));
+  return g;
+}
+function queueTab(){
+  const techs = allTechs();
+  if (!queueTech || techs.indexOf(queueTech) < 0) queueTech = techs[0] || "";
+  if (!queueTech) return `<div class="card"><div class="empty">No technicians yet.</div></div>`;
+  const g = queueGroups(queueTech);
+  return `<div class="tabs">${techs.map(t => `<button class="${t === queueTech ? "on" : ""}" onclick="queueTech='${esc(t).replace(/'/g, "")}';renderBoard()">${esc(t)}</button>`).join("")}</div>
+  ${["NOW","NEXT","WAITING","COMPLETED"].map(k => `<div class="card qsec q-${k}"><h2 style="margin-top:0">${k} <span class="muted">${g[k].length}</span></h2>
+    ${g[k].map(({o, l}) => queueCard(o, l)).join("") || `<div class="muted">—</div>`}</div>`).join("")}`;
+}
+function queueCard(o, l){
+  const parts = jobParts(o, l);
+  const refs = l.refs || {};
+  const refCount = ["procedure","spec","torque","wiring"].filter(k => String(refs[k] || "").trim()).length;
+  return `<div class="qcard">
+    <div class="toolbar" style="margin:0"><b style="font-size:15px">${esc(vehLabel(o.vehicleId))}</b><span class="muted">${esc(ticketNo(o))}${o.bay ? " · " + esc(o.bay) : ""}</span>
+      ${o.priority && o.priority !== "Normal" ? `<span class="badge b-verify">${esc(o.priority.toUpperCase())}</span>` : ""}
+      <div class="grow"></div>${stateChip(jobState(l))}</div>
+    <div class="qjob">${esc(l.desc || "job")}</div>
+    ${o.complaint ? `<div><span class="muted">Concern:</span> ${esc(o.complaint)}</div>` : ""}
+    ${l.finding ? `<div><span class="muted">Inspection finding:</span> ${esc(l.finding)}</div>` : ""}
+    ${l.hold ? `<div class="badge b-verify">ON HOLD — ${esc(l.hold.reason)}${l.hold.note ? ": " + esc(l.hold.note) : ""}</div>` : ""}
+    <div class="kline">${clockLine(o, l)}${psBadge(jobPartsState(o, l))}</div>
+    ${parts.length ? `<div class="muted" style="font-size:12px">${parts.map(x => esc(x.desc) + " — " + esc(partReady(x) ? "ready" : partState(x))).join(" · ")}</div>` : ""}
+    <div class="muted" style="font-size:12px">${refCount ? refCount + " reference" + (refCount === 1 ? "" : "s") + " entered (manual — not OEM data)" : "No procedure reference entered"}${refs.techNote ? " · Note: " + esc(refs.techNote) : ""}</div>
+    <div class="qbtns">${jobControls(o, l)}<button class="sm" onclick="editOrder('${o.id}')">Open RO</button></div>
+  </div>`;
+}
+function productionTab(){
+  if (!prodFrom) prodFrom = todayStr();
+  if (!prodTo) prodTo = todayStr();
+  const m = shopMetrics(prodFrom, prodTo);
+  const techs = allTechs().map(t => techProduction(t, prodFrom, prodTo));
+  const today = dailyProduction(todayStr());
+  const w = today.workload;
+  return `<div class="card"><div class="toolbar" style="margin:0">
+    <label style="margin:0">From</label><input type="date" id="pf" value="${esc(prodFrom)}" style="max-width:160px">
+    <label style="margin:0">To</label><input type="date" id="pt" value="${esc(prodTo)}" style="max-width:160px">
+    <button class="sm" onclick="prodFrom=$('#pf').value;prodTo=$('#pt').value;renderBoard()">Show</button>
+    <button class="sm" onclick="prodFrom=todayStr();prodTo=todayStr();renderBoard()">Today</button></div></div>
+  <div class="wstrip">
+    <div class="wcell h"><b>${fmtHrs(m.sold)}</b><span>sold hours completed</span></div>
+    <div class="wcell h"><b>${fmtHrs(m.clock)}</b><span>actual job hours</span></div>
+    <div class="wcell"><b>${m.efficiency == null ? "—" : m.efficiency + "%"}</b><span>efficiency</span></div>
+    <div class="wcell"><b>${m.jobsCompleted}</b><span>jobs completed</span></div>
+    <div class="wcell"><b>${m.vehicles}</b><span>vehicles in</span></div>
+    <div class="wcell"><b>${m.avgDaysInShop == null ? "—" : m.avgDaysInShop + "d"}</b><span>avg time in shop</span></div>
+    <div class="wcell"><b>${m.waitingParts}</b><span>jobs waiting parts</span></div>
+    <div class="wcell"><b>${m.waitingApproval}</b><span>jobs waiting approval</span></div>
+    <div class="wcell"><b>${m.comebacks}</b><span>comebacks</span></div>
+    <div class="wcell"><b>${m.qcFailures}</b><span>QC failures</span></div></div>
+  <div class="card"><h2 style="margin-top:0">Technician production</h2>
+    <table><thead><tr><th>Technician</th><th class="right">Jobs completed</th><th class="right">Sold hours</th><th class="right">Actual hours</th><th class="right">Avg actual / job</th><th class="right">Efficiency</th></tr></thead><tbody>
+    ${techs.map(t => `<tr><td><b>${esc(t.tech)}</b></td><td class="right">${t.jobsCompleted}</td><td class="right">${fmtHrs(t.sold)}</td><td class="right">${fmtHrs(t.clock)}</td>
+      <td class="right">${t.avgClock == null ? "—" : fmtHrs(t.avgClock)}</td><td class="right"><b>${t.efficiency == null ? "—" : t.efficiency + "%"}</b></td></tr>`).join("")}
+    </tbody></table>
+    <p class="muted" style="font-size:12px;margin-bottom:0"><b>Sold hours</b> are the labor hours on the ticket for jobs finished in this period.
+    <b>Actual hours</b> are the time sessions the technician ran on those same jobs — started, paused, resumed and completed on the job, never shop-open time.
+    <b>Efficiency</b> = sold hours completed ÷ actual hours. Over 100% means the jobs took less time than was sold.</p></div>
+  <div class="card"><h2 style="margin-top:0">Today</h2>
+    <div class="prodsum">
+      <div>Vehicles in shop: <b>${w.vehicles}</b></div><div>Ready jobs: <b>${w.jobsReady}</b></div><div>In progress: <b>${w.jobsInProgress}</b></div>
+      <div>Waiting parts: <b>${w.columns["WAITING ON PARTS"]}</b> vehicles</div><div>Waiting approval: <b>${w.columns["AWAITING APPROVAL"]}</b> vehicles</div>
+      <div>QC: <b>${w.columns["QUALITY CONTROL"]}</b></div><div>Ready for pickup: <b>${w.columns["READY FOR PICKUP"]}</b></div>
+      <div>Sold hours ready: <b>${fmtHrs(w.soldReady)}</b></div><div>Sold hours in progress: <b>${fmtHrs(w.soldInProgress)}</b></div>
+      <div>Sold hours completed: <b>${fmtHrs(w.soldCompletedToday)}</b></div></div>
+    ${today.techs.map(t => `<div class="prodtech">Tech ${esc(t.tech)}: <b>${fmtHrs(t.sold)}</b> sold / <b>${fmtHrs(t.clock)}</b> clock
+      <span class="muted">(${fmtHrs(t.clockAllJobs)} on the clock today across all jobs)</span></div>`).join("") || `<div class="muted">No technician time recorded today.</div>`}
+  </div>`;
+}
+
+/* ---------- on the ticket: the floor ---------- */
+function floorPanel(o){
+  const col = (o.customerId && (o.labor || []).length) || o.bay || (o.checkin && o.checkin.at) ? boardColumn(o) : "";
+  const bays = db.settings.bays || [];
+  const rep = o.vehicleId ? repeatedConcerns(o.vehicleId) : [];
+  const cb = comebackFor(o);
+  const qcWaiting = (o.labor || []).filter(l => jobState(l) === "QC Required").length;
+  return `<div class="card floorbox" style="margin-top:12px">
+    <div class="toolbar" style="margin-bottom:6px"><b>On the floor</b>${col ? `<span class="pill st-InProgress">${esc(col)}</span>` : ""}
+      ${o.checkin && o.checkin.at ? `<span class="muted">in shop ${fmtDuration(timeInShopMs(o))}</span>` : ""}
+      ${o.deliveredAt ? `<span class="badge b-vehicle">DELIVERED ${esc(String(o.deliveredAt).slice(0, 10))}</span>` : ""}</div>
+    <div class="row">
+      <div><label>Bay</label><select id="fl_bay" onchange="floorSetBay('${o.id}',this.value)"><option value="">— no bay —</option>
+        ${bays.map(b => { const occ = bayOccupants(b).filter(x => x.id !== o.id); return `<option value="${esc(b)}" ${o.bay === b ? "selected" : ""}>${esc(b)}${occ.length ? " — occupied" : ""}</option>`; }).join("")}</select></div>
+      <div><label>Priority</label><select id="fl_pri" onchange="floorSetOrderField('${o.id}','priority',this.value)">${PRIORITIES.map(p => `<option ${(o.priority || "Normal") === p ? "selected" : ""}>${p}</option>`).join("")}</select></div>
+      <div><label>Bay technician / note</label><div class="muted" style="padding-top:8px">${esc(o.bayTech || "—")}${o.bayNote ? " · " + esc(o.bayNote) : ""} ${o.bay ? `<button class="sm" onclick="bayNoteDialog('${o.id}')">Edit</button>` : ""}</div></div>
+    </div>
+    <div class="toolbar" style="margin:10px 0 0">
+      <button class="sm" onclick="openRoadTest('${o.id}','Pre-Repair')">Pre-repair road test</button>
+      <button class="sm" onclick="openRoadTest('${o.id}','Post-Repair')">Post-repair road test</button>
+      <button class="sm ${qcWaiting ? "primary" : ""}" onclick="openQC('${o.id}','')">Quality control${qcWaiting ? " (" + qcWaiting + " waiting)" : ""}</button>
+      ${cb ? "" : `<button class="sm" onclick="openComeback('${o.id}')">Flag comeback / recheck</button>`}
+      ${boardColumn(o) === "READY FOR PICKUP" && !o.deliveredAt ? `<button class="sm green" onclick="floorDeliver('${o.id}')">Mark delivered</button>` : ""}
+    </div>
+    ${rep.length ? repeatedConcernBox(rep) : ""}
+    ${cb ? comebackBox(cb) : ""}
+    ${qcRoadList(o)}
+  </div>`;
+}
+function repeatedConcernBox(rep){
+  return `<div class="authbox wait"><b>REPEATED CONCERN</b>
+    <div class="authline">This vehicle has been in more than once for something similar. The history is listed here; whether the cause is the same is for the technician to decide.</div>
+    ${rep.map(r => `<div style="margin-top:6px"><b>${esc(r.topic)}</b>
+      ${r.visits.map(v => `<div class="authline">• ${esc(v.mileage ? Number(numOrNull(v.mileage)).toLocaleString() + " mi" : "mileage not recorded")} · ${esc(v.date || "")} · ${esc(v.ticket)} — ${esc(String(v.text).slice(0, 90))}</div>`).join("")}</div>`).join("")}</div>`;
+}
+function qcRoadList(o){
+  const qcs = qcFor(o), rts = roadTestsFor(o);
+  if (!qcs.length && !rts.length) return "";
+  return `<table style="margin-top:10px"><thead><tr><th>When</th><th>Record</th><th>By</th><th>Result / detail</th></tr></thead><tbody>
+    ${qcs.map(q => ({at:q.at, html:`<tr><td class="muted">${esc(String(q.at).slice(0, 16).replace("T", " "))}</td><td><b>QC</b> ${q.lineIds.map(id => esc((findLine(o, id) || {}).desc || "")).join(", ")}</td><td>${esc(q.by)}</td>
+      <td><span class="psb ${q.result === "Pass" ? "ps-ok" : "ps-wait"}">${q.result === "Pass" ? "PASSED" : "FAILED"}</span> ${esc((q.failedItems || []).join(", "))}${q.returnTo ? " → back to " + esc(q.returnTo) : ""}${q.roadTestResult ? " · road test: " + esc(q.roadTestResult) : ""}${q.notes ? " · " + esc(q.notes) : ""}</td></tr>`}))
+      .concat(rts.map(r => ({at:r.at, html:`<tr><td class="muted">${esc(String(r.at).slice(0, 16).replace("T", " "))}</td><td><b>${esc(r.kind)} road test</b></td><td>${esc(r.tech)}</td>
+      <td>${esc([r.mileageStart && r.mileageEnd ? r.mileageStart + "→" + r.mileageEnd + " mi" : "", r.symptoms, r.steering && "steering " + r.steering, r.braking && "braking " + r.braking, r.vibration && "vibration " + r.vibration, r.noise && "noise " + r.noise, r.powertrain && "powertrain " + r.powertrain, r.warningLights && "lights " + r.warningLights, r.result, r.notes].filter(Boolean).join(" · "))}</td></tr>`})))
+      .sort((a, b) => String(a.at).localeCompare(String(b.at))).map(x => x.html).join("")}
+  </tbody></table>`;
+}
+
+/* ---------- quality control sheet ---------- */
+let qcDraft = null;
+function openQC(orderId, lineId){
+  const {o} = floorTarget(orderId);
+  if (!o) return;
+  const jobs = (o.labor || []).filter(l => l.desc);
+  if (!jobs.length){ alert("There are no jobs on this ticket to check."); return; }
+  const pre = jobs.filter(l => jobState(l) === "QC Required" || l.id === lineId).map(l => l.id);
+  qcDraft = {orderId, lines:pre.length ? pre : [], states:{}, notes:{}, extra:[]};
+  drawQC();
+  $("#recOverlay").classList.add("on");
+}
+function drawQC(){
+  const {o} = floorTarget(qcDraft.orderId);
+  const jobs = (o.labor || []).filter(l => l.desc);
+  const sel = jobs.filter(l => qcDraft.lines.indexOf(l.id) >= 0);
+  const items = QC_ITEMS.concat(...sel.map(l => (l.qcExtra || []).map((t, ii) => ({key:"j" + l.id + "_" + ii, label:t, custom:true}))))
+    .concat(qcDraft.extra.map((t, i) => ({key:"d" + i, label:t, custom:true})));
+  const torqueGaps = sel.filter(l => torqueJob(l) && !(l.torque || []).some(t => t.confirmed));
+  const posts = roadTestsFor(o).filter(r => r.kind === "Post-Repair");
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>Quality control — ${esc(ticketNo(o))}</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <div class="muted">${esc(vehLabel(o.vehicleId))}</div>
+    <label>Jobs being checked</label>
+    <div class="flags">${jobs.map(l => `<button class="flag ${qcDraft.lines.indexOf(l.id) >= 0 ? "on" : ""}" onclick="qcToggleLine('${l.id}')">${esc(l.desc)} · ${esc(jobState(l))}</button>`).join("")}</div>
+    ${torqueGaps.length ? `<div class="verifynote">No confirmed wheel torque is recorded on: ${esc(torqueGaps.map(l => l.desc).join("; "))}. Record it on the job before passing “Wheels torqued”, or mark it N/A if it does not apply.</div>` : ""}
+    <div class="toolbar" style="margin:10px 0 4px"><b>Checklist</b><div class="grow"></div><button class="sm" onclick="qcAll('Pass')">Everything passes</button></div>
+    ${items.map(it => { const s = qcDraft.states[it.key] || ""; return `<div class="qcrow">
+      <div class="qclabel">${esc(it.label)}${it.custom ? ` <span class="badge b-manual">CUSTOM</span>` : ""}</div>
+      <div class="sbtns">${["Pass","Fail","N/A"].map(v => `<button class="sbtn ${s === v ? "on " + (v === "Pass" ? "is-good" : v === "Fail" ? "is-att" : "is-na") : ""}" data-qckey="${esc(it.key)}" onclick="qcSet('${esc(it.key).replace(/'/g, "")}','${v}')">${v === "Pass" ? "PASS" : v === "Fail" ? "FAIL" : "N/A"}</button>`).join("")}</div>
+      ${s === "Fail" ? `<input placeholder="what failed" value="${esc(qcDraft.notes[it.key] || "")}" onchange="qcDraft.notes['${esc(it.key).replace(/'/g, "")}']=this.value" style="margin-top:4px">` : ""}
+    </div>`; }).join("")}
+    <div style="display:flex;gap:6px;margin-top:6px"><input id="qc_extra" placeholder="Add a check for this job (e.g. DCT adaptation run)"><button class="sm" onclick="qcAddExtra()">Add</button></div>
+    <div class="row">
+      <div><label>QC performed by</label><input id="qc_by" value="${esc(qcDraft.by || db.settings.lastTech || "")}" list="techlist"></div>
+      <div><label>Road test</label><select id="qc_rt"><option value="">— none —</option>${posts.map(r => `<option value="${r.id}" ${qcDraft.roadTestId === r.id ? "selected" : ""}>${esc(r.kind)} · ${esc(String(r.at).slice(11, 16))} · ${esc(r.tech)}</option>`).join("")}</select></div>
+      <div><label>Road-test result</label><select id="qc_rtres">${["","Pass","Fail","Not road tested"].map(v => `<option ${qcDraft.roadTestResult === v ? "selected" : ""} value="${v}">${v || "—"}</option>`).join("")}</select></div>
+    </div>
+    <label>If anything fails, send the job back to</label>
+    <div class="flags">${["In Progress","Diagnosing"].map(v => `<button class="flag ${(qcDraft.returnTo || "In Progress") === v ? "on" : ""}" onclick="qcDraft.returnTo='${v}';qcKeep();drawQC()">${v === "Diagnosing" ? "Diagnosis" : v}</button>`).join("")}</div>
+    <label>Notes</label><input id="qc_notes" value="${esc(qcDraft.qcNotes || "")}">
+    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveQC()">Record QC</button><button onclick="qcKeep();qcDraft.roadFromQC=true;openRoadTest('${o.id}','Post-Repair')">Record a road test first</button></div>`;
+}
+function qcKeep(){
+  const g = id => { const el = $("#" + id); return el ? el.value : undefined; };
+  if (g("qc_by") !== undefined) qcDraft.by = g("qc_by");
+  if (g("qc_rt") !== undefined) qcDraft.roadTestId = g("qc_rt");
+  if (g("qc_rtres") !== undefined) qcDraft.roadTestResult = g("qc_rtres");
+  if (g("qc_notes") !== undefined) qcDraft.qcNotes = g("qc_notes");
+}
+function qcToggleLine(id){ qcKeep(); const i = qcDraft.lines.indexOf(id); if (i >= 0) qcDraft.lines.splice(i, 1); else qcDraft.lines.push(id); drawQC(); }
+function qcSet(key, v){ qcKeep(); qcDraft.states[key] = qcDraft.states[key] === v ? "" : v; drawQC(); }
+function qcAll(v){
+  qcKeep();
+  document.querySelectorAll("#recSheet [data-qckey]").forEach(b => { const k = b.dataset.qckey; if (!qcDraft.states[k]) qcDraft.states[k] = v; });
+  drawQC();
+}
+function qcAddExtra(){ qcKeep(); const t = $("#qc_extra").value.trim(); if (t) qcDraft.extra.push(t); drawQC(); }
+function saveQC(){
+  qcKeep();
+  const {o, inSheet} = floorTarget(qcDraft.orderId);
+  if (!o) return;
+  if (!qcDraft.lines.length){ alert("Pick the job or jobs this QC covers."); return; }
+  if (!String(qcDraft.by || "").trim()){ alert("Who performed the QC?"); return; }
+  const items = [];
+  document.querySelectorAll("#recSheet .qcrow").forEach(row => {
+    const b = row.querySelector("[data-qckey]"); if (!b) return;
+    const key = b.dataset.qckey;
+    items.push({key, label:row.querySelector(".qclabel").childNodes[0].textContent.trim(), state:qcDraft.states[key] || "", note:qcDraft.notes[key] || ""});
+  });
+  const unanswered = items.filter(i => !i.state).length;
+  if (unanswered && !confirm(unanswered + " checklist item(s) have no answer.\n\nRecord the QC anyway?")) return;
+  /* checks added during this QC belong to the job from now on */
+  if (qcDraft.extra.length) qcDraft.lines.forEach(id => { const l = findLine(o, id); if (l) l.qcExtra = Array.from(new Set((l.qcExtra || []).concat(qcDraft.extra))); });
+  const rec = recordQC(o, {lineIds:qcDraft.lines, by:qcDraft.by.trim(), items, notes:qcDraft.qcNotes || "",
+    roadTestId:qcDraft.roadTestId || "", roadTestResult:qcDraft.roadTestResult || "", returnTo:qcDraft.returnTo || "In Progress"});
+  db.settings.lastTech = qcDraft.by.trim();
+  qcDraft = null;
+  closeRec();
+  commitFloor(o, inSheet);
+  if (rec.result === "Fail") alert("QC failed: " + (rec.failedItems.join(", ") || "see notes") + ".\n\nThe job has gone back to " + rec.returnTo + ". Its history keeps this record.");
+}
+
+/* ---------- road test sheet ---------- */
+function openRoadTest(orderId, kind){
+  const {o} = floorTarget(orderId);
+  if (!o) return;
+  const f = (id, label, ph) => `<div><label>${label}</label><input id="rt_${id}" placeholder="${ph || ""}"></div>`;
+  const obs = ["","Normal","Concern noted","Not checked"];
+  const s = (id, label) => `<div><label>${label}</label><select id="rt_${id}">${obs.map(v => `<option value="${v}">${v || "—"}</option>`).join("")}</select></div>`;
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>${esc(kind)} road test</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <div class="muted">${esc(ticketNo(o))} · ${esc(vehLabel(o.vehicleId))}</div>
+    <div class="row">
+      <div><label>Type</label><select id="rt_kind">${ROAD_KINDS.map(k => `<option ${k === kind ? "selected" : ""}>${k}</option>`).join("")}</select></div>
+      <div><label>Technician</label><input id="rt_tech" value="${esc(db.settings.lastTech || "")}" list="techlist"></div>
+      ${f("mileageStart", "Mileage start")}${f("mileageEnd", "Mileage end")}
+    </div>
+    <label>Symptoms observed</label><input id="rt_symptoms">
+    <div class="row">${s("steering", "Steering")}${s("braking", "Braking")}${s("vibration", "Vibration")}${s("noise", "Noise")}${s("powertrain", "Powertrain")}${s("warningLights", "Warning lights")}</div>
+    <div class="row"><div><label>Result</label><select id="rt_result">${["","Concern verified","Concern not reproduced","Repair verified","Concern remains"].map(v => `<option value="${v}">${v || "—"}</option>`).join("")}</select></div></div>
+    <label>Notes</label><input id="rt_notes">
+    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveRoadTest('${o.id}')">Record road test</button></div>`;
+  $("#rt_mileageStart").value = o.mileageIn || "";
+  $("#recOverlay").classList.add("on");
+}
+function saveRoadTest(orderId){
+  const {o, inSheet} = floorTarget(orderId);
+  if (!o) return;
+  const g = k => ($("#rt_" + k) || {}).value || "";
+  if (!g("tech").trim()){ alert("Which technician drove it?"); return; }
+  const fields = {};
+  ["kind","tech","mileageStart","mileageEnd","symptoms","steering","braking","vibration","noise","powertrain","warningLights","result","notes"].forEach(k => fields[k] = g(k).trim());
+  const rt = recordRoadTest(o, fields);
+  db.settings.lastTech = fields.tech;
+  /* Only go back to a QC sheet if this road test was started from one. */
+  const backToQC = !!(qcDraft && qcDraft.roadFromQC && qcDraft.orderId === orderId);
+  if (backToQC){ qcDraft.roadFromQC = false; if (fields.kind === "Post-Repair") qcDraft.roadTestId = rt.id; }
+  if (!db.orders[o.id] && inSheet){ commitFloor(o, inSheet); }
+  save();
+  if (backToQC){ drawQC(); return; }
+  closeRec();
+  if (inSheet) drawWO(); else render();
+}
+
+/* ---------- diagnosis on the ticket ---------- */
+function diagPanel(o){
+  const d = diagFor(o, false);
+  if (!d) return `<div class="card" style="margin-top:12px"><div class="toolbar" style="margin:0"><b>Diagnosis</b><span class="muted">not started</span><div class="grow"></div>
+    <button class="sm primary" onclick="startDiag('${o.id}')">Start diagnosis record</button></div></div>`;
+  const ta = (k, label, ph) => `<div><label>${label}</label><textarea onchange="dxSet('${d.id}','${k}',this.value)" placeholder="${ph || ""}">${esc(d[k] || "")}</textarea></div>`;
+  return `<details class="card dxbox" style="margin-top:12px" open><summary style="cursor:pointer;font-weight:700">Diagnosis
+      ${diagnosed(d) ? `<span class="badge b-vehicle">ROOT CAUSE RECORDED</span>` : `<span class="badge b-override">NO ROOT CAUSE YET</span>`}
+      <span class="muted" style="font-weight:400">${d.dtcs.length} code${d.dtcs.length === 1 ? "" : "s"} · ${d.measurements.length} measurement${d.measurements.length === 1 ? "" : "s"}</span></summary>
+    <div class="row">${ta("concern", "Customer concern")}
+      <div><label>Symptom verified</label><select onchange="dxSet('${d.id}','symptomVerified',this.value)">${["","Yes","No","Intermittent — not reproduced"].map(v => `<option value="${v}" ${d.symptomVerified === v ? "selected" : ""}>${v || "—"}</option>`).join("")}</select>
+        <label>Technician</label><input value="${esc(d.tech || "")}" list="techlist" onchange="dxSet('${d.id}','tech',this.value)"></div></div>
+    <div class="row">${ta("observations", "Initial observations")}${ta("tests", "Tests performed")}</div>
+    <h3 style="margin:12px 0 4px">Measurements</h3>
+    ${d.measurements.length ? `<table><thead><tr><th>Measurement</th><th>Value</th><th>Expected</th><th>Spec source</th><th>Tech</th><th>When</th></tr></thead><tbody>
+      ${d.measurements.map(m => `<tr><td><b>${esc(m.type)}</b>${m.label ? " — " + esc(m.label) : ""}${m.note ? `<div class="muted" style="font-size:11.5px">${esc(m.note)}</div>` : ""}</td>
+        <td><b>${esc(m.value)}</b> ${esc(m.unit)}</td><td>${esc(m.spec || "—")}</td><td class="muted">${esc(m.spec ? m.specSource : "no spec entered")}</td><td>${esc(m.tech)}</td><td class="muted">${esc(String(m.at).slice(11, 16))}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">None recorded.</div>`}
+    <button class="sm" style="margin-top:6px" onclick="openMeasurement('${o.id}')">+ Measurement</button>
+    <h3 style="margin:12px 0 4px">Trouble codes</h3>
+    ${d.dtcs.length ? `<table><thead><tr><th>Code</th><th>Module</th><th>Description</th><th>Status</th><th>Phase</th><th>Freeze frame</th></tr></thead><tbody>
+      ${d.dtcs.map(c => `<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.module || "—")}</td><td>${esc(c.description || "—")}</td><td>${esc(c.status)}</td><td>${esc(c.phase)}</td><td class="muted">${esc(c.freezeFrame || "")}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">None recorded.</div>`}
+    <button class="sm" style="margin-top:6px" onclick="openDTC('${o.id}')">+ Trouble code</button>
+    <div class="muted" style="font-size:11.5px;margin-top:4px">A code is a clue, not a diagnosis. Descriptions are whatever the technician enters from the scan tool.</div>
+    <div class="row" style="margin-top:6px">${ta("rootCause", "Root cause", "what is actually wrong, and how you know")}${ta("recommendedRepair", "Recommended repair")}</div>
+    <div class="toolbar" style="margin:6px 0 0">${String(d.recommendedRepair || "").trim() ? `<button class="sm primary" onclick="dxRecommend('${d.id}')">Add recommended repair to the estimate</button>` : ""}</div>
+    ${ta("postVerification", "Post-repair verification")}
+    ${photoStrip("diag", d.id)}
+  </details>`;
+}
+function startDiag(orderId){
+  const {o, inSheet} = floorTarget(orderId);
+  if (!o) return;
+  if (inSheet && !cur.customerId){ alert("Pick a customer for this ticket first."); return; }
+  diagFor(o, true);
+  commitFloor(o, inSheet);
+}
+function dxSet(id, k, v){
+  const d = db.diagnostics[id]; if (!d) return;
+  d[k] = v; d.updatedAt = floorNow();
+  save();
+  if (k === "recommendedRepair" || k === "rootCause"){ if (cur && $("#woOverlay").classList.contains("on")){ pullWO(); drawWO(); } }
+}
+function dxRecommend(id){
+  const d = db.diagnostics[id]; if (!d) return;
+  const {o, inSheet} = floorTarget(d.orderId);
+  if (!o) return;
+  const rec = addRecommendation({vehicleId:o.vehicleId, orderId:o.id, severity:"Needs Attention",
+    desc:String(d.recommendedRepair).trim(), reason:d.rootCause ? "Diagnosis: " + d.rootCause : "", mileage:o.mileageIn || ""});
+  d.recId = rec.id;
+  if (inSheet){ db.orders[cur.id] = JSON.parse(JSON.stringify(cur)); addRecToTicket(rec.id); }
+  else { recToOrder(o, rec); save(); render(); }
+}
+function openMeasurement(orderId){
+  const {o} = floorTarget(orderId);
+  if (!o) return;
+  const d = diagFor(o, false) || {tech:""};   /* the record is only created when something is saved */
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>Record a measurement</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <label>What was measured</label>
+    <div class="flags" id="msTypes">${MEAS_TYPES.map(([t, u], i) => `<button class="flag ${i === 0 ? "on" : ""}" data-type="${esc(t)}" data-unit="${esc(u)}" onclick="msPick(this)">${esc(t)}</button>`).join("")}</div>
+    <div class="row">
+      <div><label>Where / what (e.g. battery at rest, cyl 3)</label><input id="ms_label"></div>
+      <div><label>Value</label><input id="ms_value" inputmode="decimal"></div>
+      <div><label>Unit</label><input id="ms_unit" value="${esc(MEAS_TYPES[0][1])}"></div>
+    </div>
+    <div class="row">
+      <div><label>Expected specification (if known)</label><input id="ms_spec" placeholder="leave blank if unknown"></div>
+      <div><label>Source of that specification</label><input id="ms_src" placeholder="e.g. service manual page, scan tool, tech experience"></div>
+      <div><label>Technician</label><input id="ms_tech" value="${esc(d.tech || db.settings.lastTech || "")}" list="techlist"></div>
+    </div>
+    <label>Note</label><input id="ms_note">
+    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveMeasurement('${o.id}')">Record it</button></div>`;
+  $("#recOverlay").classList.add("on");
+}
+function msPick(btn){ btn.parentElement.querySelectorAll(".flag").forEach(b => b.classList.remove("on")); btn.classList.add("on"); $("#ms_unit").value = btn.dataset.unit; }
+function saveMeasurement(orderId){
+  const {o, inSheet} = floorTarget(orderId);
+  const d = o && diagFor(o, true); if (!d) return;
+  const type = ($("#msTypes .flag.on") || {dataset:{type:"Custom"}}).dataset.type;
+  const value = $("#ms_value").value.trim();
+  if (!value){ alert("Enter the value you measured."); return; }
+  addMeasurement(d, {type, label:$("#ms_label").value.trim(), value, unit:$("#ms_unit").value.trim(),
+    spec:$("#ms_spec").value.trim(), specSource:$("#ms_src").value.trim(), tech:$("#ms_tech").value.trim(), note:$("#ms_note").value.trim()});
+  if (!db.orders[o.id] && inSheet) commitFloor(o, inSheet);
+  save(); closeRec();
+  if (inSheet) drawWO(); else render();
+}
+function openDTC(orderId){
+  const {o} = floorTarget(orderId);
+  if (!o) return;
+  const d = diagFor(o, false) || {tech:""};   /* the record is only created when something is saved */
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>Record a trouble code</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <div class="row">
+      <div><label>Code</label><input id="dtc_code" placeholder="P0171" style="text-transform:uppercase"></div>
+      <div><label>Module</label><input id="dtc_module" placeholder="DME / ECM / ABS…"></div>
+      <div><label>Status</label><select id="dtc_status">${DTC_STATUSES.map(s => `<option>${s}</option>`).join("")}</select></div>
+      <div><label>Recorded</label><select id="dtc_phase">${DTC_PHASES.map(s => `<option>${s}</option>`).join("")}</select></div>
+    </div>
+    <label>Description — as shown by the scan tool</label><input id="dtc_desc" placeholder="leave blank rather than guess">
+    <label>Freeze-frame note</label><input id="dtc_ff">
+    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveDTC('${o.id}')">Record code</button></div>`;
+  $("#recOverlay").classList.add("on");
+}
+function saveDTC(orderId){
+  const {o, inSheet} = floorTarget(orderId);
+  const d = o && diagFor(o, true); if (!d) return;
+  const code = $("#dtc_code").value.trim();
+  if (!code){ alert("Enter the code."); return; }
+  addDTC(d, {code, module:$("#dtc_module").value.trim(), status:$("#dtc_status").value, phase:$("#dtc_phase").value,
+    description:$("#dtc_desc").value.trim(), freezeFrame:$("#dtc_ff").value.trim(), tech:d.tech || db.settings.lastTech || ""});
+  if (!db.orders[o.id] && inSheet) commitFloor(o, inSheet);
+  save(); closeRec();
+  if (inSheet) drawWO(); else render();
+}
+
+/* ---------- comeback / recheck ---------- */
+let cbDraft = null;
+function openComeback(orderId){
+  const {o} = floorTarget(orderId);
+  if (!o) return;
+  if (!o.vehicleId){ alert("Pick the vehicle first."); return; }
+  const prior = vals(db.orders).filter(x => x.vehicleId === o.vehicleId && x.id !== o.id && !isDead(x)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  if (!prior.length){ alert("This vehicle has no earlier visit to link to."); return; }
+  cbDraft = {orderId, priorOrderId:prior[0].id, priorLineId:"", priorPartLineId:""};
+  drawComeback();
+  $("#recOverlay").classList.add("on");
+}
+function drawComeback(){
+  const {o} = floorTarget(cbDraft.orderId);
+  const prior = vals(db.orders).filter(x => x.vehicleId === o.vehicleId && x.id !== o.id && !isDead(x)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const p = db.orders[cbDraft.priorOrderId] || prior[0];
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>Comeback / recheck</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <div class="muted">Linking this visit to earlier work records the history. It does not decide whose fault anything was.</div>
+    <label>Earlier visit</label><select id="cb_order" onchange="cbDraft.priorOrderId=this.value;cbDraft.priorLineId='';cbDraft.priorPartLineId='';drawComeback()">
+      ${prior.map(x => `<option value="${x.id}" ${x.id === p.id ? "selected" : ""}>${esc(ticketNo(x))} · ${esc(x.date || "")} · ${esc(x.mileageOut || x.mileageIn || "?")} mi · ${esc(String(x.complaint || (x.labor || []).map(l => l.desc).join(", ")).slice(0, 60))}</option>`).join("")}</select>
+    <div class="row">
+      <div><label>Earlier job</label><select id="cb_line"><option value="">— not tied to one job —</option>${(p.labor || []).filter(l => l.desc).map(l => `<option value="${l.id}" ${cbDraft.priorLineId === l.id ? "selected" : ""}>${esc(l.desc)}${l.tech ? " · " + esc(l.tech) : ""}</option>`).join("")}</select></div>
+      <div><label>Earlier part</label><select id="cb_part"><option value="">— none —</option>${(p.parts || []).filter(x => x.desc).map(x => `<option value="${x.id}" ${cbDraft.priorPartLineId === x.id ? "selected" : ""}>${esc(x.desc)}${x.partNo ? " · " + esc(x.partNo) : ""}</option>`).join("")}</select></div>
+    </div>
+    <div class="row">
+      <div><label>Same concern?</label><select id="cb_same">${["Unknown","Yes","No"].map(v => `<option>${v}</option>`).join("")}</select></div>
+      <div><label>Finding so far</label><select id="cb_finding">${COMEBACK_FINDINGS.map(v => `<option>${v}</option>`).join("")}</select></div>
+      <div><label>Current mileage</label><input id="cb_miles" value="${esc(o.mileageIn || "")}"></div>
+    </div>
+    <label>Notes</label><input id="cb_notes">
+    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveComeback()">Link to earlier work</button></div>`;
+}
+function saveComeback(){
+  const {o, inSheet} = floorTarget(cbDraft.orderId);
+  if (!o) return;
+  if (inSheet && !cur.customerId){ alert("Pick a customer for this ticket first."); return; }
+  flagComeback(o, {priorOrderId:$("#cb_order").value, priorLineId:$("#cb_line").value, priorPartLineId:$("#cb_part").value,
+    sameConcern:$("#cb_same").value, finding:$("#cb_finding").value, currentMileage:$("#cb_miles").value.trim(),
+    notes:$("#cb_notes").value.trim(), by:db.settings.lastTech || ""});
+  closeRec();
+  commitFloor(o, inSheet);
+}
+function comebackBox(c){
+  const sel = (k, list) => `<select onchange="cbSet('${c.id}','${k}',this.value)">${list.map(v => `<option ${c[k] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>`;
+  const inp = (k, ph) => `<input value="${esc(c[k] || "")}" placeholder="${ph || ""}" onchange="cbSet('${c.id}','${k}',this.value)">`;
+  const prior = db.orders[c.priorOrderId];
+  const ms = milesSince(c);
+  return `<div class="authbox wait"><b>COMEBACK / RECHECK</b>
+    <div class="authline">Linked to <b>${prior ? `<span class="clk" onclick="openLinkedOrder('${prior.id}')">${esc(c.priorTicket)}</span>` : esc(c.priorTicket)}</b>
+      · ${esc(c.priorDate || "date not recorded")} · ${esc(c.priorMileage || "?")} mi${ms != null ? " · " + ms.toLocaleString() + " miles since" : ""}
+      ${c.priorJob ? " · job: " + esc(c.priorJob) + (c.priorTech ? " (" + esc(c.priorTech) + ")" : "") : ""}${c.priorPart ? " · part: " + esc(c.priorPart) : ""}</div>
+    <div class="row">
+      <div><label>Same concern?</label>${sel("sameConcern", ["Unknown","Yes","No"])}</div>
+      <div><label>Finding</label>${sel("finding", COMEBACK_FINDINGS)}</div>
+      <div><label>Shop warranty decision</label>${sel("warrantyDecision", WARRANTY_DECISIONS)}</div>
+    </div>
+    <div class="row"><div><label>Diagnostic outcome</label>${inp("diagnosticOutcome")}</div><div><label>Corrective action</label>${inp("correctiveAction")}</div></div>
+    <div class="row"><div><label>Supplier warranty claim (optional)</label>${inp("supplierClaim", "claim # / RMA")}</div><div><label>Current mileage</label>${inp("currentMileage")}</div><div><label>Notes</label>${inp("notes")}</div></div>
+  </div>`;
+}
+function cbSet(id, k, v){ const c = db.comebacks[id]; if (!c) return; c[k] = v; c.updatedAt = floorNow(); save(); }
+function openLinkedOrder(id){ if (cur){ pullWO(); if (db.orders[cur.id]) db.orders[cur.id] = JSON.parse(JSON.stringify(cur)); save(); closeWO(); } editOrder(id); }
+
+/* ---------- job references and torque ---------- */
+function openRefs(orderId, lineId){
+  const {o} = floorTarget(orderId);
+  const l = o && findLine(o, lineId); if (!l) return;
+  const r = l.refs || {};
+  const f = (k, label, ph) => `<label>${label}</label><input id="rf_${k}" value="${esc(r[k] || "")}" placeholder="${ph || ""}">`;
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>References — ${esc(l.desc || "job")}</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <div class="verifynote">These are references the shop types in — a manual page, a document number, a link. They are not OEM procedures and are never labelled as such. Licensed repair data is not connected.</div>
+    ${f("procedure", "Procedure reference")}${f("spec", "Specification reference")}${f("torque", "Torque reference")}${f("wiring", "Wiring reference")}
+    <label>Technician note</label><textarea id="rf_techNote">${esc(r.techNote || "")}</textarea>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="rf_qc" style="width:auto" ${qcNeeded(l) ? "checked" : ""}> This job goes through quality control when it is completed</label>
+    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveRefs('${o.id}','${l.id}')">Save</button></div>`;
+  $("#recOverlay").classList.add("on");
+}
+function saveRefs(orderId, lineId){
+  const {o, inSheet} = floorTarget(orderId);
+  const l = o && findLine(o, lineId); if (!l) return;
+  l.refs = {};
+  ["procedure","spec","torque","wiring","techNote"].forEach(k => l.refs[k] = $("#rf_" + k).value.trim());
+  l.qcRequired = $("#rf_qc").checked;
+  closeRec();
+  commitFloor(o, inSheet);
+}
+function openTorque(orderId, lineId){
+  const {o} = floorTarget(orderId);
+  const l = o && findLine(o, lineId); if (!l) return;
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>Wheel torque — ${esc(l.desc || "job")}</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    ${(l.torque || []).length ? `<table><thead><tr><th>Position</th><th>Specification</th><th>Source</th><th>Actual</th><th>Confirmed</th><th>Tech</th><th>When</th></tr></thead><tbody>
+      ${l.torque.map(t => `<tr><td>${esc(t.position)}</td><td>${t.specUnknown ? `<span class="badge b-verify">SPEC UNKNOWN / VERIFY</span>` : "<b>" + esc(t.spec) + "</b> " + esc(t.unit)}</td>
+        <td class="muted">${esc(t.specSource || "—")}</td><td>${esc(t.actual || "—")}</td><td>${t.confirmed ? "yes" : "no"}</td><td>${esc(t.tech)}</td><td class="muted">${esc(String(t.at).slice(0, 16).replace("T", " "))}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">Nothing recorded yet.</div>`}
+    <div class="verifynote">This program does not supply torque figures. Enter the specification from your service information, or leave it as SPEC UNKNOWN / VERIFY.</div>
+    <div class="row">
+      <div><label>Position</label><select id="tq_pos">${["All wheels","LF","RF","LR","RR","Front axle","Rear axle","Other"].map(p => `<option>${p}</option>`).join("")}</select></div>
+      <div><label>Specification</label><input id="tq_spec" inputmode="decimal" placeholder="blank = unknown"></div>
+      <div><label>Unit</label><select id="tq_unit"><option>ft-lb</option><option>N·m</option></select></div>
+      <div><label>Spec source</label><input id="tq_src" placeholder="where the figure came from"></div>
+    </div>
+    <div class="row">
+      <div><label>Actual torque applied</label><input id="tq_actual" inputmode="decimal"></div>
+      <div><label>Technician</label><input id="tq_tech" value="${esc(l.tech || db.settings.lastTech || "")}" list="techlist"></div>
+      <div><label>&nbsp;</label><label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="tq_ok" style="width:auto"> Torqued and confirmed</label></div>
+    </div>
+    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveTorque('${o.id}','${l.id}')">Record torque</button></div>`;
+  $("#recOverlay").classList.add("on");
+}
+function saveTorque(orderId, lineId){
+  const {o, inSheet} = floorTarget(orderId);
+  const l = o && findLine(o, lineId); if (!l) return;
+  const tech = $("#tq_tech").value.trim();
+  if (!tech){ alert("Which technician?"); return; }
+  const spec = $("#tq_spec").value.trim();
+  recordTorque(l, {position:$("#tq_pos").value, spec, unit:$("#tq_unit").value, specSource:spec ? $("#tq_src").value.trim() : "",
+    specUnknown:!spec, actual:$("#tq_actual").value.trim(), confirmed:$("#tq_ok").checked, tech});
+  closeRec();
+  commitFloor(o, inSheet);
+}
+
+/* ---------- the vehicle, technically ---------- */
+let vehHistQ = "";
+function vehicleTechPanels(vehicleId){
+  const rep = repeatedConcerns(vehicleId);
+  return `${rep.length ? `<div class="card" style="padding:0;border:none;background:none">${repeatedConcernBox(rep)}</div>` : ""}
+  ${maintenancePanel(vehicleId)}
+  ${installedPartsPanel(vehicleId)}
+  <div class="card"><div class="toolbar"><h2 style="margin:0">Technical timeline</h2><div class="grow"></div>
+    <input class="search" id="vhq" placeholder="Search history — job, part #, DTC, tech, mileage, date" value="${esc(vehHistQ)}" style="max-width:360px"></div>
+    <div id="vhtl">${timelineTable(vehicleId)}</div></div>`;
+}
+function wireVehicleTech(vehicleId){
+  const el = $("#vhq");
+  if (el) el.oninput = () => { vehHistQ = el.value; $("#vhtl").innerHTML = timelineTable(vehicleId); };
+}
+function timelineTable(vehicleId){
+  const q = vehHistQ.trim();
+  const list = q ? searchVehicleHistory(vehicleId, q) : vehicleTimeline(vehicleId);
+  if (!list.length) return `<div class="empty">${q ? "Nothing in this vehicle's history matches that." : "No history yet."}</div>`;
+  return `<table><thead><tr><th>Date</th><th>What</th><th>Detail</th><th>Mileage</th><th>Tech</th><th>RO</th></tr></thead><tbody>
+    ${list.slice(0, 300).map(e => `<tr class="${e.orderId ? "clk" : ""}" ${e.orderId ? `onclick="editOrder('${e.orderId}')"` : ""}>
+      <td class="muted" style="white-space:nowrap">${esc(dayOf(e.at))}</td><td><span class="tlk tl-${esc(e.kind.replace(/[^A-Za-z]/g, ""))}">${esc(e.kind)}</span> <b>${esc(e.title)}</b></td>
+      <td class="muted">${esc(String(e.detail).slice(0, 120))}</td><td>${esc(e.mileage || "")}</td><td>${esc(e.tech || "")}</td><td>${esc(e.ticket || "")}</td></tr>`).join("")}</tbody></table>`;
+}
+function installedPartsPanel(vehicleId){
+  const list = installedParts(vehicleId);
+  return `<details class="card" ${list.length ? "open" : ""}><summary style="cursor:pointer"><b style="font-size:17px">Installed parts</b> <span class="muted">${list.length}</span></summary>
+    ${list.length ? `<table><thead><tr><th>Part</th><th>Part #</th><th>Brand</th><th>Installed</th><th>Mileage</th><th>RO / job</th><th>Vendor</th><th>Core / warranty</th></tr></thead><tbody>
+    ${list.map(p => `<tr class="clk" onclick="editOrder('${p.orderId}')"><td><b>${esc(p.desc)}</b></td><td>${esc(p.partNo || "—")}</td><td>${esc(p.brand || "—")}</td><td>${esc(p.date)}</td><td>${esc(p.mileage || "—")}</td>
+      <td>${esc(p.ticket)}${p.job ? `<div class="muted" style="font-size:11.5px">${esc(p.job)}</div>` : ""}</td><td>${esc(p.vendor || "—")}</td><td class="muted">${esc([p.core, p.warranty].filter(Boolean).join(" · ") || "—")}</td></tr>`).join("")}</tbody></table>`
+    : `<div class="empty">No parts recorded as installed on this vehicle.</div>`}</details>`;
+}
+function maintenancePanel(vehicleId){
+  const list = vehicleMaintenance(vehicleId);
+  const mi = vehicleMileage(vehicleId);
+  const order = {"DUE NOW":0, "DUE SOON":1, "UNKNOWN":2, "NOT DUE":3, "NO INTERVAL SET":4};
+  const cls = s => s === "DUE NOW" ? "ps-wait" : s === "DUE SOON" ? "ps-part" : s === "NOT DUE" ? "ps-ok" : "ps-none";
+  return `<div class="card"><div class="toolbar"><h2 style="margin:0">Maintenance</h2><span class="muted">current mileage ${mi == null ? "not recorded" : mi.toLocaleString()}</span></div>
+    <table><thead><tr><th>Service</th><th>Interval</th><th>Last recorded</th><th>Status</th><th></th></tr></thead><tbody>
+    ${list.sort((a, b) => order[a.state] - order[b.state]).map(s => `<tr>
+      <td><b>${esc(s.item.name)}</b></td>
+      <td>${s.interval.miles == null && s.interval.months == null ? `<span class="muted">not set</span>` : esc([s.interval.miles != null ? Number(s.interval.miles).toLocaleString() + " mi" : "", s.interval.months != null ? s.interval.months + " mo" : ""].filter(Boolean).join(" / "))}${s.interval.vehicleSpecific ? ` <span class="badge b-override">THIS VEHICLE</span>` : ""}</td>
+      <td>${s.last ? esc([s.last.date, s.last.mileage ? s.last.mileage + " mi" : ""].filter(Boolean).join(" · ")) + `<div class="muted" style="font-size:11.5px">${esc(s.last.source)}</div>` : `<span class="muted">no record</span>`}</td>
+      <td><span class="psb ${cls(s.state)}">${esc(s.state === "UNKNOWN" ? "UNKNOWN" : s.state)}</span>
+        <div class="muted" style="font-size:11.5px">${esc(s.state === "UNKNOWN" ? s.note : s.state === "NO INTERVAL SET" ? "" : [s.dueMileage != null ? "due at " + s.dueMileage.toLocaleString() + " mi" : "", s.dueDate ? "due " + s.dueDate : ""].filter(Boolean).join(" · "))}</div></td>
+      <td class="right"><button class="sm" onclick="setVehInterval('${vehicleId}','${s.item.id}')">Interval…</button><button class="sm" onclick="recordPastService('${vehicleId}','${s.item.id}')">Record service…</button></td></tr>`).join("")}
+    </tbody></table>
+    <p class="muted" style="font-size:12px;margin-bottom:0">Intervals are the shop's own, set in Settings or per vehicle — not a manufacturer schedule. Only work recorded here or entered by hand with its source counts; with no record the status is UNKNOWN.</p></div>`;
+}
+function setVehInterval(vehicleId, itemId){
+  const item = (db.settings.maintItems || []).find(m => m.id === itemId); if (!item) return;
+  const iv = maintInterval(vehicleId, item);
+  const miles = prompt(`Interval for ${item.name} on this vehicle — miles (blank for none):`, iv.miles == null ? "" : iv.miles);
+  if (miles == null) return;
+  const months = prompt(`…and months (blank for none):`, iv.months == null ? "" : iv.months);
+  if (months == null) return;
+  const ov = db.maintenance.overrides[vehicleId] = db.maintenance.overrides[vehicleId] || {};
+  if (!miles.trim() && !months.trim()) delete ov[itemId];
+  else ov[itemId] = {miles:numOrNull(miles), months:numOrNull(months), at:floorNow()};
+  save(); render();
+}
+function recordPastService(vehicleId, itemId){
+  const item = (db.settings.maintItems || []).find(m => m.id === itemId); if (!item) return;
+  const date = prompt(`${item.name} — date it was done (YYYY-MM-DD):`, "");
+  if (date == null || !date.trim()) return;
+  const mileage = prompt("Mileage when it was done (blank if not known):", "");
+  if (mileage == null) return;
+  const source = prompt("Where does this come from? (e.g. customer's receipt from another shop)", "");
+  if (source == null || !source.trim()){ alert("A source is required, so nobody later mistakes this for work the shop did or saw."); return; }
+  db.maintenance.records.push({id:uid("mr"), vehicleId, itemId, date:date.trim(), mileage:mileage.trim(), source:source.trim(), at:floorNow(), by:db.settings.lastTech || ""});
+  save(); render();
+}
+
+/* ---------- settings for the floor ---------- */
+function floorSettingsCard(){
+  const s = db.settings;
+  return `<div class="card"><h3 style="margin-top:0">Shop floor</h3>
+    <div class="toolbar" style="margin-bottom:6px"><b>Bays</b><div class="grow"></div><button class="sm primary" onclick="addBay()">+ Add bay</button></div>
+    <div class="flags">${(s.bays || []).map((b, i) => `<span class="flag on">${esc(b)} <button class="x" style="height:18px;width:18px;line-height:1" onclick="delBay(${i})">✕</button></span>`).join("") || `<span class="muted">No bays.</span>`}</div>
+    <div class="row" style="margin-top:10px">
+      <div><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fs_qc" style="width:auto" ${s.qcRequired !== false ? "checked" : ""}> Completed jobs go to quality control</label>
+        <div class="muted" style="font-size:11.5px">Each job can still be switched on or off from its References.</div></div>
+      <div><label>Warn when a job timer has run longer than (hours)</label><input id="fs_timer" type="number" step="0.5" value="${esc(s.timerWarnHours)}"></div>
+      <div><label>Maintenance “due soon” within (miles)</label><input id="fs_soonMi" type="number" step="100" value="${esc(s.dueSoonMiles)}"></div>
+      <div><label>…or within (days)</label><input id="fs_soonDays" type="number" step="1" value="${esc(s.dueSoonDays)}"></div>
+    </div>
+    <h3 style="margin:14px 0 4px">Maintenance intervals</h3>
+    <div class="muted" style="font-size:12px">Blank means not set. These are your shop's intervals, not a manufacturer schedule. “Matches” is the wording on a job that counts as this service.</div>
+    <table><thead><tr><th>Service</th><th>Miles</th><th>Months</th><th>Matches jobs containing</th><th></th></tr></thead><tbody>
+    ${(s.maintItems || []).map((m, i) => `<tr><td><input id="mi_name_${i}" value="${esc(m.name)}"></td><td><input id="mi_miles_${i}" value="${esc(m.miles == null ? "" : m.miles)}" inputmode="numeric" style="max-width:100px"></td>
+      <td><input id="mi_months_${i}" value="${esc(m.months == null ? "" : m.months)}" inputmode="numeric" style="max-width:80px"></td><td><input id="mi_match_${i}" value="${esc(m.match || "")}"></td>
+      <td><button class="x" onclick="delMaintItem(${i})">✕</button></td></tr>`).join("")}</tbody></table>
+    <div class="toolbar" style="margin-top:10px"><button class="sm" onclick="addMaintItem()">+ Service</button><div class="grow"></div><button class="sm green" onclick="saveFloorSettings()">Save shop floor settings</button></div></div>`;
+}
+function addBay(){ const n = prompt("Bay or resource name:", ""); if (n == null || !n.trim()) return; if ((db.settings.bays || []).indexOf(n.trim()) < 0) db.settings.bays.push(n.trim()); save(); render(); }
+function delBay(i){
+  const b = db.settings.bays[i];
+  if (bayOccupants(b).length && !confirm(b + " has a vehicle in it. Remove the bay anyway? The vehicle keeps its record.")) return;
+  db.settings.bays.splice(i, 1); save(); render();
+}
+function readMaintItems(){
+  (db.settings.maintItems || []).forEach((m, i) => {
+    const g = k => ($("#mi_" + k + "_" + i) || {}).value;
+    if (g("name") === undefined) return;
+    m.name = g("name").trim() || m.name; m.miles = numOrNull(g("miles")); m.months = numOrNull(g("months")); m.match = g("match").trim();
+  });
+}
+function addMaintItem(){ readMaintItems(); db.settings.maintItems.push({id:uid("mt"), name:"New service", match:"", miles:null, months:null, active:true}); save(); render(); }
+function delMaintItem(i){ readMaintItems(); db.settings.maintItems.splice(i, 1); save(); render(); }
+function saveFloorSettings(){
+  readMaintItems();
+  db.settings.qcRequired = $("#fs_qc").checked;
+  db.settings.timerWarnHours = Number($("#fs_timer").value) || 10;
+  db.settings.dueSoonMiles = Number($("#fs_soonMi").value) || 1000;
+  db.settings.dueSoonDays = Number($("#fs_soonDays").value) || 30;
+  save(); render(); alert("Shop floor settings saved.");
 }
 
 
@@ -4324,7 +6001,12 @@ function go(v){view=v;document.querySelectorAll("#nav button").forEach(b=>b.clas
 $("#newWO").onclick=()=>editOrder(null);
 $("#brandTop").onclick=()=>go("dash");
 
-function render(){$("#brandTop").innerHTML=esc(db.settings.shopName).replace(/(Inc\.?)$/i,'<span> $1</span>')||"JZD<span> Inc.</span>";
+function render(){
+  const wr=document.querySelector(".wrap"); if(wr) wr.classList.toggle("wide",view==="board");
+  let dl=document.getElementById("techlistGlobal");
+  if(!dl){ dl=document.createElement("div"); dl.id="techlistGlobal"; document.body.appendChild(dl); }
+  dl.innerHTML=`<datalist id="techlist">${allTechs().map(t=>`<option value="${esc(t)}">`).join("")}</datalist>`;
+  $("#brandTop").innerHTML=esc(db.settings.shopName).replace(/(Inc\.?)$/i,'<span> $1</span>')||"JZD<span> Inc.</span>";
   if(view==="insp")return renderInspection();
   if(view==="schedule")return renderSchedule();
   if(view==="appt")return renderAppointment();
@@ -4456,10 +6138,12 @@ function renderVehicleDetail(id){const v=db.vehicles[id];if(!v){go("vehicles");r
   ${photoStrip("vehicle",id)}
   </div>
   ${vehicleDeclinedPanel(id)}
+  ${vehicleTechPanels(id)}
   <div class="card"><h2 style="margin-top:0">Service History</h2>
   ${hist.length?`<table><thead><tr><th>#</th><th>Date</th><th>Mileage</th><th>Work performed</th><th>Status</th><th class="right">Total</th></tr></thead><tbody>
   ${hist.map(o=>{const t=orderTotals(o);const insp=inspectionFor(o);const work=o.complaint||(o.labor||[]).map(l=>l.desc).filter(Boolean).join(", ")||"—";return `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${esc(ticketNo(o))}</b>${insp?`<div class="muted" style="font-size:11px">MPI ${insp.state==="Completed"?inspSummary(insp).Urgent+"U/"+inspSummary(insp)["Needs Attention"]+"A":"in progress"}</div>`:""}</td><td>${esc(o.date||"")}</td><td>${esc(o.mileageOut||o.mileageIn||"")}</td><td>${esc(work).slice(0,70)}</td><td><span class="pill st-${statusClass(o.status)}">${esc(canonStatus(o.status))}</span></td><td class="right">${money(t.total)}</td></tr>`;}).join("")}
   </tbody></table>`:`<div class="empty">No service history yet. Click <b>+ New Work Order</b> to log the first visit for this vehicle.</div>`}</div>`;
+  wireVehicleTech(id);
 }
 /* ---------- catalog ---------- */
 /* Everything this vehicle has been told about and not done, newest first. */
@@ -4582,6 +6266,7 @@ function renderSettings(){const s=db.settings;
   <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveSettings()">Save Settings</button></div>
   </div>
   ${techCard()}
+  ${floorSettingsCard()}
   ${thresholdCard()}
   ${feeCard()}
   ${providerCard()}
@@ -4902,7 +6587,9 @@ function drawWO(){const o=cur;
   </div>
   <label>Customer concern / work requested</label><textarea id="o_complaint">${esc(o.complaint)}</textarea>
   ${checkinPanel(o)}
+  ${floorPanel(o)}
   ${inspectionPanel(o)}
+  ${diagPanel(o)}
   ${priorDeclinedPanel(o)}
 
   <div class="secthead"><h3>Labor</h3></div>
@@ -5121,6 +6808,8 @@ function partRow(x,i,o){
       <label style="display:flex;align-items:center;gap:4px;margin:0;font-weight:400"><input type="checkbox" data-k="parts" data-i="${i}" data-f="taxable" ${lineTaxable(x,taxCfg(o).taxParts)?"checked":""} style="width:auto"> taxable</label>
       <input data-k="parts" data-i="${i}" data-f="vendor" value="${esc(x.vendor||"")}" placeholder="vendor" style="max-width:120px;height:24px;font-size:11.5px">
       <input data-k="parts" data-i="${i}" data-f="intNote" value="${esc(x.intNote||"")}" placeholder="internal note" style="max-width:180px;height:24px;font-size:11.5px">
+      ${(o.labor||[]).filter(l=>l.desc).length?`<select style="max-width:170px;height:26px;font-size:11.5px" title="which job this part is for" onchange="setPartField(${i},'jobLineId',this.value)">
+        <option value="">for: whole ticket</option>${(o.labor||[]).filter(l=>l.desc).map(l=>`<option value="${l.id}" ${x.jobLineId===l.id?"selected":""}>for: ${esc(String(l.desc).slice(0,40))}</option>`).join("")}</select>`:""}
     </div>
   </div>`;
 }
@@ -5202,6 +6891,7 @@ function laborRow(l,i,o){
 }
 function lineMeta(l,i,o){
   if(!l.serviceId && !l.source) return "";
+  if(!l.id) l.id=uid("ln");
   const bits=[];
   const src=l.source||SRC_MANUAL;
   const cl=src===SRC_OVERRIDE?"b-override":src===SRC_SEED?"b-seed":"b-manual";
@@ -5215,8 +6905,13 @@ function lineMeta(l,i,o){
   bits.push(`<select class="sm" style="height:26px;font-size:11.5px;max-width:150px" onchange="setJobState(${i},this.value)">
     ${JOB_STATES.map(x=>`<option value="${x}" ${x===js?"selected":""}>${x}</option>`).join("")}</select>`);
   bits.push(`<input value="${esc(l.tech||"")}" list="techlist" placeholder="tech" style="max-width:110px;height:26px;font-size:11.5px" onchange="setJobTech(${i},this.value)">`);
-  if(js!=="Completed") bits.push(`<button class="sm" onclick="jobBtn(${i},'start')">${js==="In Progress"?"Working":"Start job"}</button>`);
-  if(js!=="Completed") bits.push(`<button class="sm" onclick="jobBtn(${i},'done')">Complete job</button>`);
+  bits.push(`<span class="jobctl">${jobControls(o,l)}</span>`);
+  bits.push(clockLine(o,l));
+  bits.push(psBadge(jobPartsState(o,l)));
+  if(l.hold) bits.push(`<span class="badge b-verify">HOLD — ${esc(l.hold.reason)}</span><button class="sm" onclick="floorAct('${o.id}','${l.id}','release')">Release hold</button>`);
+  else if(JOB_DONE.indexOf(js)<0&&JOB_CLOSED.indexOf(js)<0) bits.push(`<button class="sm" onclick="floorAct('${o.id}','${l.id}','hold')">Hold…</button>`);
+  bits.push(`<button class="sm" onclick="openRefs('${o.id}','${l.id}')">References${l.refs&&["procedure","spec","torque","wiring","techNote"].some(k=>l.refs[k])?" ✓":""}…</button>`);
+  if(torqueJob(l)||(l.torque||[]).length) bits.push(`<button class="sm" onclick="openTorque('${o.id}','${l.id}')">Wheel torque${(l.torque||[]).length?" ("+l.torque.length+")":""}…</button>`);
   if(l.startedAt) bits.push(`<span class="muted">started ${esc(String(l.startedAt).slice(11,16))}${l.completedAt?" · done "+esc(String(l.completedAt).slice(11,16)):""}</span>`);
   if(l.serviceId){
     bits.push(`<button class="sm" onclick="overrideLine(${i})">Override…</button>`);
@@ -5226,7 +6921,17 @@ function lineMeta(l,i,o){
   return `<div class="linemeta">${bits.join("")}</div>
   ${(l.finding||l.workPerformed)?`<div class="linemeta" style="padding-top:0">${l.finding?`<span><b>Found:</b> ${esc(l.finding)}</span>`:""}${l.workPerformed?`<span><b>Done:</b> ${esc(l.workPerformed)}</span>`:""}</div>`:""}`;
 }
-function setJobState(i,v){ pullWO(); cur.labor[i].jobState=v; save(); renderLines(); updateTotals(); }
+/* Picking a state by hand is recorded like any other change, and a clock that was
+   running stops rather than carrying on under a job that is no longer active. */
+function setJobState(i,v){
+  pullWO();
+  const l=cur.labor[i]; if(!l) return;
+  const at=new Date().toISOString();
+  if(v!=="In Progress"&&v!=="Diagnosing") closeSessions(cur,l,"state set to "+v,at);
+  if(JOB_DONE.indexOf(v)>=0&&!l.completedAt) l.completedAt=at;
+  moveJob(cur,l,v,{at,by:db.settings.lastTech||"",note:"set by hand"});
+  save(); renderLines(); updateTotals();
+}
 function setJobTech(i,v){ pullWO(); cur.labor[i].tech=v; if(v&&db.settings.techs.indexOf(v)<0)db.settings.techs.push(v); save(); }
 function jobBtn(i,which){
   pullWO();

@@ -105,6 +105,32 @@ subscription. Settings ▸ **Where is my data?** shows the folder.
 - **A customer inspection report** — what needs attention now, what to keep an
   eye on, and everything checked and sound, with the measurements. Statuses
   print with words as well as colour so a grayscale copy still reads.
+- **The shop floor, live** — one board with every car in the building in the
+  column it is actually in: checked in, diagnosis, awaiting approval, waiting on
+  parts, ready to work, in progress, quality control, ready for pickup. Each card
+  says who has it, which bay, how many sold hours, how many jobs are done,
+  whether the parts are here, and anything holding it up.
+- **Bays, dispatch and a queue for each technician** — a bay knows which car is
+  in it and asks before a second one goes in. Dispatch shows who is on the clock,
+  who has work ready and who is waiting; each technician gets NOW / NEXT /
+  WAITING / COMPLETED with the parts readiness on every job.
+- **Clock time that never touches sold time** — START, PAUSE, RESUME and
+  COMPLETE record real time sessions. Sold hours stay exactly as the ticket
+  says. Efficiency is sold hours completed divided by the clock hours on those
+  same jobs, and a timer left running is called out rather than quietly counted.
+- **Quality control and road tests** — a finished job can go to a checklist
+  QC; a failure names the item and sends the job back to work with its history
+  intact. Pre- and post-repair road tests and wheel torque (spec entered by
+  hand, or SPEC UNKNOWN / VERIFY — never guessed) are kept with the job.
+- **Diagnosis as a record, not a code** — concern, verification, observations,
+  tests, measurements with their spec and where it came from, trouble codes as
+  the scan tool reported them, root cause, recommended repair, verification.
+  A code on its own never becomes a diagnosis.
+- **Comebacks and the vehicle's technical history** — link a return visit to
+  the earlier job and part without changing that RO or deciding whose fault it
+  was. The vehicle page shows installed parts, a searchable timeline, repeated
+  concerns with their mileages, and maintenance status from the shop's own
+  intervals — UNKNOWN when there is no record, never assumed.
 - **Parts you actually have** — a catalog with stock, bins, units and reorder
   levels, or non-stock items for a one-off special order. **On hand** is the
   shelf, **committed** is what live tickets have claimed, **available** is the
@@ -200,6 +226,7 @@ node testshop.cjs      # check-in, inspection, recommendations, parts, history
 node testphoto.cjs     # photographs, visibility, and a real backup round trip
 node testfront.cjs     # customers, duplicates, appointments, arrival, search
 node testparts.cjs     # stock, vendors, purchase orders, receiving, cores
+node testfloor.cjs     # bays, job clock, efficiency, QC, diagnosis, comebacks, maintenance
 cd desktop/src-tauri && cargo test    # the storage layer
 ```
 
@@ -225,5 +252,10 @@ Parts carry two numbers that must never be confused: what they cost you and
 what they sold for. The first never appears on anything a customer sees, and
 changing either today cannot reach backwards into an invoice already issued.
 
-Tag a version (`git tag v2.6.0 && git push origin v2.6.0`) and CI runs all eight
+Sold hours and clock hours are two numbers that must never be confused either:
+what the customer was charged for, and what the job actually took. Timers write
+only time sessions; nothing on the floor can change a labor line's hours or an
+invoice.
+
+Tag a version (`git tag v2.7.0 && git push origin v2.7.0`) and CI runs all nine
 suites, then builds and publishes the installer.

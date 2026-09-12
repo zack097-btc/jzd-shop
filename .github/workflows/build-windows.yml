@@ -55,7 +55,7 @@ jobs:
       # network - the VIN suite stubs fetch - so a release is never blocked by
       # NHTSA being down, and a green run means the page itself works, not just
       # that it parsed.
-      - name: Test persistence, VIN, pricing, invoicing, the shop floor, the front office and parts
+      - name: Test persistence, VIN, pricing, invoicing, the front office, parts and floor operations
         run: |
           npm install --no-save playwright
           npx playwright install chromium
@@ -66,6 +66,7 @@ jobs:
           node testphoto.cjs
           node testfront.cjs
           node testparts.cjs
+          node testfloor.cjs
 
       - name: Build the installers
         uses: tauri-apps/tauri-action@v0
