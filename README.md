@@ -113,13 +113,22 @@ subscription. Settings ▸ **Where is my data?** shows the folder.
     applicable* year/make/model matches — never as open on a VIN), NHTSA
     consumer complaints (informational, never a diagnosis), NHTSA crash ratings,
     and NHTSA's public Manufacturer Communications and defect-investigation flat
-    files, downloaded and indexed on this computer and swapped in only when a
-    refresh finishes cleanly.
-  - **Licensed APIs, one credential step from use:** MOTOR DaaS (sandbox and
-    production, from MOTOR's published Swagger), DataOne (trial and production),
-    TecAlliance TecRMI (from its published REST Swagger) and Autodata (OAuth).
-    Sandbox results are watermarked and can never be saved or printed on a
-    customer document.
+    files, downloaded and indexed on this computer. **Check for updates** asks
+    NHTSA for its ETag and Last-Modified without downloading; **Update NHTSA
+    data** downloads only the files that changed, checks each is a whole ZIP in
+    NHTSA's published layout, builds a new index beside the old one, flushes it
+    to disk and swaps it in — a failed update keeps the last good index and is
+    recorded as the last failure.
+  - **Sandbox, live:** MOTOR DaaS. Requests are signed by the desktop shell with
+    MOTOR's documented Shared scheme (HMAC-SHA256 from the RustCrypto crates),
+    and every result is watermarked SANDBOX and can never reach a customer
+    document. Production needs a MOTOR licence.
+  - **Licensed APIs, ready for credentials:** DataOne (address and credentials
+    from its welcome letter), TecAlliance TecRMI (from its published REST
+    Swagger) and Autodata (API key, per its published samples).
+  - **Settings → Data Providers** opens with a capability matrix: what each
+    source can do today, what is waiting on credentials, and what is not
+    offered.
   - **Portals, opened in the shop's own browser:** ALLDATA, ProDemand,
     Direct-Hit, MOTOR TruTech and FleetCross, PartsTech, BMW / MINI /
     Rolls-Royce TechInfo, Toyota/Lexus TIS, Nissan/Infiniti and the other major
@@ -252,13 +261,17 @@ node testfront.cjs     # customers, duplicates, appointments, arrival, search
 node testparts.cjs     # stock, vendors, purchase orders, receiving, cores
 node testfloor.cjs     # bays, job clock, efficiency, QC, diagnosis, comebacks, maintenance
 node testdata.cjs      # provider hub: NHTSA, datasets, routing, provenance, sandbox, secrets
-cd desktop/src-tauri && cargo test    # the storage layer
+node testmotorlive.cjs # LIVE MOTOR sandbox through the page (needs MOTOR_SANDBOX_PUBLIC/PRIVATE)
+cd desktop/src-tauri && cargo test    # the storage layer and the provider hub's native side
+cargo test motor_sandbox_live -- --ignored --nocapture   # LIVE MOTOR sandbox through the shell
 ```
 
 `index.html` is the whole app in one file and is the source; `build.py` stages
 it into the desktop shell and refuses to run unless `index.html`,
-`tauri.conf.json` and `Cargo.toml` agree on the version. Both browser suites
-stub the network, so no release ever depends on a third party being up.
+`tauri.conf.json` and `Cargo.toml` agree on the version. The browser suites
+stub the network. The one live check is MOTOR's public sandbox: CI reads the
+keys MOTOR publishes for developers from motor.com/daas-sandbox at run time.
+They are never stored in this repository (`*.env` is ignored) or in a shop book.
 
 Once an invoice is finalized it carries its own copy of the labor rate and the
 tax rules it was billed under, so changing either afterwards cannot move a
@@ -286,5 +299,5 @@ External data is supplemental. With the internet off, NHTSA down, or every
 provider disabled, customers, vehicles, inspections, repair orders, the SHOP SEED
 labor catalog, parts and the floor all keep working from this computer.
 
-Tag a version (`git tag v2.8.0 && git push origin v2.8.0`) and CI runs all ten
-suites, then builds and publishes the installer.
+Tag a version (`git tag v2.8.1 && git push origin v2.8.1`) and CI runs every
+suite and the live MOTOR sandbox check, then builds and publishes the installer.

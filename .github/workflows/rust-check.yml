@@ -44,6 +44,7 @@ jobs:
             exit $code
           }
           Get-Content test.log | Where-Object { $_ -match '^test result:' } | ForEach-Object { Write-Output "::notice title=cargo test::$_" }
+          cargo test a_secret_goes_in -- --nocapture 2>&1 | Where-Object { $_ -match '^CREDMAN:' } | ForEach-Object { Write-Output "::notice title=Credential Manager::$_" }
 
       # A real request to MOTOR's public DaaS sandbox, through the desktop app's
       # own signing and request code. The sandbox keys are the ones MOTOR

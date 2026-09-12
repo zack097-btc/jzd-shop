@@ -1070,8 +1070,9 @@ mod tests {
                 assert!(secret_delete("jzdtest", &field).unwrap());
                 assert_eq!(secret_get("jzdtest", &field).unwrap(), None);
                 assert!(!secret_delete("jzdtest", &field).unwrap());
+                println!("CREDMAN: stored, read back on the native side, deleted, confirmed gone (Windows Credential Manager)");
             }
-            Err(e) => eprintln!("credential store unavailable on this machine, round trip skipped: {e}"),
+            Err(e) => println!("CREDMAN: credential store unavailable on this machine, round trip skipped: {e}"),
         }
         assert!(secret_put("jzdtest", "empty", "").is_err());
         assert!(secret_put("jzdtest", "huge", &"x".repeat(MAX_SECRET_BYTES + 1)).is_err());
