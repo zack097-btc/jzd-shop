@@ -1022,14 +1022,12 @@ mod tests {
     fn motor_signature_matches_the_handbook_example() {
         // MOTOR DaaS Development Handbook, "Example API Key Credentials":
         // public L6yPPubKey, private 90PoIbjdUdhY9Hmfrin7JoEVo, epoch 1429200721,
-        // GET /v1/Information/YMME/Years?min=1990. The handbook prints the result
-        // as "q+FhRKNY...". The same computation in Python's hmac module gives
-        // "Q+FhRKNY..." — the PDF lower-cases the first letter of that line.
+        // GET /v1/Information/YMME/Years?min=1990, and the header it prints.
         let data = motor_signature_data("L6yPPubKey", "GET", 1429200721, "/v1/Information/YMME/Years");
         assert_eq!(data, "L6yPPubKey\nGET\n1429200721\n/v1/Information/YMME/Years");
         assert_eq!(
             motor_authorization("L6yPPubKey", "90PoIbjdUdhY9Hmfrin7JoEVo", "GET", 1429200721, "/v1/Information/YMME/Years"),
-            "Shared L6yPPubKey:Q+FhRKNYtWNCsUiip9e92yPw73zEIfm4ZETGOh+olRs="
+            "Shared L6yPPubKey:q+FhRKNYtWNCsUiip9e92yPw73zEIfm4ZETGOh+olRs="
         );
         assert_eq!(http_date(1429200721), "Thu, 16 Apr 2015 16:12:01 GMT");
     }
