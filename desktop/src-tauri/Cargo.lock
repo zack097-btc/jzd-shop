@@ -1672,7 +1672,7 @@ dependencies = [
 
 [[package]]
 name = "jzd-shop"
-version = "2.4.1"
+version = "2.5.0"
 dependencies = [
  "serde",
  "serde_json",

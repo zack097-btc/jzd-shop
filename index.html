@@ -85,6 +85,24 @@
   .imatrix input{width:72px;height:38px;text-align:right;font-size:14px}
   .imatrix .pos{font-weight:700;width:52px}
   .sugg{font-size:11px;color:var(--accent);cursor:pointer;text-decoration:underline}
+  .appt{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:8px 11px;margin-bottom:7px;background:#fff;cursor:pointer;display:flex;gap:12px;align-items:flex-start}
+  .appt:hover{background:#f7f9fc}
+  .appt .t{font-weight:800;font-size:15px;min-width:66px}
+  .appt .who{font-weight:600}
+  .appt.s-Confirmed{border-left-color:#187a4b}
+  .appt.s-Arrived,.appt.s-InShop{border-left-color:#c9770a}
+  .appt.s-Completed{border-left-color:#5b6673;opacity:.7}
+  .appt.s-NoShow,.appt.s-Cancelled{border-left-color:#c0392b;opacity:.6}
+  .daycols{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .daycol{border:1px solid var(--line);border-radius:8px;padding:7px;min-height:120px;background:#fff}
+  .daycol h4{margin:0 0 5px;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  .daycol.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .daycol .mini{font-size:11px;border-radius:5px;background:#eef3fa;padding:3px 5px;margin-bottom:4px;cursor:pointer}
+  .daycol .mini:hover{background:#dfe9f6}
+  .caphint{font-size:12px;color:var(--muted)}
+  .caphint b{color:var(--ink)}
+  .caphint.over{color:#8f2419;font-weight:600}
+  .dupwarn{background:#fdf8ee;border:1px solid #efdcb8;border-radius:8px;padding:9px 11px;margin:8px 0;font-size:12.5px}
   .photos{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
   .thumb{position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid var(--line);cursor:pointer;background:#eef1f5}
   .thumb img{width:100%;height:100%;object-fit:cover;display:block}
@@ -201,6 +219,7 @@
   <nav id="nav">
     <button data-view="dash" class="on">Dashboard</button>
     <button data-view="orders">Work Orders</button>
+    <button data-view="schedule">Schedule</button>
     <button data-view="board">Shop Board</button>
     <button data-view="customers">Customers</button>
     <button data-view="vehicles">Vehicles</button>
@@ -540,7 +559,7 @@ const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;
    not know the law. taxParts defaults true because the version before this one
    always taxed parts, and a silent change to that would rewrite what every
    existing draft charges. */
-const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:112.50,rateMin:100,rateMax:125,taxRate:8.25,taxLabor:false,taxParts:true,taxFees:false,partsMarkup:40,nextInvoice:1001,nextEstimate:1,nextRO:1,nextInspection:1,fees:[],techs:[],thresholds:{treadMonitor:5,treadUrgent:3,padMonitor:4,padUrgent:2,moistureMonitor:2,moistureUrgent:3},terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},recommendations:{},catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[],inspections:{},attachments:{}};
+const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:112.50,rateMin:100,rateMax:125,taxRate:8.25,taxLabor:false,taxParts:true,taxFees:false,partsMarkup:40,nextInvoice:1001,nextEstimate:1,nextRO:1,nextInspection:1,fees:[],techs:[],bays:["Bay 1","Bay 2","Alignment Rack","Outside"],dayStart:8,dayEnd:18,slotMinutes:30,thresholds:{treadMonitor:5,treadUrgent:3,padMonitor:4,padUrgent:2,moistureMonitor:2,moistureUrgent:3},terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},appointments:{},recommendations:{},catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[],inspections:{},attachments:{}};
 let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot() */
 /* ---------- where the book actually lives ----------------------------------
 
@@ -567,7 +586,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.4.1";
+const JZD_VERSION = "2.5.0";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -592,7 +611,8 @@ function shapeDb(d){
     audit: Array.isArray(d.audit) ? d.audit : [],
     inspections: d.inspections || {},
     attachments: d.attachments || {},
-    recommendations: d.recommendations || {}
+    recommendations: d.recommendations || {},
+    appointments: d.appointments || {}
   });
 }
 
@@ -692,7 +712,7 @@ function markSaveState(state, detail){
 function vals(o){return Object.values(o||{});}
 
 /* ---------- helpers ---------- */
-function custName(id){const c=db.customers[id];return c?c.name:"—";}
+function custName(id){const c=db.customers[id];return c?(customerLabel(c)||c.name||"—"):"—";}
 function vehLabel(id){const v=db.vehicles[id];return v?`${v.year||""} ${v.make||""} ${v.model||""}`.trim()||"Vehicle":"—";}
 /* orderTotals now lives with the rest of the commercial engine below. */
 
@@ -2740,6 +2760,644 @@ function photoRow(list){
      ${a.caption?`<figcaption style="font-size:10.5px;max-width:120px">${esc(a.caption)}</figcaption>`:""}</figure>`).join("")}</div>`;
 }
 
+
+/* ====================================================================
+   The front office: customers, and the day before the car arrives
+   ====================================================================
+   Everything up to now started when a vehicle was already on the
+   forecourt. A shop's day does not: it starts on the telephone, with
+   somebody who may or may not already be in the book, about a car that
+   may or may not already be in the book, for work that may already have
+   been quoted and declined six months ago.
+
+   So the rules here are about not creating things twice. A customer who
+   rings back is the same customer; a VIN that is already known is the
+   same vehicle; and work this car was told about before should be on
+   the screen before anybody thinks to go looking for it. */
+
+const CONTACT_METHODS = ["No preference","Call","Text","Email"];
+const APPT_STATES = ["Scheduled","Confirmed","Arrived","In Shop","Completed","No Show","Cancelled"];
+const APPT_OPEN = ["Scheduled","Confirmed","Arrived","In Shop"];
+
+/* ---------- customers ----------
+   The old book stored one "name" and nothing else, and that name is what
+   every screen and every printed document already uses. So it stays the
+   record's name; first, last and company are added beside it and keep it in
+   step. Nothing that already worked has to change. */
+function shapeCustomer(c){
+  if (!c) return c;
+  if (c.first == null) c.first = "";
+  if (c.last == null) c.last = "";
+  if (c.company == null) c.company = "";
+  if (c.phone2 == null) c.phone2 = "";
+  if (c.city == null) c.city = "";
+  if (c.state == null) c.state = "";
+  if (c.zip == null) c.zip = "";
+  if (c.contactBy == null) c.contactBy = "No preference";
+  if (c.createdAt == null) c.createdAt = c.updatedAt || new Date().toISOString();
+  return c;
+}
+function customerName(c){
+  if (!c) return "";
+  const person = [c.first, c.last].filter(Boolean).join(" ").trim();
+  return (person || c.company || c.name || "").trim();
+}
+/* A business is a customer with a company name; there is no second kind of
+   record, because a fleet is just somebody with more vehicles. */
+function isBusiness(c){ return !!(c && c.company); }
+function customerLabel(c){
+  if (!c) return "—";
+  const person = [c.first, c.last].filter(Boolean).join(" ").trim();
+  if (c.company && person) return c.company + " (" + person + ")";
+  return c.company || person || c.name || "—";
+}
+function saveCustomer(c){
+  shapeCustomer(c);
+  c.name = customerName(c) || c.name || "";
+  c.updatedAt = new Date().toISOString();
+  db.customers[c.id] = c;
+  return c;
+}
+function digits(s){ return String(s || "").replace(/\D/g, ""); }
+
+/* Somebody ringing back is not a new customer. This looks for the ways the
+   same person turns up twice and says so; it never merges anything, because a
+   wrong merge is far harder to undo than a duplicate. */
+function findDuplicateCustomers(c){
+  const ph = digits(c.phone), ph2 = digits(c.phone2), em = String(c.email || "").toLowerCase().trim();
+  const nm = customerName(c).toLowerCase().trim();
+  return vals(db.customers).filter(x => x.id !== c.id).map(x => {
+    const reasons = [];
+    const xph = [digits(x.phone), digits(x.phone2)].filter(Boolean);
+    if (ph && xph.indexOf(ph) >= 0) reasons.push("same phone number");
+    if (ph2 && xph.indexOf(ph2) >= 0) reasons.push("same second number");
+    if (em && String(x.email || "").toLowerCase().trim() === em) reasons.push("same email");
+    if (nm && customerName(x).toLowerCase().trim() === nm) reasons.push("same name");
+    return reasons.length ? {customer:x, reasons} : null;
+  }).filter(Boolean).sort((a,b) => b.reasons.length - a.reasons.length);
+}
+/* A VIN is the vehicle's identity. Two records for one VIN is how a car's
+   history gets cut in half. */
+function findVehicleByVin(vin, exceptId){
+  const n = normalizeVin(vin);
+  if (!n.ok) return null;
+  return vals(db.vehicles).find(v => v.id !== exceptId && v.vin && normalizeVin(v.vin).vin === n.vin) || null;
+}
+function vehiclesOf(customerId){ return vals(db.vehicles).filter(v => v.customerId === customerId); }
+function moveVehicle(vehicleId, toCustomerId){
+  const v = db.vehicles[vehicleId]; if (!v) return;
+  const from = v.customerId;
+  v.customerId = toCustomerId;
+  audit("vehicle-owner", vehLabel(vehicleId), custName(from), custName(toCustomerId), db.settings.lastTech || "shop", "ownership changed");
+  save();
+}
+
+/* ---------- appointments ---------- */
+function shapeAppointment(a){
+  if (!a) return a;
+  a.requested = a.requested || [];
+  a.history = a.history || [];
+  a.reminder = a.reminder || {requested:false, channel:"", status:"Not sent", lastAt:null};
+  return a;
+}
+function newAppointment(fields){
+  const a = shapeAppointment(Object.assign({
+    id: uid("appt"), customerId:"", vehicleId:"", date: todayStr(), time:"09:00",
+    hours: 1, concern:"", notes:"", tech:"", bay:"", status:"Scheduled",
+    orderId:"", createdAt:new Date().toISOString(), updatedAt:new Date().toISOString()
+  }, fields || {}));
+  db.appointments[a.id] = a;
+  return a;
+}
+function setApptStatus(a, next, note){
+  const from = a.status;
+  if (from === next) return;
+  a.status = next;
+  a.updatedAt = new Date().toISOString();
+  a.history.push({at:new Date().toISOString(), from, to:next, note:note || ""});
+}
+/* Moving an appointment is a change to that appointment, not a new one: the
+   customer thinks of it as the same booking and so does the shop. */
+function rescheduleAppointment(a, date, time, tech, why){
+  const from = a.date + " " + a.time + (a.tech ? " · " + a.tech : "");
+  a.date = date || a.date;
+  a.time = time || a.time;
+  if (tech !== undefined && tech !== null) a.tech = tech;
+  a.updatedAt = new Date().toISOString();
+  a.history.push({at:new Date().toISOString(), from:"rescheduled from " + from,
+                  to:a.date + " " + a.time + (a.tech ? " · " + a.tech : ""), note:why || ""});
+}
+function apptMinutes(a){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(a.time || "00:00"));
+  return m ? (+m[1]) * 60 + (+m[2]) : 0;
+}
+function apptsOn(date){
+  return vals(db.appointments).filter(a => a.date === date)
+    .sort((a,b) => apptMinutes(a) - apptMinutes(b) || String(a.id).localeCompare(String(b.id)));
+}
+function apptsOpenOn(date){ return apptsOn(date).filter(a => APPT_OPEN.indexOf(a.status) >= 0); }
+function apptsFor(opts){
+  opts = opts || {};
+  return vals(db.appointments).filter(a =>
+    (!opts.customerId || a.customerId === opts.customerId) &&
+    (!opts.vehicleId || a.vehicleId === opts.vehicleId))
+    .sort((a,b) => (b.date + b.time).localeCompare(a.date + a.time));
+}
+/* Planned hours, which is all a shop needs to know whether tomorrow is full.
+   Deliberately not an optimiser: it counts, warns, and lets the owner decide. */
+function scheduledHours(date){
+  const list = apptsOpenOn(date);
+  const byTech = {};
+  let total = 0;
+  list.forEach(a => {
+    const h = Number(a.hours) || (a.requested || []).reduce((s,r) => s + (Number(r.hours) || 0), 0) || 0;
+    total += h;
+    const k = a.tech || "Unassigned";
+    byTech[k] = (byTech[k] || 0) + h;
+  });
+  return {total:r2(total), byTech, count:list.length};
+}
+function capacityPerDay(){
+  const techs = (db.settings.techs || []).length || 1;
+  return techs * Math.max(1, (Number(db.settings.dayEnd) || 18) - (Number(db.settings.dayStart) || 8));
+}
+
+/* ---------- requested work ----------
+   Planning values. They are what the customer asked for, not what anybody has
+   been charged: nothing here touches an invoice until it is deliberately put
+   on a ticket through the same pricing engine as everything else. */
+function addRequested(a, fields){
+  const r = Object.assign({id:uid("req"), desc:"", serviceId:"", hours:null, amount:null,
+                           custNote:"", intNote:"", recId:""}, fields || {});
+  if (r.serviceId && SEED_BY_ID[r.serviceId]){
+    const row = SEED_BY_ID[r.serviceId];
+    const e = effectiveSeed(row);
+    if (!r.desc) r.desc = row.svc;
+    if (r.hours == null) r.hours = isFixed(row) ? null : e.hours;
+    if (r.amount == null) r.amount = seedCharge(row);
+  }
+  a.requested.push(r);
+  a.updatedAt = new Date().toISOString();
+  return r;
+}
+function requestedHours(a){
+  return r2((a.requested || []).reduce((s,r) => s + (Number(r.hours) || 0), 0));
+}
+function requestedTotal(a){
+  return r2((a.requested || []).reduce((s,r) => s + (Number(r.amount) || 0), 0));
+}
+
+/* ---------- what this vehicle was already told ----------
+   Surfaced at the moment of scheduling, so nobody has to remember to look. */
+function schedulingContext(vehicleId){
+  if (!vehicleId) return {declined:[], history:[], lastVisit:null};
+  const declined = priorDeclined(vehicleId, null);
+  const orders = vals(db.orders).filter(o => o.vehicleId === vehicleId)
+    .sort((a,b) => String(b.date).localeCompare(String(a.date)));
+  const history = orders.slice(0, 6).map(o => ({
+    date:o.date, mileage:o.mileageOut || o.mileageIn || "",
+    work:(o.labor || []).map(l => l.desc).filter(Boolean).join(", ") || o.complaint || "—",
+    total:orderTotals(o).total, id:o.id, ticket:ticketNo(o)
+  }));
+  return {declined, history, lastVisit:history[0] || null};
+}
+
+/* ---------- arrival ----------
+   The whole point of the phase: an appointment becomes the existing check-in,
+   carrying everything already known, and does not start a second one. */
+function arriveAppointment(a){
+  if (a.orderId && db.orders[a.orderId]) return db.orders[a.orderId];
+  const o = {
+    id:uid("o"), invoiceNo:null, customerId:a.customerId, vehicleId:a.vehicleId,
+    date:todayStr(), status:"Estimate", complaint:a.concern || "",
+    mileageIn:(db.vehicles[a.vehicleId] || {}).mileage || "", mileageOut:"",
+    labor:[], parts:[], extras:[], payments:[], history:[],
+    notes:"", recommendation:"", custNotes:"", internalNotes:a.notes || "",
+    appointmentId:a.id
+  };
+  shapeOrder(o);
+  ensureNumber(o, "estimate");
+  db.orders[o.id] = o;
+  a.orderId = o.id;
+  setApptStatus(a, "Arrived", "checked in");
+  return o;
+}
+/* Requested work becomes real work through the existing catalog and the
+   existing pricing. There is still one place that knows what a job costs. */
+function requestedToOrder(o, a){
+  const added = [];
+  (a.requested || []).forEach(r => {
+    if (r.lineId) return;
+    let line = null;
+    if (r.serviceId && SEED_BY_ID[r.serviceId]){
+      const before = (o.labor || []).length;
+      const keep = cur; cur = o;
+      addJob(r.serviceId);
+      cur = keep;
+      line = o.labor[before];
+    } else {
+      let hours = r.hours;
+      if ((hours == null || hours === "") && r.amount != null && isFinite(Number(r.amount)) && shopRate() > 0){
+        hours = r2(Number(r.amount) / shopRate());
+      }
+      line = {id:uid("ln"), type:"manual-labor", desc:r.desc, hours:hours || "",
+              rate:shopRate(), bill:"H", rateSource:"shop", source:SRC_MANUAL};
+      if (hours) line.billedHours = hours;
+      o.labor.push(line);
+    }
+    if (line){
+      line.requestId = r.id;
+      if (r.custNote) line.custNote = r.custNote;
+      r.lineId = line.id;
+      added.push(line);
+    }
+    if (r.recId && db.recommendations[r.recId]){
+      const rec = db.recommendations[r.recId];
+      rec.orderId = o.id;
+      rec.status = "Awaiting Approval";
+      if (line) { rec.lineId = line.id; line.recId = rec.id; }
+    }
+  });
+  return added;
+}
+
+/* ---------- one search box for the whole shop ---------- */
+function searchEverything(q){
+  const t = String(q || "").toLowerCase().trim();
+  if (!t) return {customers:[], vehicles:[], appointments:[], orders:[]};
+  const d = digits(t);
+  const hit = (...parts) => parts.filter(Boolean).join(" ").toLowerCase().indexOf(t) >= 0;
+  const customers = vals(db.customers).filter(c =>
+    hit(customerLabel(c), c.name, c.company, c.email, c.address, c.city, c.zip) ||
+    (d.length >= 3 && [digits(c.phone), digits(c.phone2)].some(x => x && x.indexOf(d) >= 0)));
+  const vehicles = vals(db.vehicles).filter(v =>
+    hit(v.year, v.make, v.model, v.plate, v.vin, v.unit, custName(v.customerId)) ||
+    (v.vin && v.vin.toLowerCase().indexOf(t) >= 0));
+  const appointments = vals(db.appointments).filter(a =>
+    hit(custName(a.customerId), vehLabel(a.vehicleId), a.concern, a.date, a.tech, a.status,
+        (a.requested || []).map(r => r.desc).join(" ")));
+  const orders = vals(db.orders).filter(o => searchHay(o).indexOf(t) >= 0);
+  return {customers, vehicles, appointments, orders};
+}
+
+
+/* ---------- the schedule ----------
+   A shop looks at today far more often than it looks at anything else, so the
+   day is the default and the week is one click away. */
+let schedDate = null, schedMode = "day", apptId = null, detailCust = null, searchQ = "";
+function schedToday(){ return schedDate || todayStr(); }
+function shiftDate(iso, days){
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() + days);
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth()+1) + "-" + p(d.getDate());
+}
+function prettyDate(iso){
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString(undefined, {weekday:"long", day:"numeric", month:"long"});
+}
+function prettyTime(t){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t||"")); if(!m) return t||"";
+  let h = +m[1]; const ap = h >= 12 ? "pm" : "am"; h = h % 12 || 12;
+  return h + ":" + m[2] + ap;
+}
+function renderSchedule(){
+  const date = schedToday();
+  const cap = scheduledHours(date);
+  const limit = capacityPerDay();
+  const over = cap.total > limit;
+  const inShop = vals(db.orders).filter(o => !isDead(o) && canonStatus(o.status) !== "Paid / Closed" &&
+    !vals(db.appointments).some(a => a.orderId === o.id && a.date === date));
+  $("#app").innerHTML = `
+  <div class="toolbar">
+    <h2 style="margin:0">Schedule</h2>
+    <button class="sm" onclick="goDate('${shiftDate(date,-1)}')">‹</button>
+    <button class="sm" onclick="goDate('${todayStr()}')">Today</button>
+    <button class="sm" onclick="goDate('${shiftDate(date,1)}')">›</button>
+    <input type="date" value="${date}" onchange="goDate(this.value)" style="max-width:165px">
+    <div class="tabs" style="margin:0">
+      <button class="${schedMode==="day"?"on":""}" onclick="schedMode='day';renderSchedule()">Day</button>
+      <button class="${schedMode==="week"?"on":""}" onclick="schedMode='week';renderSchedule()">Week</button>
+    </div>
+    <div class="grow"></div>
+    <button class="sm" onclick="newWalkIn()">Walk-in</button>
+    <button class="primary" onclick="newAppointmentFor()">+ Appointment</button>
+  </div>
+  ${schedMode === "week" ? weekView(date) : dayView(date, cap, limit, over)}
+  ${inShop.length ? `<div class="card"><div class="toolbar"><h2 style="margin:0">In the shop now</h2><span class="muted">${inShop.length}</span></div>
+    ${boardRows(inShop)}</div>` : ""}`;
+}
+function goDate(d){ schedDate = d; renderSchedule(); }
+function dayView(date, cap, limit, over){
+  const list = apptsOn(date);
+  return `<div class="card">
+    <div class="toolbar"><h2 style="margin:0">${esc(prettyDate(date))}</h2>
+      <div class="grow"></div>
+      <span class="caphint ${over?"over":""}"><b>${cap.total}</b> scheduled hours${limit?` of about ${limit} available`:""}${over?" — this day is overbooked":""}</span>
+    </div>
+    ${Object.keys(cap.byTech).length ? `<div class="caphint" style="margin-bottom:8px">${
+      Object.keys(cap.byTech).sort().map(t => esc(t) + " — " + cap.byTech[t] + " hr").join(" · ")}</div>` : ""}
+    ${list.length ? list.map(apptCard).join("") : `<div class="empty">Nothing booked for this day. <b>+ Appointment</b> to add one.</div>`}
+  </div>`;
+}
+function apptCard(a){
+  const v = db.vehicles[a.vehicleId] || {};
+  const work = (a.requested || []).map(r => r.desc).filter(Boolean).join(", ");
+  const hrs = Number(a.hours) || requestedHours(a);
+  return `<div class="appt s-${a.status.replace(/\s/g,"")}" onclick="openAppointment('${a.id}')">
+    <div class="t">${esc(prettyTime(a.time))}</div>
+    <div style="flex:1">
+      <div class="who">${esc(custName(a.customerId))} <span class="muted">·</span> ${esc(vehLabel(a.vehicleId))}${v.plate?` <span class="muted">${esc(v.plate)}</span>`:""}</div>
+      <div class="muted" style="font-size:12px">${esc(work || a.concern || "—")}</div>
+    </div>
+    <div style="text-align:right;min-width:150px">
+      <span class="pill st-${a.status.replace(/\s/g,"")}">${esc(a.status)}</span>
+      <div class="muted" style="font-size:11.5px;margin-top:3px">${hrs?hrs+" hr":""}${a.tech?" · "+esc(a.tech):""}${a.bay?" · "+esc(a.bay):""}</div>
+    </div>
+  </div>`;
+}
+function weekView(date){
+  const d = new Date(date + "T12:00:00");
+  const start = shiftDate(date, -((d.getDay() + 6) % 7));   /* Monday */
+  const days = Array.from({length:7}, (_, i) => shiftDate(start, i));
+  return `<div class="card"><div class="toolbar"><h2 style="margin:0">Week of ${esc(prettyDate(start))}</h2>
+    <div class="grow"></div><span class="caphint"><b>${days.reduce((s,x)=>s+scheduledHours(x).total,0).toFixed(1)}</b> hours booked this week</span></div>
+  <div class="daycols">${days.map(x => {
+    const list = apptsOn(x), cap = scheduledHours(x);
+    return `<div class="daycol ${x===todayStr()?"today":""}">
+      <h4>${new Date(x+"T12:00:00").toLocaleDateString(undefined,{weekday:"short",day:"numeric"})}</h4>
+      ${list.map(a => `<div class="mini" onclick="event.stopPropagation();openAppointment('${a.id}')">
+        <b>${esc(prettyTime(a.time))}</b> ${esc(custName(a.customerId))}<br>
+        <span class="muted">${esc(vehLabel(a.vehicleId))}</span></div>`).join("")}
+      ${cap.total?`<div class="muted" style="font-size:10.5px;margin-top:3px">${cap.total} hr</div>`:""}
+      <button class="sm" style="width:100%;margin-top:4px" onclick="newAppointmentFor(null,null,'${x}')">+</button>
+    </div>`;}).join("")}</div></div>`;
+}
+
+/* ---------- the appointment ----------
+   Customer, vehicle, when, and what they asked for. Deliberately not an
+   estimate: nothing here is priced into anything until the car arrives. */
+function newAppointmentFor(customerId, vehicleId, date){
+  const a = newAppointment({customerId:customerId||"", vehicleId:vehicleId||"", date:date||schedToday()});
+  save(); openAppointment(a.id);
+}
+function openAppointment(id){ apptId = id; go("appt"); }
+function renderAppointment(){
+  const a = shapeAppointment(db.appointments[apptId]);
+  if (!a){ go("schedule"); return; }
+  const ctx = schedulingContext(a.vehicleId);
+  const custOpts = vals(db.customers).sort((x,y)=>customerLabel(x).localeCompare(customerLabel(y)))
+    .map(c => `<option value="${c.id}" ${c.id===a.customerId?"selected":""}>${esc(customerLabel(c))}${c.phone?" · "+esc(c.phone):""}</option>`).join("");
+  const vehOpts = vehiclesOf(a.customerId).map(v =>
+    `<option value="${v.id}" ${v.id===a.vehicleId?"selected":""}>${esc(vehLabel(v.id))}${v.plate?" · "+esc(v.plate):""}</option>`).join("");
+  const open = APPT_OPEN.indexOf(a.status) >= 0;
+  $("#app").innerHTML = `
+  <div class="toolbar"><button onclick="go('schedule')">← Schedule</button>
+    <h2 style="margin:0">Appointment</h2><span class="pill st-${a.status.replace(/\s/g,"")}">${esc(a.status)}</span>
+    <div class="grow"></div>
+    ${a.orderId?`<button class="sm" onclick="editOrder('${a.orderId}')">Open ticket ${esc(ticketNo(db.orders[a.orderId]||{}))}</button>`:""}
+    ${open&&a.status!=="Arrived"&&a.customerId&&a.vehicleId?`<button class="green" onclick="arriveNow()">Arrive / check in</button>`:""}
+  </div>
+  <div class="card">
+    <div class="row">
+      <div><label>Customer</label><div style="display:flex;gap:6px">
+        <select id="a_cust" style="flex:1"><option value="">— select —</option>${custOpts}</select>
+        <button class="sm" onclick="quickApptCustomer()">+ New</button></div></div>
+      <div><label>Vehicle</label><div style="display:flex;gap:6px">
+        <select id="a_veh" style="flex:1"><option value="">— select —</option>${vehOpts}</select>
+        <button class="sm" onclick="quickApptVehicle()">+ New</button></div></div>
+    </div>
+    <div class="row">
+      <div><label>Date</label><input id="a_date" type="date" value="${esc(a.date)}"></div>
+      <div><label>Time</label><input id="a_time" type="time" value="${esc(a.time)}"></div>
+      <div><label>Estimated hours</label><input id="a_hours" inputmode="decimal" value="${esc(a.hours)}"></div>
+      <div><label>Technician</label><input id="a_tech" list="techlist" value="${esc(a.tech)}"></div>
+      <div><label>Bay</label><select id="a_bay"><option value="">—</option>${(db.settings.bays||[]).map(b=>`<option value="${esc(b)}" ${b===a.bay?"selected":""}>${esc(b)}</option>`).join("")}</select></div>
+    </div>
+    ${techDatalist()}
+    <label>Customer concern / what they asked for</label><textarea id="a_concern">${esc(a.concern)}</textarea>
+    <label>Appointment notes <span class="muted" style="font-weight:400">— for the shop</span></label><input id="a_notes" value="${esc(a.notes)}">
+    <div class="row" style="margin-top:8px">
+      <div><label>Status</label><select id="a_status">${APPT_STATES.map(x=>`<option value="${x}" ${x===a.status?"selected":""}>${x}</option>`).join("")}</select></div>
+      <div><label>Remind the customer</label><select id="a_remind">
+        <option value="">No reminder</option>
+        ${CONTACT_METHODS.filter(m=>m!=="No preference").map(m=>`<option value="${m}" ${a.reminder.channel===m?"selected":""}>${m}</option>`).join("")}</select>
+        <div class="muted" style="font-size:11px;margin-top:3px">Recorded only — this version sends nothing.</div></div>
+    </div>
+    <div class="toolbar" style="margin-top:12px"><button class="green" onclick="saveAppointment()">Save appointment</button>
+      <button class="sm" onclick="rescheduleDialog()">Reschedule…</button>
+      <button class="sm" onclick="markAppt('No Show')">No show</button>
+      <button class="sm danger" onclick="markAppt('Cancelled')">Cancel</button></div>
+  </div>
+
+  <div class="card"><div class="toolbar"><h2 style="margin:0">Requested work</h2>
+    <span class="muted">${requestedHours(a)?requestedHours(a)+" hr":""}${requestedTotal(a)?" · about "+money(requestedTotal(a)):""}</span>
+    <div class="grow"></div>
+    <button class="sm primary" onclick="addRequestedDialog()">+ Add work</button></div>
+    ${(a.requested||[]).length?`<table><thead><tr><th>Work</th><th>Hours</th><th class="right">Estimate</th><th>Note</th><th></th></tr></thead><tbody>
+      ${a.requested.map((r,i)=>`<tr><td><b>${esc(r.desc)}</b>${r.serviceId?` <span class="muted">${esc(r.serviceId)}</span>`:""}</td>
+        <td>${r.hours!=null?esc(r.hours)+" hr":"—"}</td>
+        <td class="right">${r.amount!=null?money(r.amount):"—"}</td>
+        <td class="muted">${esc(r.custNote||"")}</td>
+        <td class="right"><button class="sm" onclick="delRequested(${i})">Remove</button></td></tr>`).join("")}
+    </tbody></table>`:`<div class="empty">Nothing added yet. A concern above is enough to book the car in.</div>`}
+  </div>
+
+  ${ctx.declined.length?`<div class="card authbox wait"><b>PREVIOUSLY DECLINED</b>
+    <div class="authline">This vehicle was told about the following and did not have it done.</div>
+    <table><thead><tr><th>Work</th><th>Recommended</th><th>Mileage</th><th class="right">Estimated</th><th></th></tr></thead><tbody>
+    ${ctx.declined.map(r=>`<tr><td><b>${esc(r.desc)}</b></td><td>${esc(String(r.at).slice(0,10))}</td>
+      <td>${esc(r.mileage||"—")}</td><td class="right">${r.amount!=null?money(r.amount):"—"}</td>
+      <td class="right">${(a.requested||[]).some(x=>x.recId===r.id)?`<span class="muted">on this appointment</span>`
+        :`<button class="sm primary" onclick="addDeclinedToAppt('${r.id}')">Add to appointment</button>
+          <button class="sm" onclick="retireRec('${r.id}')">No longer applies</button>`}</td></tr>`).join("")}
+    </tbody></table></div>`:""}
+
+  ${ctx.history.length?`<div class="card"><h2 style="margin-top:0">Recent history for this vehicle</h2>
+    <table><thead><tr><th>Date</th><th>Mileage</th><th>Work</th><th class="right">Total</th></tr></thead><tbody>
+    ${ctx.history.map(h=>`<tr class="clk" onclick="editOrder('${h.id}')"><td>${esc(h.date)}</td><td>${esc(h.mileage||"—")}</td>
+      <td>${esc(h.work).slice(0,80)}</td><td class="right">${money(h.total)}</td></tr>`).join("")}
+    </tbody></table></div>`:""}
+
+  ${(a.history||[]).length?`<div class="card"><h3 style="margin-top:0">Appointment history</h3>
+    ${a.history.slice().reverse().map(h=>`<div class="authline">${esc(String(h.at).slice(0,16).replace("T"," "))} — ${esc(h.from)} → ${esc(h.to)}${h.note?" · "+esc(h.note):""}</div>`).join("")}
+  </div>`:""}`;
+  $("#a_cust").onchange = () => { pullAppt(); const a2 = db.appointments[apptId]; a2.vehicleId = ""; save(); renderAppointment(); };
+  $("#a_veh").onchange = () => { pullAppt(); save(); renderAppointment(); };
+}
+function pullAppt(){
+  const a = db.appointments[apptId]; if (!a) return;
+  const g = id => { const el = $("#"+id); return el ? el.value : undefined; };
+  const map = {a_cust:"customerId", a_veh:"vehicleId", a_date:"date", a_time:"time",
+               a_hours:"hours", a_tech:"tech", a_bay:"bay", a_concern:"concern", a_notes:"notes"};
+  Object.keys(map).forEach(id => { const v = g(id); if (v !== undefined) a[map[id]] = v; });
+  const st = g("a_status");
+  if (st !== undefined && st !== a.status) setApptStatus(a, st);
+  const ch = g("a_remind");
+  if (ch !== undefined){ a.reminder.channel = ch; a.reminder.requested = !!ch; }
+  a.updatedAt = new Date().toISOString();
+  if (a.tech && (db.settings.techs||[]).indexOf(a.tech) < 0) db.settings.techs.push(a.tech);
+}
+function saveAppointment(){
+  pullAppt();
+  const a = db.appointments[apptId];
+  if (!a.customerId){ alert("Pick a customer first."); return; }
+  save(); go("schedule");
+}
+function markAppt(state){
+  pullAppt();
+  const why = prompt(state === "No Show" ? "Note (optional):" : "Reason (optional):", "");
+  if (why === null) return;
+  setApptStatus(db.appointments[apptId], state, why);
+  save(); renderAppointment();
+}
+function rescheduleDialog(){
+  pullAppt();
+  const a = db.appointments[apptId];
+  const date = prompt("New date (YYYY-MM-DD):", a.date); if (date === null) return;
+  const time = prompt("New time (HH:MM):", a.time); if (time === null) return;
+  const tech = prompt("Technician (blank to leave):", a.tech); if (tech === null) return;
+  const why = prompt("Why? (optional)", "") || "";
+  rescheduleAppointment(a, date.trim() || a.date, time.trim() || a.time, tech.trim(), why);
+  save(); renderAppointment();
+}
+function quickApptCustomer(){
+  pullAppt();
+  editCustomer(null, cid => { const a = db.appointments[apptId]; a.customerId = cid; a.vehicleId = ""; save(); renderAppointment(); });
+}
+function quickApptVehicle(){
+  pullAppt();
+  const a = db.appointments[apptId];
+  if (!a.customerId){ alert("Pick a customer first."); return; }
+  editVehicle(null, a.customerId, vid => { const a2 = db.appointments[apptId]; a2.vehicleId = vid; save(); renderAppointment(); });
+}
+function addRequestedDialog(){
+  pullAppt();
+  const a = db.appointments[apptId];
+  const q = prompt("Search the labor catalog, or type the work as free text:", "");
+  if (q === null || !q.trim()) return;
+  const hits = searchCatalog(vehicleProfile(db.vehicles[a.vehicleId]), q);
+  if (hits.length){
+    const pick = prompt("Which job?\n" + hits.slice(0,5).map((h,i)=>(i+1)+". "+h.row.svc+"  "+money(seedCharge(h.row))).join("\n") +
+                        "\n\nNumber, or blank to add \"" + q + "\" as free text:", "1");
+    if (pick === null) return;
+    const n = parseInt(pick, 10);
+    if (isFinite(n) && hits[n-1]){ addRequested(a, {serviceId:hits[n-1].row.id}); save(); return renderAppointment(); }
+  }
+  addRequested(a, {desc:q.trim()});
+  save(); renderAppointment();
+}
+function delRequested(i){ pullAppt(); db.appointments[apptId].requested.splice(i,1); save(); renderAppointment(); }
+function addDeclinedToAppt(recId){
+  pullAppt();
+  const rec = db.recommendations[recId]; if (!rec) return;
+  addRequested(db.appointments[apptId], {desc:rec.desc, serviceId:rec.serviceId || "",
+    amount:rec.amount, recId:rec.id, custNote:rec.custNote || ""});
+  save(); renderAppointment();
+}
+/* The handover. Everything known already goes with it and the existing
+   check-in takes over; there is no second check-in screen. */
+function arriveNow(){
+  pullAppt();
+  const a = db.appointments[apptId];
+  if (!a.customerId || !a.vehicleId){ alert("An appointment needs a customer and a vehicle before the car can be checked in."); return; }
+  const o = arriveAppointment(a);
+  const added = requestedToOrder(o, a);
+  if (a.tech) (o.labor||[]).forEach(l => { if (!l.tech) l.tech = a.tech; });
+  save();
+  alert("Checked in. " + (added.length ? added.length + " requested job(s) added to the ticket." : "No catalog work was requested, so the ticket starts empty."));
+  editOrder(o.id);
+}
+function newWalkIn(){
+  const a = newAppointment({date:todayStr(), time:new Date().toTimeString().slice(0,5), status:"Arrived", notes:"Walk-in"});
+  a.history.push({at:new Date().toISOString(), from:"—", to:"Arrived", note:"walk-in"});
+  save();
+  apptId = a.id;
+  editCustomer(null, cid => {
+    a.customerId = cid; save();
+    editVehicle(null, cid, vid => {
+      a.vehicleId = vid; save();
+      const o = arriveAppointment(a);
+      save(); editOrder(o.id);
+    });
+  });
+}
+
+/* ---------- the customer ---------- */
+function openCustomer(id){ detailCust = id; go("custProfile"); }
+function renderCustomerProfile(){
+  const c = shapeCustomer(db.customers[detailCust]);
+  if (!c){ go("customers"); return; }
+  const vs = vehiclesOf(c.id);
+  const appts = apptsFor({customerId:c.id});
+  const orders = vals(db.orders).filter(o => o.customerId === c.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const openOrders = orders.filter(o => canonStatus(o.status) !== "Paid / Closed" && !isDead(o));
+  const declined = vs.flatMap(v => priorDeclined(v.id, null));
+  $("#app").innerHTML = `
+  <div class="toolbar"><button onclick="go('customers')">← Customers</button>
+    <h2 style="margin:0">${esc(customerLabel(c))}</h2>${isBusiness(c)?`<span class="badge b-vehicle">BUSINESS</span>`:""}
+    <div class="grow"></div>
+    <button class="sm" onclick="editCustomer('${c.id}')">Edit</button>
+    <button class="sm" onclick="newAppointmentFor('${c.id}')">+ Appointment</button>
+    <button class="primary" onclick="editOrder(null,{customerId:'${c.id}'})">+ Work Order</button></div>
+  <div class="card"><div class="row">
+    <div><h3>Contact</h3>${esc(c.phone||"—")}${c.phone2?`<br>${esc(c.phone2)}`:""}<br>${esc(c.email||"")}
+      <br><span class="muted">Prefers ${esc(c.contactBy||"no preference")}</span></div>
+    <div><h3>Address</h3>${esc(c.address||"—")}<br>${[c.city,c.state,c.zip].filter(Boolean).map(esc).join(" ")}</div>
+    <div><h3>History</h3>${orders.length} visit${orders.length===1?"":"s"}<br>
+      Total billed <b>${money(r2(orders.reduce((s,o)=>s+orderTotals(o).total,0)))}</b></div>
+    ${c.notes?`<div><h3>Notes</h3>${esc(c.notes)}</div>`:""}
+  </div></div>
+  <div class="card"><div class="toolbar"><h2 style="margin:0">Vehicles</h2><span class="muted">${vs.length}</span>
+    <div class="grow"></div><button class="sm" onclick="editVehicle(null,'${c.id}')">+ Add vehicle</button></div>
+    ${vs.length?`<table><thead><tr><th>Vehicle</th><th>Plate</th><th>Unit</th><th>VIN</th><th>Mileage</th><th></th></tr></thead><tbody>
+      ${vs.map(v=>`<tr class="clk" onclick="openVehicle('${v.id}')"><td><b>${esc(vehLabel(v.id))}</b></td><td>${esc(v.plate||"—")}</td>
+        <td>${esc(v.unit||"—")}</td><td class="muted">${esc(v.vin||"—")}</td><td>${esc(v.mileage||"—")}</td>
+        <td class="right"><button class="sm" onclick="event.stopPropagation();newAppointmentFor('${c.id}','${v.id}')">Book</button></td></tr>`).join("")}
+    </tbody></table>`:`<div class="empty">No vehicles yet.</div>`}</div>
+  ${appts.length?`<div class="card"><h2 style="margin-top:0">Appointments</h2>
+    ${appts.slice(0,10).map(apptCard).join("")}</div>`:""}
+  ${openOrders.length?`<div class="card"><h2 style="margin-top:0">Open work</h2>${boardRows(openOrders)}</div>`:""}
+  ${orders.length?`<div class="card"><h2 style="margin-top:0">Service history</h2>${tableOrders(orders.slice(0,15))}</div>`:""}
+  ${declined.length?`<div class="card authbox wait"><b>DECLINED OR DEFERRED</b>
+    <table><thead><tr><th>Work</th><th>Vehicle</th><th>Recommended</th><th class="right">Estimated</th></tr></thead><tbody>
+    ${declined.map(r=>`<tr><td>${esc(r.desc)}</td><td>${esc(vehLabel(r.vehicleId))}</td>
+      <td>${esc(String(r.at).slice(0,10))}</td><td class="right">${r.amount!=null?money(r.amount):"—"}</td></tr>`).join("")}
+    </tbody></table></div>`:""}`;
+}
+
+/* ---------- one search box ---------- */
+function openSearch(q){ searchQ = q || ""; go("search"); setTimeout(()=>{const el=$("#gq"); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}},20); }
+function renderSearch(){
+  const r = searchEverything(searchQ);
+  const none = !r.customers.length && !r.vehicles.length && !r.appointments.length && !r.orders.length;
+  $("#app").innerHTML = `
+  <div class="toolbar"><h2 style="margin:0">Search</h2>
+    <input class="search" id="gq" style="flex:1;max-width:520px" placeholder="Name, business, phone, email, VIN, plate, RO or invoice number…" value="${esc(searchQ)}">
+  </div>
+  ${searchQ.trim()==="" ? `<div class="card"><div class="empty">Type a name, a phone number, a plate or part of a VIN.</div></div>` :
+   none ? `<div class="card"><div class="empty">Nothing matches “${esc(searchQ)}”.</div></div>` : `
+  ${r.customers.length?`<div class="card"><div class="toolbar"><h2 style="margin:0">Customers</h2><span class="muted">${r.customers.length}</span></div>
+    <table><thead><tr><th>Customer</th><th>Phone</th><th>Email</th><th>Vehicles</th></tr></thead><tbody>
+    ${r.customers.slice(0,20).map(c=>`<tr class="clk" onclick="openCustomer('${c.id}')"><td><b>${esc(customerLabel(c))}</b></td>
+      <td>${esc(c.phone||"")}</td><td>${esc(c.email||"")}</td><td>${vehiclesOf(c.id).length}</td></tr>`).join("")}
+    </tbody></table></div>`:""}
+  ${r.vehicles.length?`<div class="card"><div class="toolbar"><h2 style="margin:0">Vehicles</h2><span class="muted">${r.vehicles.length}</span></div>
+    <table><thead><tr><th>Vehicle</th><th>Plate</th><th>VIN</th><th>Owner</th></tr></thead><tbody>
+    ${r.vehicles.slice(0,20).map(v=>`<tr class="clk" onclick="openVehicle('${v.id}')"><td><b>${esc(vehLabel(v.id))}</b></td>
+      <td>${esc(v.plate||"—")}</td><td class="muted">${esc(v.vin||"—")}</td><td>${esc(custName(v.customerId))}</td></tr>`).join("")}
+    </tbody></table></div>`:""}
+  ${r.appointments.length?`<div class="card"><div class="toolbar"><h2 style="margin:0">Appointments</h2><span class="muted">${r.appointments.length}</span></div>
+    ${r.appointments.slice(0,10).map(a=>`<div class="appt s-${a.status.replace(/\s/g,"")}" onclick="openAppointment('${a.id}')">
+      <div class="t">${esc(a.date)}</div><div style="flex:1"><div class="who">${esc(custName(a.customerId))} · ${esc(vehLabel(a.vehicleId))}</div>
+      <div class="muted" style="font-size:12px">${esc(a.concern||"—")}</div></div>
+      <div><span class="pill st-${a.status.replace(/\s/g,"")}">${esc(a.status)}</span></div></div>`).join("")}</div>`:""}
+  ${r.orders.length?`<div class="card"><div class="toolbar"><h2 style="margin:0">Tickets</h2><span class="muted">${r.orders.length}</span></div>
+    ${boardRows(r.orders.slice(0,25))}</div>`:""}`}`;
+  const el = $("#gq");
+  el.oninput = () => { const at = el.selectionStart; searchQ = el.value; renderSearch(); const n = $("#gq"); n.focus(); n.setSelectionRange(at,at); };
+}
+
 /* ---------- the audit trail ---------- */
 /* An override is a person deciding to charge something other than what the
    catalog says. That is a defensible decision; an unexplained one is not. So
@@ -2769,6 +3427,10 @@ $("#brandTop").onclick=()=>go("dash");
 
 function render(){$("#brandTop").innerHTML=esc(db.settings.shopName).replace(/(Inc\.?)$/i,'<span> $1</span>')||"JZD<span> Inc.</span>";
   if(view==="insp")return renderInspection();
+  if(view==="schedule")return renderSchedule();
+  if(view==="appt")return renderAppointment();
+  if(view==="custProfile")return renderCustomerProfile();
+  if(view==="search")return renderSearch();
   if(view==="board")return renderBoard();
   if(view==="techview")return renderTechView();
   if(view==="dash")renderDash();else if(view==="orders")renderOrders();else if(view==="customers")renderCustomers();else if(view==="vehicles")renderVehicles();else if(view==="vehDetail")renderVehicleDetail(detailVeh);else if(view==="services")renderServices();else if(view==="catalog")renderCatalog();else renderSettings();}
@@ -2790,9 +3452,14 @@ function renderDash(){
     ["Estimates",         o=>canonStatus(o.status)==="Estimate"]
   ];
   const unpaid=os.filter(o=>orderTotals(o).balance>0.004&&isFinal(o));
+  const today=apptsOn(todayStr());
+  const todayOpen=today.filter(a=>APPT_OPEN.indexOf(a.status)>=0);
+  const cap=scheduledHours(todayStr());
+  const ready=live.filter(o=>canonStatus(o.status)==="Completed");
   const cards=[
-    ["Open tickets",live.length],
-    ["Need authorization",live.filter(o=>canonStatus(o.status)==="Awaiting Approval"||needsAdditionalAuth(o)).length],
+    ["Booked today",todayOpen.length],
+    ["In the shop",live.length],
+    ["Ready for pickup",ready.length],
     ["Unpaid balance",money(r2(unpaid.reduce((s,o)=>s+orderTotals(o).balance,0)))]
   ];
   const board=groups.map(([name,fn])=>{
@@ -2801,11 +3468,23 @@ function renderDash(){
     return `<div class="card"><div class="toolbar"><h2 style="margin:0">${esc(name)}</h2><span class="muted">${list.length}</span></div>${boardTable(list)}</div>`;
   }).join("");
   $("#app").innerHTML=`
+  <div class="toolbar"><input class="search" id="dq" style="flex:1;max-width:520px" placeholder="Find a customer, phone number, plate, VIN, RO or invoice…">
+    <div class="grow"></div>
+    <button class="sm" onclick="newWalkIn()">Walk-in</button>
+    <button class="sm" onclick="newAppointmentFor()">+ Appointment</button>
+    <button class="primary" onclick="editOrder(null)">+ New Work Order</button></div>
   <div class="row" style="margin-bottom:6px">${cards.map(c=>`<div class="card" style="text-align:center"><div style="font-size:30px;font-weight:800">${c[1]}</div><div class="muted">${c[0]}</div></div>`).join("")}</div>
-  <div class="toolbar"><div class="grow"></div><button class="primary" onclick="editOrder(null)">+ New Work Order</button></div>
+  ${today.length?`<div class="card"><div class="toolbar"><h2 style="margin:0">Today</h2>
+      <span class="caphint ${cap.total>capacityPerDay()?"over":""}"><b>${cap.total}</b> scheduled hours</span>
+      <div class="grow"></div><button class="sm" onclick="go('schedule')">Full schedule</button></div>
+    ${today.map(apptCard).join("")}</div>`:
+   `<div class="card"><div class="toolbar"><h2 style="margin:0">Today</h2><div class="grow"></div><button class="sm" onclick="go('schedule')">Full schedule</button></div>
+    <div class="empty">Nothing booked today.</div></div>`}
   ${board||`<div class="card"><div class="empty">Nothing open. Click <b>+ New Work Order</b> to start a ticket.</div></div>`}
   ${os.length?`<div class="card"><div class="toolbar"><h2 style="margin:0">Recently closed</h2></div>
     ${tableOrders(os.filter(o=>canonStatus(o.status)==="Paid / Closed"||isDead(o)).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).slice(0,10))}</div>`:""}`;
+  const dq=$("#dq");
+  if(dq) dq.oninput=()=>{ if(dq.value.trim().length>=2) openSearch(dq.value); };
 }
 function boardTable(list){
   return `<table><thead><tr><th>#</th><th>Customer</th><th>Vehicle</th><th>Status</th><th class="right">Total</th><th class="right">Balance</th><th>Updated</th></tr></thead><tbody>
@@ -2839,10 +3518,11 @@ function renderOrders(){const os=vals(db.orders).sort((a,b)=>(b.date||"").locale
 /* ---------- customers ---------- */
 let custFilter="";
 function renderCustomers(){const cs=vals(db.customers).sort((a,b)=>(a.name||"").localeCompare(b.name||""));const f=custFilter.toLowerCase();
-  const list=cs.filter(c=>!f||(c.name+" "+(c.phone||"")+" "+(c.email||"")).toLowerCase().includes(f));
+  const list=cs.filter(c=>!f||(customerLabel(c)+" "+(c.phone||"")+" "+(c.phone2||"")+" "+(c.email||"")+" "+(c.company||"")+" "+(c.city||"")).toLowerCase().includes(f)
+    ||(digits(f).length>=3&&[digits(c.phone),digits(c.phone2)].some(x=>x&&x.indexOf(digits(f))>=0)));
   $("#app").innerHTML=`<div class="card"><div class="toolbar"><h2 style="margin:0">Customers</h2><input class="search" id="cf" placeholder="Search…" value="${esc(custFilter)}"><div class="grow"></div><button class="primary" onclick="editCustomer(null)">+ Add Customer</button></div>
   ${list.length?`<table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Vehicles</th><th></th></tr></thead><tbody>
-  ${list.map(c=>`<tr><td><b>${esc(c.name)}</b></td><td>${esc(c.phone||"")}</td><td>${esc(c.email||"")}</td><td>${vals(db.vehicles).filter(v=>v.customerId===c.id).length}</td><td class="right"><button class="sm" onclick="editCustomer('${c.id}')">Edit</button></td></tr>`).join("")}
+  ${list.map(c=>`<tr class="clk" onclick="openCustomer('${c.id}')"><td><b>${esc(customerLabel(c))}</b>${isBusiness(c)?` <span class="badge b-vehicle">BUSINESS</span>`:""}</td><td>${esc(c.phone||"")}</td><td>${esc(c.email||"")}</td><td>${vehiclesOf(c.id).length}</td><td class="right"><button class="sm" onclick="event.stopPropagation();newAppointmentFor('${c.id}')">Book</button><button class="sm" onclick="event.stopPropagation();editCustomer('${c.id}')">Edit</button></td></tr>`).join("")}
   </tbody></table>`:`<div class="empty">No customers yet.</div>`}</div>`;
   $("#cf").oninput=e=>{custFilter=e.target.value;const s=e.target.selectionStart;renderCustomers();const el=$("#cf");el.focus();el.setSelectionRange(s,s);};
 }
@@ -3131,15 +3811,61 @@ function importData(e){
 }
 
 /* ---------- customer editor ---------- */
-function editCustomer(id,then){const c=id?db.customers[id]:{id:uid("c"),name:"",phone:"",email:"",address:"",notes:""};
+function editCustomer(id,then){
+  const c=shapeCustomer(id?JSON.parse(JSON.stringify(db.customers[id])):{id:uid("c"),name:"",phone:"",email:"",address:"",notes:""});
+  /* An older record has one "name" and nothing else. Split it once, here, so
+     the form has something sensible in it; the record itself is only rewritten
+     if the person actually saves. */
+  if(!c.first&&!c.last&&!c.company&&c.name){
+    const bits=String(c.name).trim().split(/\s+/);
+    c.first=bits.shift()||""; c.last=bits.join(" ");
+  }
   $("#recSheet").innerHTML=`<div class="sheet-head"><h2>${id?"Edit":"Add"} Customer</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
-  <label>Name</label><input id="c_name" value="${esc(c.name)}">
-  <div class="row"><div><label>Phone</label><input id="c_phone" value="${esc(c.phone)}"></div><div><label>Email</label><input id="c_email" value="${esc(c.email)}"></div></div>
-  <label>Address</label><input id="c_address" value="${esc(c.address)}">
+  <div class="row"><div><label>First name</label><input id="c_first" value="${esc(c.first)}"></div>
+    <div><label>Last name</label><input id="c_last" value="${esc(c.last)}"></div>
+    <div><label>Business / fleet name</label><input id="c_company" value="${esc(c.company)}" placeholder="leave blank for an individual"></div></div>
+  <div class="row"><div><label>Phone</label><input id="c_phone" value="${esc(c.phone)}"></div>
+    <div><label>Other phone</label><input id="c_phone2" value="${esc(c.phone2)}"></div>
+    <div><label>Email</label><input id="c_email" value="${esc(c.email)}"></div>
+    <div><label>Prefers</label><select id="c_contactBy">${CONTACT_METHODS.map(m=>`<option value="${m}" ${c.contactBy===m?"selected":""}>${m}</option>`).join("")}</select></div></div>
+  <div class="row"><div><label>Address</label><input id="c_address" value="${esc(c.address)}"></div>
+    <div><label>City</label><input id="c_city" value="${esc(c.city)}"></div>
+    <div><label>State</label><input id="c_state" value="${esc(c.state)}"></div>
+    <div><label>ZIP</label><input id="c_zip" value="${esc(c.zip)}"></div></div>
   <label>Notes</label><textarea id="c_notes">${esc(c.notes)}</textarea>
+  <div id="c_dupes"></div>
   <div class="toolbar" style="margin-top:14px"><button class="green" id="c_save">Save Customer</button>${id?`<button class="danger" onclick="delCustomer('${id}')">Delete</button>`:""}</div>`;
-  $("#c_save").onclick=()=>{const name=$("#c_name").value.trim();if(!name){alert("Enter a name.");return;}c.name=name;c.phone=$("#c_phone").value;c.email=$("#c_email").value;c.address=$("#c_address").value;c.notes=$("#c_notes").value;db.customers[c.id]=c;save();closeRec();if(then)then(c.id);else render();};
+  const read=()=>{
+    ["first","last","company","phone","phone2","email","address","city","state","zip","notes","contactBy"]
+      .forEach(k=>{const el=$("#c_"+k); if(el) c[k]=el.value;});
+    return c;
+  };
+  /* Somebody ringing back is not a new customer. The warning appears as the
+     number is typed, not after the duplicate has been created. */
+  const checkDupes=()=>{
+    if(id) return;
+    const dupes=findDuplicateCustomers(read());
+    $("#c_dupes").innerHTML=dupes.length?`<div class="dupwarn"><b>This may already be in the book.</b>
+      ${dupes.slice(0,3).map(d=>`<div style="margin-top:5px">${esc(customerLabel(d.customer))}${d.customer.phone?" · "+esc(d.customer.phone):""}
+        <span class="muted">— ${esc(d.reasons.join(", "))}</span>
+        <button class="sm" onclick="useExistingCustomer('${d.customer.id}')">Use this one</button></div>`).join("")}
+      <div class="muted" style="margin-top:6px">Saving anyway creates a second record. Nothing is merged automatically.</div></div>`:"";
+  };
+  ["c_first","c_last","c_company","c_phone","c_phone2","c_email"].forEach(x=>{const el=$("#"+x); if(el) el.oninput=checkDupes;});
+  checkDupes();
+  window.__custThen=then;
+  $("#c_save").onclick=()=>{
+    read();
+    if(!customerName(c)){alert("Enter a name, or a business name.");return;}
+    saveCustomer(c); save(); closeRec();
+    if(then) then(c.id); else render();
+  };
   $("#recOverlay").classList.add("on");
+}
+function useExistingCustomer(id){
+  const then=window.__custThen;
+  closeRec();
+  if(then) then(id); else openCustomer(id);
 }
 function delCustomer(id){if(!confirm("Delete this customer? Their vehicles stay but become unassigned."))return;delete db.customers[id];save();closeRec();render();}
 function closeRec(){$("#recOverlay").classList.remove("on");}
@@ -3162,7 +3888,9 @@ function editVehicle(id,presetCustomer,then){
   <label style="margin-top:12px">Owner</label><select id="v_cust"><option value="">— select customer —</option>${custOpts}</select>
   <div class="row"><div><label>Year</label><input id="v_year" value="${esc(v.year)}"></div><div><label>Make</label><input id="v_make" value="${esc(v.make)}"></div><div><label>Model</label><input id="v_model" value="${esc(v.model)}"></div></div>
   <div class="row"><div><label>Color</label><input id="v_color" value="${esc(v.color)}"></div><div><label>Plate</label><input id="v_plate" value="${esc(v.plate)}"></div><div><label>Mileage</label><input id="v_mileage" value="${esc(v.mileage)}"></div></div>
+  <div class="row"><div><label>Unit / fleet number</label><input id="v_unit" value="${esc(v.unit||"")}" placeholder="for fleet vehicles"></div></div>
   <label>Notes</label><textarea id="v_notes">${esc(v.notes)}</textarea>
+  <div id="v_dupe"></div>
   <div class="toolbar" style="margin-top:14px"><button class="green" id="v_save">Save Vehicle</button>${id?`<button class="danger" onclick="delVehicle('${id}')">Delete</button>`:""}</div>`;
 
   const paint=()=>{
@@ -3175,11 +3903,28 @@ function editVehicle(id,presetCustomer,then){
   $("#v_vin").onblur=paint;
   paint();
 
+  /* A VIN is the vehicle's identity, so a second record for the same VIN cuts
+     that car's history in half. Warn, offer the one that exists, and never
+     create the duplicate silently. */
+  const vinCheck=()=>{
+    const n=normalizeVin($("#v_vin").value);
+    const dup=n.ok?findVehicleByVin(n.vin,v.id):null;
+    $("#v_dupe").innerHTML=dup?`<div class="dupwarn"><b>This VIN is already in the book.</b>
+      <div style="margin-top:5px">${esc(vehLabel(dup.id))}${dup.plate?" · "+esc(dup.plate):""} — owned by ${esc(custName(dup.customerId))}
+      <button class="sm" onclick="useExistingVehicle('${dup.id}')">Use that vehicle</button></div>
+      <div class="muted" style="margin-top:6px">Saving anyway would give this car two histories.</div></div>`:"";
+  };
+  $("#v_vin").addEventListener("input",vinCheck);
+  vinCheck();
+  window.__vehThen=then;
   $("#v_save").onclick=()=>{
     v.customerId=$("#v_cust").value;v.year=$("#v_year").value;v.make=$("#v_make").value;v.model=$("#v_model").value;
     v.color=$("#v_color").value;v.plate=$("#v_plate").value;v.mileage=$("#v_mileage").value;v.notes=$("#v_notes").value;
+    v.unit=($("#v_unit")||{}).value||"";
     const n=normalizeVin($("#v_vin").value);
     if($("#v_vin").value.trim() && !n.ok){ alert(n.reason); return; }
+    const dup=n.ok?findVehicleByVin(n.vin,v.id):null;
+    if(dup&&!confirm("A vehicle with this VIN is already in the book ("+vehLabel(dup.id)+", owned by "+custName(dup.customerId)+").\n\nSaving creates a second record and splits that car's history.\n\nCreate it anyway?")) return;
     v.vin=n.ok?n.vin:"";
     if(!v.make&&!v.model){alert("Enter at least a make or model, or decode a VIN.");return;}
     db.vehicles[v.id]=v;save();closeRec();if(then)then(v.id);else render();
@@ -3218,6 +3963,11 @@ function decodedCard(d){
     ${bits?`<div style="margin-top:4px">${esc(bits)}</div>`:""}
     ${d.gvwrClass?`<div class="muted" style="font-size:12px;margin-top:3px">${esc(d.gvwrClass)}</div>`:""}
     ${warn}</div>`;
+}
+function useExistingVehicle(id){
+  const then=window.__vehThen;
+  closeRec();
+  if(then) then(id); else openVehicle(id);
 }
 function delVehicle(id){if(!confirm("Delete this vehicle?"))return;delete db.vehicles[id];save();closeRec();render();}
 
@@ -3407,6 +4157,7 @@ function applyShopFees(){
   renderLines(); updateTotals();
 }
 function renderLines(){const o=cur;
+  if(!o||!$("#laborRows")) return;        /* nothing on screen to draw on */
   $("#laborRows").innerHTML=(o.labor||[]).map((l,i)=>laborRow(l,i,o)).join("");
   $("#partsRows").innerHTML=(o.parts||[]).map((x,i)=>partRow(x,i,o)).join("");
   $("#extraRows").innerHTML=(o.extras||[]).map((x,i)=>extraRow(x,i,o)).join("");
@@ -3576,7 +4327,9 @@ function drawVerifyBanner(){
 }
 /* Totals are recalculated from the ticket on every keystroke rather than nudged,
    so a rounding error cannot accumulate as somebody edits. */
-function updateTotals(){const t=orderTotals(cur);
+function updateTotals(){
+  if(!cur||!$("#laborRows")) return;
+  const t=orderTotals(cur);
   /* The authorization box has to keep up with the total, not with the next
      full redraw: the moment work is added past what the customer agreed to is
      the moment somebody needs to be told. */

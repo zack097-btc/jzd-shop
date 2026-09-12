@@ -105,6 +105,23 @@ subscription. Settings ▸ **Where is my data?** shows the folder.
 - **A customer inspection report** — what needs attention now, what to keep an
   eye on, and everything checked and sound, with the measurements. Statuses
   print with words as well as colour so a grayscale copy still reads.
+- **A schedule, and a front office** — book a customer and a vehicle onto a day
+  and a time with the work they asked for, in day or week view, with the hours
+  already booked shown against what the shop can actually do. **Arrive / check
+  in** hands the appointment straight to the existing check-in with the
+  customer, vehicle, concern, technician and requested work already filled in —
+  there is no second check-in screen.
+- **Customers who only exist once** — a customer who rings back is flagged as a
+  probable duplicate by phone, email or name before a second record is made,
+  and a VIN already in the book is caught before a car gets two histories.
+  Nothing is ever merged automatically.
+- **Work they said no to, offered again** — booking a known vehicle puts its
+  previously declined work on screen with the date, the mileage and the amount,
+  ready to add to the appointment. Nobody has to remember to go looking.
+- **Businesses and fleets** — a company name and a contact, as many vehicles as
+  they like, and a unit number on each one.
+- **One search box** — name, business, phone however it is punctuated, email,
+  full or partial VIN, plate, unit number, RO or invoice number.
 - **Photographs, where they belong** — on a damage entry, on an inspection
   finding, on a vehicle. Each one is marked either for the customer or internal
   to the shop, takes a caption, and appears on the customer's report only when
@@ -162,6 +179,7 @@ node testvin.cjs       # VIN, matching, pricing, overrides, provenance
 node testflow.cjs      # estimate to paid invoice, and old books still opening
 node testshop.cjs      # check-in, inspection, recommendations, parts, history
 node testphoto.cjs     # photographs, visibility, and a real backup round trip
+node testfront.cjs     # customers, duplicates, appointments, arrival, search
 cd desktop/src-tauri && cargo test    # the storage layer
 ```
 
@@ -183,5 +201,5 @@ the book: a book carrying its own photographs would be rewritten whole on every
 keystroke and copied into sixty backups. The book keeps a small record and a
 thumbnail; a backup is the one place the two travel together.
 
-Tag a version (`git tag v2.4.1 && git push origin v2.4.1`) and CI runs all six
+Tag a version (`git tag v2.5.0 && git push origin v2.5.0`) and CI runs all seven
 suites, then builds and publishes the installer.
