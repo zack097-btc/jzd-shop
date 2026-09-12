@@ -64,10 +64,10 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
         let (mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh) =
             (h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7]);
         for i in 0..64 {
-            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_left(23);
+            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
             let ch = (e & f) ^ (!e & g);
             let t1 = hh.wrapping_add(s1).wrapping_add(ch).wrapping_add(K256[i]).wrapping_add(w[i]);
-            let s0 = a.rotate_right(2) ^ a.rotate_right(7) ^ a.rotate_left(4);
+            let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
             let maj = (a & b) ^ (a & c) ^ (b & c);
             let t2 = s0.wrapping_add(maj);
             hh = g;
@@ -381,9 +381,15 @@ fn expand_inner(message: &str, lookup: &mut dyn FnMut(&str) -> Result<Option<Str
         let after = &rest[start + 2..];
         let end = after.find("]]").ok_or_else(|| "unterminated inner placeholder".to_string())?;
         let inner = &after[..end];
+        if inner == "nl" {
+            // a line break, which cannot travel inside a URL or header template
+            out.push('\n');
+            rest = &after[end + 2..];
+            continue;
+        }
         let field = inner
             .strip_prefix("secret:")
-            .ok_or_else(|| "only [[secret:FIELD]] may appear in a signed message".to_string())?;
+            .ok_or_else(|| "only [[secret:FIELD]] or [[nl]] may appear in a signed message".to_string())?;
         if !safe_token(field, 40) {
             return Err("bad credential field in signed message".into());
         }
@@ -422,7 +428,11 @@ pub fn expand_template_with(
             let v = session(name).ok_or_else(|| format!("MISSING_SESSION:{}", name))?;
             out.push_str(&v);
             used = true;
-        } else if let Some(spec) = inner.strip_prefix("hmac_sha256_b64:") {
+        } else if let Some((spec, url_safe)) = inner
+            .strip_prefix("hmac_sha256_b64url:")
+            .map(|x| (x, true))
+            .or_else(|| inner.strip_prefix("hmac_sha256_b64:").map(|x| (x, false)))
+        {
             let colon = spec.find(':').ok_or_else(|| "bad signature placeholder".to_string())?;
             let field = &spec[..colon];
             let message = &spec[colon + 1..];
@@ -432,7 +442,13 @@ pub fn expand_template_with(
             let key = lookup(field)?.ok_or_else(|| format!("MISSING_CREDENTIAL:{}", field))?;
             let message = expand_inner(message, lookup)?;
             let mac = hmac_sha256(key.as_bytes(), message.as_bytes());
-            out.push_str(&crate::b64_encode(&mac));
+            let sig = crate::b64_encode(&mac);
+            if url_safe {
+                // percent-encoded for use as a query-string value
+                out.push_str(&sig.replace('+', "%2B").replace('/', "%2F").replace('=', "%3D"));
+            } else {
+                out.push_str(&sig);
+            }
             used = true;
         } else {
             return Err(format!("unknown placeholder {{{{{}}}}}", inner.split(':').next().unwrap_or("")));
@@ -911,6 +927,10 @@ mod tests {
         let (a, _) = expand_template("{{hmac_sha256_b64:privateKey:[[secret:publicKey]]:message}}", &mut lookup).unwrap();
         let expected = crate::b64_encode(&hmac_sha256(b"key", b"PUB:message"));
         assert_eq!(a, expected);
+        let (nl, _) = expand_template("{{hmac_sha256_b64:privateKey:[[secret:publicKey]][[nl]]GET}}", &mut lookup).unwrap();
+        assert_eq!(nl, crate::b64_encode(&hmac_sha256(b"key", b"PUB\nGET")));
+        let (q, _) = expand_template("sig={{hmac_sha256_b64url:privateKey:The quick brown fox jumps over the lazy dog}}", &mut lookup).unwrap();
+        assert_eq!(q, "sig=97yD9DBThCSxMpjmqm%2BxQ%2B9NWaFJRhdZl0edvC0aPNg%3D");
         assert!(expand_template("{{hmac_sha256_b64:privateKey:[[session:x]]}}", &mut lookup).is_err());
         let mut sess = |n: &str| if n == "X-AuthToken" { Some("TOK".to_string()) } else { None };
         let (b, used) = expand_template_with("TecRMI {{session:X-AuthToken}}", &mut lookup, &mut sess).unwrap();
