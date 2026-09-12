@@ -46,10 +46,33 @@ subscription. Settings ▸ **Where is my data?** shows the folder.
   overridden, but not anonymously: it asks who and why (and a manager PIN if
   you set one) and keeps the history in Settings. The catalog row itself is
   never edited, so you can always see what it started as and undo back to it.
-- **Customers, vehicles, service history, invoices and estimates** — as before:
-  pick or create a customer and vehicle, record the complaint, add labor and
-  parts, set status (Estimate → Approved → In Progress → Completed → Invoiced →
-  Paid), print a clean invoice or estimate with auto-incrementing numbers.
+- **Estimate → approval → repair order → invoice → paid** — the whole ticket,
+  in one screen. Statuses are Estimate, Awaiting Approval, Approved, In
+  Progress, Waiting on Parts, Completed, Invoiced, Paid / Closed, Declined and
+  Cancelled, and every change is dated and kept.
+- **Parts with cost and price, not just price** — enter what a part cost you
+  and the default markup suggests a selling price you can type straight over.
+  Both numbers are kept, because the difference is your margin. Cost, markup
+  and vendor never appear on a customer document.
+- **Sublet, shop fees and discounts** — set fees up once in Settings (flat or a
+  percentage of labor, parts, or both, taxable or not) and drop them onto a
+  ticket. Nothing is ever added to a ticket by itself.
+- **Tax you configure** — labor, parts and fees are each taxable or not
+  according to what your accountant told you, with a per-line override. This
+  program does arithmetic, not law.
+- **Customer authorization that protects you** — record who approved what, how
+  (in person, phone, text, email) and for how much. Add work after that and the
+  ticket says **ADDITIONAL AUTHORIZATION REQUIRED** the moment the total passes
+  what they agreed to, rather than assuming the answer is still yes.
+- **Payments** — cash, card, check, bank transfer or other, partial or in full,
+  with the balance always on screen. No card numbers are stored, ever, and
+  there is no processor and no monthly fee.
+- **Three documents** — a customer estimate with a signature line, a shop-copy
+  repair order carrying the internal notes and verification warnings and no
+  line pricing, and a customer invoice. All print on US Letter and save as PDF
+  through Windows, with no subscription and no internet.
+- **An open-work dashboard** — what is awaiting approval, approved, on a lift,
+  stuck on a part, finished, or invoiced and unpaid, with totals and balances.
 - **Backup** — Export/Import a `.json`, plus **Restore from backup…**: the app
   keeps the last 60 copies of your book automatically, one taken before every
   single change.
@@ -98,6 +121,7 @@ The thing that went wrong before cannot happen the same way twice:
 python build.py        # stage into desktop/dist; refuses on version drift
 node testsave.cjs      # persistence suite
 node testvin.cjs       # VIN, matching, pricing, overrides, provenance
+node testflow.cjs      # estimate to paid invoice, and old books still opening
 cd desktop/src-tauri && cargo test    # the storage layer
 ```
 
@@ -106,5 +130,9 @@ it into the desktop shell and refuses to run unless `index.html`,
 `tauri.conf.json` and `Cargo.toml` agree on the version. Both browser suites
 stub the network, so no release ever depends on a third party being up.
 
-Tag a version (`git tag v2.2.0 && git push origin v2.2.0`) and CI runs all
-three suites, then builds and publishes the installer.
+Once an invoice is finalized it carries its own copy of the labor rate and the
+tax rules it was billed under, so changing either afterwards cannot move a
+document a customer already has. Numbers, once issued, are never reused.
+
+Tag a version (`git tag v2.3.0 && git push origin v2.3.0`) and CI runs all four
+suites, then builds and publishes the installer.

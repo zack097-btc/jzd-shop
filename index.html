@@ -35,6 +35,18 @@
   .tabs{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
   .tabs button{padding:7px 12px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;font:inherit;font-size:13px}
   .tabs button.on{background:var(--steel);color:#fff;border-color:var(--steel)}
+  .linerow.parts{grid-template-columns:1fr 110px 60px 80px 60px 90px 84px 28px}
+  .linerow.extra{grid-template-columns:130px 1fr 100px 90px 84px 28px}
+  .secthead{display:flex;gap:8px;align-items:center;margin:18px 0 2px}
+  .secthead h3{margin:0}
+  .authbox{border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-top:14px}
+  .authbox.ok{background:#f2f7f4;border-color:#cfe4d8}
+  .authbox.warn{background:#fdf3f2;border-color:#f0c8c2}
+  .authbox.wait{background:#fdf8ee;border-color:#efdcb8}
+  .authline{font-size:12px;color:var(--muted);margin-top:5px}
+  .totbox .totrow.sub{border-top:1px solid var(--line);margin-top:5px;padding-top:5px}
+  .totbox .totrow.bal b{color:var(--bad)}
+  .totbox .totrow.bal.clear b{color:var(--accent2)}
   .vinbar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
   .vinbar input{font-family:ui-monospace,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase}
   .decoded{background:#f2f7f4;border:1px solid #cfe4d8;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:13px}
@@ -106,6 +118,14 @@
   .inv th,.inv td{border-bottom:1px solid #ccc;padding:7px 8px;font-size:12.5px}
   .inv .tot{width:280px;margin-left:auto}
   .inv .foot{margin-top:24px;color:#555;font-size:12px;border-top:1px solid #ccc;padding-top:10px}
+  .inv h4{margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--steel)}
+  .inv .note{white-space:pre-wrap;font-size:12.5px;margin-bottom:6px}
+  .inv .authstamp{border:1.5px solid #111;padding:8px 10px;margin-top:12px;font-size:12.5px}
+  .inv .warnbox{border:1.5px solid #a3291b;color:#8f2419;padding:8px 10px;margin:10px 0;font-size:12.5px;font-weight:600}
+  .inv .sigline{margin-top:26px;border-top:1px solid #111;width:300px;padding-top:5px;font-size:11.5px}
+  .inv .tot td{border-bottom:none;padding:3px 8px}
+  .inv .tot tr.grand td{border-top:1.5px solid #111;font-size:14px;padding-top:7px}
+  @page{margin:14mm}
 </style>
 </head>
 <body>
@@ -439,7 +459,17 @@ const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;
 /* The shop's door rate. 112.50 is the current rate; rateMin/rateMax are the
    range it is expected to move within and are a guide for the settings screen,
    not a business rule — a shop that raises its rate is not a validation error. */
-const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:112.50,rateMin:100,rateMax:125,taxRate:8.25,taxLabor:false,nextInvoice:1001,terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[]};
+/* The shop door rate. 112.50 is the current rate; rateMin/rateMax are the range
+   it is expected to move within and are a guide for the settings screen, not a
+   business rule - a shop that raises its rate is not a validation error.
+
+   Tax is configuration, never an assumption: which of labor, parts and fees are
+   taxable differs by state and by what the shop has been told by its own
+   accountant, so this program takes an instruction and does arithmetic. It does
+   not know the law. taxParts defaults true because the version before this one
+   always taxed parts, and a silent change to that would rewrite what every
+   existing draft charges. */
+const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:112.50,rateMin:100,rateMax:125,taxRate:8.25,taxLabor:false,taxParts:true,taxFees:false,partsMarkup:40,nextInvoice:1001,nextEstimate:1,nextRO:1,fees:[],terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[]};
 let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot() */
 /* ---------- where the book actually lives ----------------------------------
 
@@ -466,7 +496,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.2.0";
+const JZD_VERSION = "2.3.0";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -590,7 +620,7 @@ function vals(o){return Object.values(o||{});}
 /* ---------- helpers ---------- */
 function custName(id){const c=db.customers[id];return c?c.name:"—";}
 function vehLabel(id){const v=db.vehicles[id];return v?`${v.year||""} ${v.make||""} ${v.model||""}`.trim()||"Vehicle":"—";}
-function orderTotals(o){const labor=(o.labor||[]).reduce((s,l)=>s+lineAmount(l,o),0);const parts=(o.parts||[]).reduce((s,p)=>s+(Number(p.qty)||0)*(Number(p.price)||0),0);const taxable=parts+(db.settings.taxLabor?labor:0);const tax=taxable*(Number(db.settings.taxRate)||0)/100;return {labor,parts,tax,total:labor+parts+tax};}
+/* orderTotals now lives with the rest of the commercial engine below. */
 
 /* ---------- router ---------- */
 let view="dash",detailVeh=null;
@@ -968,7 +998,6 @@ function seedCharge(row){
   const e = effectiveSeed(row);
   return isFixed(row) ? (Number(e.price) || 0) : (Number(e.hours) || 0) * shopRate();
 }
-function isFinal(o){ return !!o && (o.status === "Invoiced" || o.status === "Paid"); }
 /* A draft follows the current door rate; an invoice keeps the rate it was
    written at. A line the shop typed a rate into by hand is that shop decision
    and is never recalculated. Lines saved before this version carry no
@@ -982,11 +1011,230 @@ function lineHours(line){ return Number(line.billedHours != null ? line.billedHo
 function lineAmount(line, order){
   return line.bill === "F" ? (Number(line.price) || 0) : lineHours(line) * effRate(line, order);
 }
-/* Called when an order is saved: an order that has become an invoice stops
-   moving, whatever the shop does to its rate afterwards. */
-function freezeIfFinal(o){
-  if (!isFinal(o)) return;
+
+
+/* ====================================================================
+   From an estimate to a paid invoice
+   ====================================================================
+   The rule that governs everything below: a document the customer has
+   already been shown must never change by itself. A shop that raises
+   its door rate, edits a catalog time or changes its tax setting on
+   Tuesday cannot be allowed to quietly rewrite Monday's invoice. So
+   pricing inputs are read live while a ticket is a draft, and frozen
+   into the ticket the moment it becomes an invoice.
+
+   Line items stay in the two arrays the older versions already wrote -
+   labor[] and parts[] - with a third, extras[], for the things a ticket
+   needs that were never modelled: sublet, shop fees and discounts. That
+   is deliberate. A book written by v2.2.0 is already a valid book here:
+   nothing is rewritten on load, nothing is migrated, and a line saved
+   last week still prices to the same number. */
+
+function r2(n){ return Math.round((Number(n) || 0) * 100) / 100; }
+
+/* Statuses. The old books wrote "InProgress" and "Paid"; those are read
+   as-is and shown correctly rather than rewritten under the shop's feet. */
+const STATUSES = ["Estimate","Awaiting Approval","Approved","In Progress","Waiting on Parts",
+                  "Completed","Invoiced","Paid / Closed","Declined","Cancelled"];
+const LEGACY_STATUS = {InProgress:"In Progress", Paid:"Paid / Closed", "Paid/Closed":"Paid / Closed"};
+function canonStatus(st){ const v = String(st || "Estimate"); return LEGACY_STATUS[v] || v; }
+function statusLabel(st){ return canonStatus(st); }
+function statusClass(st){ return canonStatus(st).replace(/[^A-Za-z]/g, ""); }
+/* Invoiced and Paid are commercially final: the numbers on them stop moving. */
+function isFinal(o){ const st = canonStatus(o && o.status); return st === "Invoiced" || st === "Paid / Closed"; }
+function isDead(o){ const st = canonStatus(o && o.status); return st === "Declined" || st === "Cancelled"; }
+
+/* Every line gets an id the first time it is touched, so a payment, an
+   authorization snapshot or a note can point at one line and keep pointing at
+   it after the list is reordered. Missing arrays are created, never assumed. */
+function shapeOrder(o){
+  if (!o) return o;
+  o.labor  = o.labor  || [];
+  o.parts  = o.parts  || [];
+  o.extras = o.extras || [];
+  o.payments = o.payments || [];
+  o.history  = o.history  || [];
+  o.auth = o.auth || {state:"Not Requested", entries:[], approvedTotal:0};
+  if (!o.auth.entries) o.auth.entries = [];
+  [["labor","labor"],["parts","part"],["extras","fee"]].forEach(([k, deflt]) => {
+    o[k].forEach(l => {
+      if (!l.id) l.id = uid("ln");
+      if (!l.type) l.type = (k === "labor") ? (l.serviceId ? "catalog-labor" : "manual-labor") : deflt;
+    });
+  });
+  return o;
+}
+
+/* Which pricing rules apply. A finalized ticket carries its own copy, taken at
+   the moment it became an invoice; everything else reads the shop's current
+   settings. This one function is why a settings change cannot reach backwards. */
+function taxCfg(o){
+  if (o && o.finalized) return o.finalized;
+  const s = db.settings;
+  return {taxRate:Number(s.taxRate) || 0, taxLabor:!!s.taxLabor, taxParts:s.taxParts !== false, taxFees:!!s.taxFees};
+}
+/* A line may override the shop-wide setting - some parts genuinely are not
+   taxable - but only when someone deliberately set it on that line. */
+function lineTaxable(line, deflt){ return (line && line.taxable != null) ? !!line.taxable : deflt; }
+
+function partSelling(p){
+  /* What the customer pays. Cost and markup are a suggestion engine; once a
+     price is on the line it is the price, and editing it never touches cost. */
+  return r2((Number(p.qty) || 0) * (Number(p.price) || 0));
+}
+function partCost(p){ return r2((Number(p.qty) || 0) * (Number(p.cost) || 0)); }
+function suggestedPrice(cost, markup){
+  const c = Number(cost) || 0, m = Number(markup);
+  return r2(c * (1 + (isFinite(m) ? m : 0) / 100));
+}
+
+/* Sublet is billed like a part. A fee is an amount or a percentage of a base
+   the shop chooses. A discount subtracts. */
+function extraAmount(x, base){
+  if (x.type === "discount"){
+    const v = (x.mode === "percent") ? (base.pre * (Number(x.value) || 0) / 100) : (Number(x.value) || 0);
+    return -r2(v);
+  }
+  if (x.type === "fee"){
+    if (x.mode === "percent"){
+      const on = x.base === "parts" ? base.parts : x.base === "laborparts" ? (base.labor + base.parts) : base.labor;
+      return r2(on * (Number(x.value) || 0) / 100);
+    }
+    return r2(Number(x.value) || 0);
+  }
+  return r2((Number(x.qty) || 1) * (Number(x.price) || 0));   /* sublet */
+}
+
+/* The whole commercial picture of a ticket, in one pass, with cost kept beside
+   revenue so a profit report later needs no new line-item model. */
+function orderTotals(o){
+  if (!o) return {labor:0,parts:0,sublet:0,fees:0,discounts:0,subtotal:0,tax:0,total:0,paid:0,balance:0,
+                  partsCost:0,subletCost:0,laborRevenue:0,partsRevenue:0};
+  const cfg = taxCfg(o);
+  const labor = r2((o.labor || []).reduce((s, l) => s + lineAmount(l, o), 0));
+  const parts = r2((o.parts || []).reduce((s, x) => s + partSelling(x), 0));
+  const partsCost = r2((o.parts || []).reduce((s, x) => s + partCost(x), 0));
+
+  const extras = o.extras || [];
+  const sublets = extras.filter(x => x.type === "sublet");
+  const sublet = r2(sublets.reduce((s, x) => s + extraAmount(x, {}), 0));
+  const subletCost = r2(sublets.reduce((s, x) => s + (Number(x.cost) || 0), 0));
+
+  /* Percentage fees and discounts are taken on what the work actually came to,
+     so they are computed after labor, parts and sublet are known. */
+  const base = {labor, parts, sublet, pre: r2(labor + parts + sublet)};
+  const feeLines = extras.filter(x => x.type === "fee");
+  const discLines = extras.filter(x => x.type === "discount");
+  const fees = r2(feeLines.reduce((s, x) => s + extraAmount(x, base), 0));
+  const discounts = r2(discLines.reduce((s, x) => s + extraAmount(x, base), 0));   /* negative */
+
+  const subtotal = r2(labor + parts + sublet + fees + discounts);
+
+  let taxable = 0;
+  if (cfg.taxLabor) taxable += labor;
+  (o.parts || []).forEach(x => { if (lineTaxable(x, cfg.taxParts)) taxable += partSelling(x); });
+  sublets.forEach(x => { if (lineTaxable(x, cfg.taxParts)) taxable += extraAmount(x, base); });
+  feeLines.forEach(x => { if (lineTaxable(x, cfg.taxFees)) taxable += extraAmount(x, base); });
+  /* A discount reduces what is taxed, in proportion to how much of the ticket
+     was taxable in the first place. Taxing a customer on money they did not
+     pay is the kind of error that is noticed. */
+  const preTaxBase = r2(labor + parts + sublet + fees);
+  if (discounts && preTaxBase > 0) taxable += discounts * (taxable / preTaxBase);
+  taxable = r2(Math.max(0, taxable));
+
+  const tax = r2(taxable * (Number(cfg.taxRate) || 0) / 100);
+  const total = r2(subtotal + tax);
+  const paid = r2((o.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0));
+  return {labor, parts, sublet, fees, discounts, subtotal, taxable, tax, total,
+          paid, balance: r2(total - paid),
+          partsCost, subletCost, laborRevenue: labor, partsRevenue: parts};
+}
+
+/* ---------- numbering ----------
+   A number, once given out, belongs to that ticket forever. Counters live in
+   the book and only ever go up; a ticket that already has a number keeps it. */
+function nextNumber(kind){
+  const key = kind === "estimate" ? "nextEstimate" : kind === "ro" ? "nextRO" : "nextInvoice";
+  const n = parseInt(db.settings[key], 10) || 1;
+  db.settings[key] = n + 1;
+  return n;
+}
+function ensureNumber(o, kind){
+  const field = kind === "estimate" ? "estimateNo" : kind === "ro" ? "roNo" : "invoiceNo";
+  if (!o[field]) o[field] = nextNumber(kind);
+  return o[field];
+}
+function ticketNo(o){
+  return o.invoiceNo ? "INV-" + o.invoiceNo : o.roNo ? "RO-" + o.roNo : o.estimateNo ? "EST-" + o.estimateNo : "—";
+}
+
+/* ---------- status ---------- */
+function setStatus(o, next, note){
+  const from = canonStatus(o.status), to = canonStatus(next);
+  if (from === to) return;
+  o.status = to;
+  o.history.push({at:new Date().toISOString(), from, to, note:note || ""});
+  /* Numbers are handed out when a ticket reaches the stage that needs one, not
+     on a timer, so an estimate that never became work never burns an RO number. */
+  if (to === "Estimate" || to === "Awaiting Approval") ensureNumber(o, "estimate");
+  if (to === "Approved" || to === "In Progress" || to === "Waiting on Parts" || to === "Completed") ensureNumber(o, "ro");
+  if (to === "Invoiced" || to === "Paid / Closed") finalizeOrder(o);
+}
+/* The moment the commercial snapshot is taken. After this the ticket prices
+   itself from its own copy of the rules and stops listening to Settings. */
+function finalizeOrder(o){
+  ensureNumber(o, "invoice");
+  if (!o.finalized){
+    const s = db.settings;
+    o.finalized = {at:new Date().toISOString(), taxRate:Number(s.taxRate) || 0, taxLabor:!!s.taxLabor,
+                   taxParts:s.taxParts !== false, taxFees:!!s.taxFees, laborRate:shopRate()};
+  }
   (o.labor || []).forEach(l => { if (l.rateSource === "shop"){ l.rate = shopRate(); l.rateSource = "locked"; } });
+}
+function freezeIfFinal(o){ if (isFinal(o)) finalizeOrder(o); }
+
+/* ---------- customer authorization ----------
+   The shop's protection. What the customer said yes to is written down with a
+   total attached, and if the work grows past that total the ticket says so
+   instead of assuming the answer is still yes. */
+const AUTH_STATES = ["Not Requested","Awaiting Approval","Approved","Partially Approved","Declined"];
+const AUTH_METHODS = ["In Person","Phone","Text","Email","Other"];
+function authorizedTotal(o){
+  return r2((o.auth && o.auth.entries || []).filter(e => e.decision === "Approved")
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0));
+}
+/* Not "is the total bigger" - "is the total bigger than everything they have
+   actually agreed to", which is the sum of the original yes and every later one. */
+function needsAdditionalAuth(o){
+  const st = (o.auth && o.auth.state) || "Not Requested";
+  if (st !== "Approved" && st !== "Partially Approved") return false;
+  return r2(orderTotals(o).total) > r2(authorizedTotal(o)) + 0.005;
+}
+function recordAuthorization(o, decision, who, method, amount, note){
+  const entry = {at:new Date().toISOString(), decision, who:who || "", method:method || "Other",
+                 amount:r2(amount), note:note || "",
+                 snapshot:{total:r2(orderTotals(o).total),
+                           lines:(o.labor || []).map(l => ({id:l.id, desc:l.desc, amount:r2(lineAmount(l, o))}))
+                             .concat((o.parts || []).map(x => ({id:x.id, desc:x.desc, amount:partSelling(x)})))}};
+  o.auth.entries.push(entry);
+  o.auth.state = decision === "Declined" ? "Declined" : decision;
+  o.auth.approvedTotal = authorizedTotal(o);
+  if (decision === "Approved" && canonStatus(o.status) === "Awaiting Approval") setStatus(o, "Approved", "customer approved");
+  if (decision === "Declined") setStatus(o, "Declined", "customer declined");
+  return entry;
+}
+
+/* ---------- payments ---------- */
+const PAY_METHODS = ["Cash","Card","Check","Bank Transfer","Other"];
+/* No card numbers, no tokens, no processor. An amount, a date and a method is
+   the whole record - anything more would be sensitive data this program has no
+   business holding. */
+function recordPayment(o, amount, method, note){
+  const amt = r2(amount);
+  if (!(amt > 0)) return null;
+  const pay = {id:uid("pay"), at:new Date().toISOString(), amount:amt, method:method || "Other", note:note || ""};
+  o.payments.push(pay);
+  return pay;
 }
 
 /* ---------- the audit trail ---------- */
@@ -1020,26 +1268,64 @@ function render(){$("#brandTop").innerHTML=esc(db.settings.shopName).replace(/(I
   if(view==="dash")renderDash();else if(view==="orders")renderOrders();else if(view==="customers")renderCustomers();else if(view==="vehicles")renderVehicles();else if(view==="vehDetail")renderVehicleDetail(detailVeh);else if(view==="services")renderServices();else if(view==="catalog")renderCatalog();else renderSettings();}
 
 /* ---------- dashboard ---------- */
-function renderDash(){const os=vals(db.orders).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
-  const open=os.filter(o=>o.status!=="Paid"&&o.status!=="Invoiced");
-  const cards=[["Open work orders",open.length],["Customers",vals(db.customers).length],["Vehicles",vals(db.vehicles).length]];
+function renderDash(){
+  /* What is actually in the shop right now, grouped the way the day runs:
+     what is waiting on the customer, what is on a lift, what is stuck on a
+     part, and what has been done but not paid for. */
+  const os=vals(db.orders);
+  const live=os.filter(o=>!isDead(o)&&canonStatus(o.status)!=="Paid / Closed");
+  const groups=[
+    ["Awaiting Approval", o=>canonStatus(o.status)==="Awaiting Approval"||needsAdditionalAuth(o)],
+    ["Approved",          o=>canonStatus(o.status)==="Approved"],
+    ["In Progress",       o=>canonStatus(o.status)==="In Progress"],
+    ["Waiting on Parts",  o=>canonStatus(o.status)==="Waiting on Parts"],
+    ["Completed",         o=>canonStatus(o.status)==="Completed"],
+    ["Invoiced / Unpaid", o=>canonStatus(o.status)==="Invoiced"&&orderTotals(o).balance>0.004],
+    ["Estimates",         o=>canonStatus(o.status)==="Estimate"]
+  ];
+  const unpaid=os.filter(o=>orderTotals(o).balance>0.004&&isFinal(o));
+  const cards=[
+    ["Open tickets",live.length],
+    ["Need authorization",live.filter(o=>canonStatus(o.status)==="Awaiting Approval"||needsAdditionalAuth(o)).length],
+    ["Unpaid balance",money(r2(unpaid.reduce((s,o)=>s+orderTotals(o).balance,0)))]
+  ];
+  const board=groups.map(([name,fn])=>{
+    const list=live.filter(fn).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+    if(!list.length)return "";
+    return `<div class="card"><div class="toolbar"><h2 style="margin:0">${esc(name)}</h2><span class="muted">${list.length}</span></div>${boardTable(list)}</div>`;
+  }).join("");
   $("#app").innerHTML=`
   <div class="row" style="margin-bottom:6px">${cards.map(c=>`<div class="card" style="text-align:center"><div style="font-size:30px;font-weight:800">${c[1]}</div><div class="muted">${c[0]}</div></div>`).join("")}</div>
-  <div class="card">
-    <div class="toolbar"><h2 style="margin:0">Recent Work Orders</h2><div class="grow"></div><button class="primary" onclick="editOrder(null)">+ New Work Order</button></div>
-    ${tableOrders(os.slice(0,25))}
-  </div>`;
+  <div class="toolbar"><div class="grow"></div><button class="primary" onclick="editOrder(null)">+ New Work Order</button></div>
+  ${board||`<div class="card"><div class="empty">Nothing open. Click <b>+ New Work Order</b> to start a ticket.</div></div>`}
+  ${os.length?`<div class="card"><div class="toolbar"><h2 style="margin:0">Recently closed</h2></div>
+    ${tableOrders(os.filter(o=>canonStatus(o.status)==="Paid / Closed"||isDead(o)).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).slice(0,10))}</div>`:""}`;
 }
+function boardTable(list){
+  return `<table><thead><tr><th>#</th><th>Customer</th><th>Vehicle</th><th>Status</th><th class="right">Total</th><th class="right">Balance</th><th>Updated</th></tr></thead><tbody>
+  ${list.map(o=>{const t=orderTotals(o);const need=needsAdditionalAuth(o);
+    const upd=(o.history||[]).slice(-1)[0];
+    return `<tr class="clk" onclick="editOrder('${o.id}')">
+      <td><b>${esc(ticketNo(o))}</b></td>
+      <td>${esc(custName(o.customerId))}</td>
+      <td>${esc(vehLabel(o.vehicleId))}</td>
+      <td><span class="pill st-${statusClass(o.status)}">${esc(canonStatus(o.status))}</span>${need?` <span class="badge b-verify">AUTH</span>`:""}</td>
+      <td class="right">${money(t.total)}</td>
+      <td class="right">${t.balance>0.004?`<b>${money(t.balance)}</b>`:"—"}</td>
+      <td class="muted">${esc(upd?String(upd.at).slice(0,10):(o.date||""))}</td></tr>`;}).join("")}
+  </tbody></table>`;
+}
+
 function tableOrders(list){if(!list.length)return `<div class="empty">No work orders yet. Click <b>+ New Work Order</b> to start.</div>`;
-  return `<table><thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Vehicle</th><th>Status</th><th class="right">Total</th></tr></thead><tbody>
-  ${list.map(o=>{const t=orderTotals(o);return `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${o.invoiceNo||"—"}</b></td><td>${esc(o.date||"")}</td><td>${esc(custName(o.customerId))}</td><td>${esc(vehLabel(o.vehicleId))}</td><td><span class="pill st-${(o.status||"Estimate").replace(/\\s/g,"")}">${esc(o.status||"Estimate")}</span></td><td class="right">${money(t.total)}</td></tr>`;}).join("")}
+  return `<table><thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Vehicle</th><th>Status</th><th class="right">Total</th><th class="right">Balance</th></tr></thead><tbody>
+  ${list.map(o=>{const t=orderTotals(o);return `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${esc(ticketNo(o))}</b></td><td>${esc(o.date||"")}</td><td>${esc(custName(o.customerId))}</td><td>${esc(vehLabel(o.vehicleId))}</td><td><span class="pill st-${statusClass(o.status)}">${esc(canonStatus(o.status))}</span>${needsAdditionalAuth(o)?` <span class="badge b-verify">AUTH</span>`:""}</td><td class="right">${money(t.total)}</td><td class="right">${t.balance>0.004?money(t.balance):"—"}</td></tr>`;}).join("")}
   </tbody></table>`;}
 
 /* ---------- orders list ---------- */
 let ordFilter="";
 function renderOrders(){const os=vals(db.orders).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
   const f=ordFilter.toLowerCase();
-  const list=os.filter(o=>!f||(custName(o.customerId)+" "+vehLabel(o.vehicleId)+" "+(o.invoiceNo||"")+" "+(o.complaint||"")).toLowerCase().includes(f));
+  const list=os.filter(o=>!f||(custName(o.customerId)+" "+vehLabel(o.vehicleId)+" "+ticketNo(o)+" "+(o.complaint||"")+" "+canonStatus(o.status)).toLowerCase().includes(f));
   $("#app").innerHTML=`<div class="card"><div class="toolbar"><h2 style="margin:0">Work Orders</h2><input class="search" id="of" placeholder="Search customer, vehicle, #…" value="${esc(ordFilter)}"><div class="grow"></div><button class="primary" onclick="editOrder(null)">+ New</button></div>${tableOrders(list)}</div>`;
   $("#of").oninput=e=>{ordFilter=e.target.value;const s=e.target.selectionStart;renderOrders();const el=$("#of");el.focus();el.setSelectionRange(s,s);};
 }
@@ -1081,7 +1367,7 @@ function renderVehicleDetail(id){const v=db.vehicles[id];if(!v){go("vehicles");r
   </div>
   <div class="card"><h2 style="margin-top:0">Service History</h2>
   ${hist.length?`<table><thead><tr><th>#</th><th>Date</th><th>Mileage</th><th>Work performed</th><th>Status</th><th class="right">Total</th></tr></thead><tbody>
-  ${hist.map(o=>{const t=orderTotals(o);const work=o.complaint||(o.labor||[]).map(l=>l.desc).filter(Boolean).join(", ")||"—";return `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${o.invoiceNo||"—"}</b></td><td>${esc(o.date||"")}</td><td>${esc(o.mileageOut||o.mileageIn||"")}</td><td>${esc(work).slice(0,70)}</td><td><span class="pill st-${(o.status||"Estimate").replace(/\s/g,"")}">${esc((o.status||"").replace("InProgress","In Progress"))}</span></td><td class="right">${money(t.total)}</td></tr>`;}).join("")}
+  ${hist.map(o=>{const t=orderTotals(o);const work=o.complaint||(o.labor||[]).map(l=>l.desc).filter(Boolean).join(", ")||"—";return `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${esc(ticketNo(o))}</b></td><td>${esc(o.date||"")}</td><td>${esc(o.mileageOut||o.mileageIn||"")}</td><td>${esc(work).slice(0,70)}</td><td><span class="pill st-${statusClass(o.status)}">${esc(canonStatus(o.status))}</span></td><td class="right">${money(t.total)}</td></tr>`;}).join("")}
   </tbody></table>`:`<div class="empty">No service history yet. Click <b>+ New Work Order</b> to log the first visit for this vehicle.</div>`}</div>`;
 }
 /* ---------- catalog ---------- */
@@ -1162,7 +1448,7 @@ function editCatItem(kind,id){const store=db.catalog[kind];const it=id?store[id]
 }
 function delCatItem(kind,id){if(!confirm("Delete this catalog item?"))return;delete db.catalog[kind][id];save();closeRec();render();}
 function catSelect(kind){const items=vals(db.catalog[kind]);if(!items.length)return "";const opts=items.map(it=>`<option value="${it.id}">${esc(kind==="labor"?it.desc:it.name)}</option>`).join("");return `<select class="sm" style="max-width:230px" onchange="insertCat('${kind}',this.value);this.selectedIndex=0"><option value="">Insert saved ${kind}…</option>${opts}</select>`;}
-function insertCat(kind,id){if(!id)return;pullWO();const it=db.catalog[kind][id];if(!it)return;if(kind==="labor")cur.labor.push({desc:it.desc,hours:it.hours||"",rate:it.rate||shopRate(),bill:"H",rateSource:"manual",source:SRC_MANUAL});else cur.parts.push({desc:it.name,qty:"1",price:it.price||""});renderLines();updateTotals();}
+function insertCat(kind,id){if(!id)return;pullWO();const it=db.catalog[kind][id];if(!it)return;if(kind==="labor")cur.labor.push({id:uid("ln"),type:"manual-labor",desc:it.desc,hours:it.hours||"",rate:it.rate||shopRate(),bill:"H",rateSource:"manual",source:SRC_MANUAL});else cur.parts.push({id:uid("ln"),type:"part",desc:it.name,qty:"1",cost:"",markup:db.settings.partsMarkup,price:it.price||""});renderLines();updateTotals();}
 function saveLinesToCatalog(kind){pullWO();const store=db.catalog[kind];let n=0;if(kind==="labor"){cur.labor.forEach(l=>{if(!l.desc)return;const ex=vals(store).find(x=>(x.desc||"").toLowerCase()===l.desc.toLowerCase());if(ex){ex.hours=l.hours;ex.rate=l.rate;}else{const id=uid("cl");store[id]={id,desc:l.desc,hours:l.hours,rate:l.rate};}n++;});}else{cur.parts.forEach(p=>{if(!p.desc)return;const ex=vals(store).find(x=>(x.name||"").toLowerCase()===p.desc.toLowerCase());if(ex){ex.price=p.price;}else{const id=uid("cp");store[id]={id,name:p.desc,price:p.price};}n++;});}save();alert(n?`Saved ${n} ${kind} item(s) to the catalog.`:"Nothing to save — add a line first.");drawWO();}
 
 /* ---------- settings ---------- */
@@ -1173,12 +1459,27 @@ function renderSettings(){const s=db.settings;
   <div class="row"><div><label>Shop labor rate ($/hr)</label><input id="s_laborRate" type="number" step="0.5" value="${s.laborRate}">
     <div class="muted" style="font-size:11.5px;margin-top:3px">Working range ${money(s.rateMin)}–${money(s.rateMax)}. Outside it just asks once — it is your shop.</div></div>
   <div><label>Sales tax rate (%)</label><input id="s_taxRate" type="number" step="0.01" value="${s.taxRate}"></div><div><label>Next invoice #</label><input id="s_nextInvoice" type="number" step="1" value="${s.nextInvoice}"></div></div>
-  <div class="chk" style="margin-top:10px"><label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="s_taxLabor" ${s.taxLabor?"checked":""} style="width:auto"> Charge sales tax on labor too (default: parts only)</label></div>
+  <div class="card" style="padding:0;box-shadow:none;border:1px solid var(--line);margin-top:10px">
+    <div style="padding:10px 12px">
+      <b>What is taxable</b>
+      <div class="muted" style="font-size:11.5px;margin:3px 0 8px">This program does arithmetic, not law. Set these to whatever your accountant tells you; an individual line can still be switched on a ticket.</div>
+      <label style="display:flex;align-items:center;gap:8px;margin:0 0 4px"><input type="checkbox" id="s_taxLabor" ${s.taxLabor?"checked":""} style="width:auto"> Labor is taxable</label>
+      <label style="display:flex;align-items:center;gap:8px;margin:0 0 4px"><input type="checkbox" id="s_taxParts" ${s.taxParts!==false?"checked":""} style="width:auto"> Parts and materials are taxable</label>
+      <label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="s_taxFees" ${s.taxFees?"checked":""} style="width:auto"> Shop fees are taxable</label>
+    </div>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <div><label>Default parts markup (%)</label><input id="s_partsMarkup" type="number" step="1" value="${s.partsMarkup}">
+      <div class="muted" style="font-size:11.5px;margin-top:3px">Suggests a selling price from cost. You can always type over it.</div></div>
+    <div><label>Next estimate #</label><input id="s_nextEstimate" type="number" step="1" value="${s.nextEstimate}"></div>
+    <div><label>Next RO #</label><input id="s_nextRO" type="number" step="1" value="${s.nextRO}"></div>
+  </div>
   <div class="chk" style="margin-top:8px"><label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="s_reqOv" ${s.requireOverrideReason?"checked":""} style="width:auto"> Ask who and why before a catalog labor time or menu price is overridden</label></div>
   <div class="row"><div><label>Manager PIN for overrides (optional)</label><input id="s_pin" value="${esc(s.managerPin)}" placeholder="leave blank for none"></div></div>
   <label>Invoice footer / terms</label><textarea id="s_terms">${esc(s.terms)}</textarea>
   <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveSettings()">Save Settings</button></div>
   </div>
+  ${feeCard()}
   ${providerCard()}
   ${auditCard()}
   <div class="card"><h3>Backup</h3><p class="muted" style="margin-top:0">Your data lives in this browser. Export a backup regularly, or to move to another computer.</p>
@@ -1197,6 +1498,13 @@ function saveSettings(){const g=id=>$("#"+id).value;db.settings.shopName=g("s_sh
   const prevRate=db.settings.laborRate;
   db.settings.laborRate=rate;
   db.settings.requireOverrideReason=$("#s_reqOv").checked;
+  db.settings.taxParts=$("#s_taxParts").checked;
+  db.settings.taxFees=$("#s_taxFees").checked;
+  db.settings.partsMarkup=Number(g("s_partsMarkup"))||0;
+  /* Counters only ever go forward. Winding one back would hand out a number
+     that is already on a document in somebody's glovebox. */
+  const fwd=(key,id)=>{const v=parseInt(g(id),10);if(isFinite(v)&&v>(parseInt(db.settings[key],10)||1))db.settings[key]=v;};
+  fwd("nextEstimate","s_nextEstimate"); fwd("nextRO","s_nextRO");
   db.settings.managerPin=g("s_pin").trim();
   if(rate!==prevRate)audit("shop-rate",'$/hr',prevRate,rate,db.settings.lastTech||"shop","shop rate changed in Settings");db.settings.taxRate=Number(g("s_taxRate"))||0;db.settings.nextInvoice=parseInt(g("s_nextInvoice"))||1001;db.settings.taxLabor=$("#s_taxLabor").checked;db.settings.terms=g("s_terms");save();render();alert("Settings saved.");}
 function exportData(){const b=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="jzd-shop-backup.json";a.click();}
@@ -1296,7 +1604,8 @@ function delVehicle(id){if(!confirm("Delete this vehicle?"))return;delete db.veh
 /* ---------- work order editor ---------- */
 let cur=null;
 function editOrder(id,preset){
-  cur=id?JSON.parse(JSON.stringify(db.orders[id])):{id:uid("o"),invoiceNo:null,customerId:"",vehicleId:"",date:todayStr(),status:"Estimate",complaint:"",mileageIn:"",mileageOut:"",labor:[],parts:[{desc:"",qty:"1",price:""}],notes:""};
+  cur=id?JSON.parse(JSON.stringify(db.orders[id])):{id:uid("o"),invoiceNo:null,customerId:"",vehicleId:"",date:todayStr(),status:"Estimate",complaint:"",mileageIn:"",mileageOut:"",labor:[],parts:[],extras:[],payments:[],history:[],notes:"",recommendation:"",custNotes:"",internalNotes:""};
+  shapeOrder(cur);
   if(!id&&preset){cur.customerId=preset.customerId||"";cur.vehicleId=preset.vehicleId||"";const pv=db.vehicles[cur.vehicleId];if(pv&&pv.mileage)cur.mileageIn=pv.mileage;}
   drawWO();$("#woOverlay").classList.add("on");
 }
@@ -1304,72 +1613,252 @@ function todayStr(){const p=n=>String(n).padStart(2,"0");const dt=new Date();ret
 function drawWO(){const o=cur;
   const custOpts=vals(db.customers).sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${c.id===o.customerId?"selected":""}>${esc(c.name)}</option>`).join("");
   const vehOpts=vals(db.vehicles).filter(v=>!o.customerId||v.customerId===o.customerId).map(v=>`<option value="${v.id}" ${v.id===o.vehicleId?"selected":""}>${esc(vehLabel(v.id))}${v.plate?" · "+esc(v.plate):""}</option>`).join("");
-  const statuses=["Estimate","Approved","InProgress","Completed","Invoiced","Paid"];
+  const st=canonStatus(o.status);
+  const final=isFinal(o);
   const t=orderTotals(o);
   $("#woSheet").innerHTML=`
-  <div class="sheet-head"><h2>${o.invoiceNo?"#"+o.invoiceNo+" — ":""}Work Order</h2><span class="pill st-${o.status}">${o.status.replace("InProgress","In Progress")}</span><div class="grow"></div><button onclick="closeWO()">Close</button></div>
+  <div class="sheet-head"><h2>${esc(ticketNo(o))}</h2><span class="pill st-${statusClass(st)}">${esc(st)}</span><div class="grow"></div><button onclick="closeWO()">Close</button></div>
   <div class="row">
     <div><label>Customer</label><div style="display:flex;gap:6px"><select id="o_cust" style="flex:1"><option value="">— select —</option>${custOpts}</select><button class="sm" onclick="quickCustomer()">+ New</button></div></div>
     <div><label>Vehicle</label><div style="display:flex;gap:6px"><select id="o_veh" style="flex:1"><option value="">— select —</option>${vehOpts}</select><button class="sm" onclick="quickVehicle()">+ New</button></div></div>
   </div>
   <div class="row">
     <div><label>Date</label><input id="o_date" type="date" value="${esc(o.date)}"></div>
-    <div><label>Status</label><select id="o_status">${statuses.map(s=>`<option value="${s}" ${s===o.status?"selected":""}>${s.replace("InProgress","In Progress")}</option>`).join("")}</select></div>
+    <div><label>Status</label><select id="o_status">${STATUSES.map(x=>`<option value="${x}" ${x===st?"selected":""}>${x}</option>`).join("")}</select></div>
     <div><label>Mileage In</label><input id="o_mIn" value="${esc(o.mileageIn)}"></div>
     <div><label>Mileage Out</label><input id="o_mOut" value="${esc(o.mileageOut)}"></div>
   </div>
-  <label>Complaint / Work requested</label><textarea id="o_complaint">${esc(o.complaint)}</textarea>
+  <label>Customer concern / work requested</label><textarea id="o_complaint">${esc(o.complaint)}</textarea>
 
-  <h3 style="margin-top:16px">Labor</h3>
+  <div class="secthead"><h3>Labor</h3></div>
   <div class="linerow"><div class="lbl">Description</div><div class="lbl">Hours</div><div class="lbl">Rate/hr</div><div class="lbl right">Amount</div><div></div></div>
   <div id="laborRows"></div>
   <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><button class="sm primary" onclick="openJobs()">+ Add job</button><button class="sm" onclick="addLine('labor')">+ Blank line</button>${catSelect('labor')}<button class="sm" onclick="saveLinesToCatalog('labor')">Save lines to catalog</button></div>
   <div id="verifyBanner"></div>
 
-  <h3 style="margin-top:16px">Parts</h3>
-  <div class="linerow"><div class="lbl">Part / Description</div><div class="lbl">Qty</div><div class="lbl">Price</div><div class="lbl right">Amount</div><div></div></div>
+  <div class="secthead"><h3>Parts &amp; materials</h3><span class="muted" style="font-size:11.5px">cost and markup are yours — they never print on a customer document</span></div>
+  <div class="linerow parts"><div class="lbl">Part / description</div><div class="lbl">Part #</div><div class="lbl">Qty</div><div class="lbl">Cost ea</div><div class="lbl">MU%</div><div class="lbl">Price ea</div><div class="lbl right">Amount</div><div></div></div>
   <div id="partsRows"></div>
-  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><button class="sm" onclick="addLine('parts')">+ Parts line</button>${catSelect('parts')}<button class="sm" onclick="saveLinesToCatalog('parts')">Save lines to catalog</button></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><button class="sm" onclick="addLine('parts')">+ Part</button><button class="sm" onclick="addLine('parts','tire')">+ Tire</button><button class="sm" onclick="addLine('parts','fluid')">+ Fluid / material</button>${catSelect('parts')}<button class="sm" onclick="saveLinesToCatalog('parts')">Save lines to catalog</button></div>
 
-  <label style="margin-top:14px">Tech notes / cause &amp; correction</label><textarea id="o_notes">${esc(o.notes)}</textarea>
+  <div class="secthead"><h3>Sublet, fees &amp; discounts</h3></div>
+  <div class="linerow extra"><div class="lbl">Type</div><div class="lbl">Description</div><div class="lbl">Amount / %</div><div class="lbl">Taxable</div><div class="lbl right">Amount</div><div></div></div>
+  <div id="extraRows"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><button class="sm" onclick="addLine('extras','sublet')">+ Sublet</button><button class="sm" onclick="addLine('extras','fee')">+ Fee</button><button class="sm" onclick="addLine('extras','discount')">+ Discount</button>${(db.settings.fees||[]).filter(f=>f.active).length?`<button class="sm" onclick="applyShopFees()">Apply shop fees</button>`:""}</div>
+
+  <div class="row" style="margin-top:16px">
+    <div><label>Technician findings / cause &amp; correction</label><textarea id="o_notes">${esc(o.notes)}</textarea></div>
+    <div><label>Recommendation to customer</label><textarea id="o_recommendation">${esc(o.recommendation||"")}</textarea></div>
+  </div>
+  <div class="row">
+    <div><label>Notes for the customer <span class="muted" style="font-weight:400">— prints on the estimate and invoice</span></label><textarea id="o_custNotes">${esc(o.custNotes||"")}</textarea></div>
+    <div><label>Internal notes <span class="muted" style="font-weight:400">— never printed for the customer</span></label><textarea id="o_internalNotes">${esc(o.internalNotes||"")}</textarea></div>
+  </div>
+
+  <div id="authWrap">${authPanel(o,t)}</div>
+  <div id="payWrap">${paymentPanel(o,t)}</div>
 
   <div style="display:flex;align-items:flex-start;margin-top:16px">
     <div class="totbox">
+      <div class="totrow"><span>Parts &amp; materials</span><b id="tParts">${money(t.parts)}</b></div>
       <div class="totrow"><span>Labor</span><b id="tLabor">${money(t.labor)}</b></div>
-      <div class="totrow"><span>Parts</span><b id="tParts">${money(t.parts)}</b></div>
-      <div class="totrow"><span>Tax (${db.settings.taxRate}%${db.settings.taxLabor?"":" parts"})</span><b id="tTax">${money(t.tax)}</b></div>
+      ${t.sublet?`<div class="totrow"><span>Sublet</span><b>${money(t.sublet)}</b></div>`:""}
+      ${t.fees?`<div class="totrow"><span>Fees</span><b>${money(t.fees)}</b></div>`:""}
+      ${t.discounts?`<div class="totrow"><span>Discounts</span><b>${money(t.discounts)}</b></div>`:""}
+      <div class="totrow sub"><span>Subtotal</span><b id="tSub">${money(t.subtotal)}</b></div>
+      <div class="totrow"><span>Tax (${taxCfg(o).taxRate}%${final?" — as invoiced":""})</span><b id="tTax">${money(t.tax)}</b></div>
       <div class="totrow grand"><span>Total</span><b id="tTotal">${money(t.total)}</b></div>
+      ${t.paid?`<div class="totrow"><span>Paid</span><b id="tPaid">${money(t.paid)}</b></div>`:""}
+      ${(t.paid||final)?`<div class="totrow bal ${t.balance<=0.004?"clear":""}"><span>Balance due</span><b id="tBal">${money(t.balance)}</b></div>`:""}
     </div>
   </div>
 
   <div class="toolbar" style="margin-top:16px">
     <button class="green" onclick="saveOrder()">Save</button>
-    <button class="primary" onclick="printDoc('Invoice')">Print Invoice</button>
     <button onclick="printDoc('Estimate')">Print Estimate</button>
+    <button onclick="printDoc('RepairOrder')">Print Repair Order</button>
+    <button class="primary" onclick="printDoc('Invoice')">Print Invoice</button>
     <div class="grow"></div>
     ${db.orders[o.id]?`<button class="danger" onclick="delOrder('${o.id}')">Delete</button>`:""}
   </div>`;
   renderLines();
   $("#o_cust").onchange=e=>{pullWO();cur.customerId=e.target.value;cur.vehicleId="";drawWO();};
-  ["o_veh","o_date","o_status","o_mIn","o_mOut","o_complaint","o_notes"].forEach(id=>{const el=$("#"+id);if(el)el.onchange=pullWO;});
+  $("#o_status").onchange=e=>{pullWO();changeStatus(e.target.value);};
+  ["o_veh","o_date","o_mIn","o_mOut","o_complaint","o_notes","o_recommendation","o_custNotes","o_internalNotes"].forEach(id=>{const el=$("#"+id);if(el)el.onchange=pullWO;});
+}
+/* A status change is a real event in the life of a ticket, so it is recorded
+   rather than just stored, and it is what hands out RO and invoice numbers. */
+function changeStatus(next){
+  const from=canonStatus(cur.status);
+  if(isFinal(cur)&&!isFinal({status:next})){
+    if(!confirm(`This ticket is already ${from}. Moving it back to ${next} keeps the invoice number and the rates it was invoiced at.\n\nContinue?`)){ drawWO(); return; }
+  }
+  setStatus(cur,next);
+  save(); drawWO();
+}
+/* What the customer agreed to, and whether the work has since grown past it. */
+function authPanel(o,t){
+  const a=o.auth||{state:"Not Requested",entries:[]};
+  const need=needsAdditionalAuth(o);
+  const approved=authorizedTotal(o);
+  const cls=need?"warn":(a.state==="Approved"?"ok":(a.state==="Awaiting Approval"?"wait":""));
+  const entries=(a.entries||[]).slice().reverse().map(e=>
+    `<div class="authline">${esc(e.decision)} ${money(e.amount)} — ${esc(e.who||"customer")} by ${esc(e.method)} on ${esc(String(e.at).slice(0,16).replace("T"," "))}${e.note?" — "+esc(e.note):""}</div>`).join("");
+  return `<div class="authbox ${cls}">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <b>Customer authorization:</b> <span>${esc(a.state)}</span>
+      ${approved?`<span class="muted">approved to ${money(approved)}</span>`:""}
+      <div class="grow"></div>
+      <button class="sm" onclick="askAuthorization('Approved')">Record approval…</button>
+      <button class="sm" onclick="askAuthorization('Declined')">Record decline…</button>
+    </div>
+    ${need?`<div style="margin-top:8px;color:#8f2419;font-weight:700">ADDITIONAL AUTHORIZATION REQUIRED</div>
+      <div class="authline">This ticket now totals ${money(t.total)}. The customer has approved ${money(approved)}.
+      Get approval for the extra ${money(r2(t.total-approved))} before the work goes ahead, then record it above.</div>`:""}
+    ${entries}
+  </div>`;
+}
+function askAuthorization(decision){
+  pullWO();
+  const t=orderTotals(cur);
+  const approved=authorizedTotal(cur);
+  const suggested=decision==="Approved"?r2(t.total-approved):t.total;
+  const c=db.customers[cur.customerId]||{};
+  const who=prompt("Who authorized this?",c.name||"");
+  if(who==null||!who.trim())return;
+  const method=prompt("How? "+AUTH_METHODS.join(" / "),"Phone");
+  if(method==null)return;
+  const m=AUTH_METHODS.find(x=>x.toLowerCase()===String(method).trim().toLowerCase())||"Other";
+  let amount=t.total;
+  if(decision==="Approved"){
+    const raw=prompt(approved?`Amount approved now (the extra over the ${money(approved)} already approved):`:"Amount approved:",String(suggested));
+    if(raw==null)return;
+    amount=Number(raw);
+    if(!isFinite(amount)||amount<0){alert("That is not an amount.");return;}
+  }
+  const note=prompt("Note (optional):","")||"";
+  recordAuthorization(cur,decision,who.trim(),m,amount,note);
+  save(); drawWO();
+}
+function paymentPanel(o,t){
+  if(!(o.payments||[]).length && !isFinal(o)) return "";
+  const rows=(o.payments||[]).slice().reverse().map(p=>
+    `<div class="authline">${money(p.amount)} — ${esc(p.method)} on ${esc(String(p.at).slice(0,16).replace("T"," "))}${p.note?" — "+esc(p.note):""}</div>`).join("");
+  const clear=t.balance<=0.004&&t.total>0;
+  return `<div class="authbox ${clear?"ok":""}">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <b>Payments:</b> <span>${money(t.paid)} of ${money(t.total)}</span>
+      ${clear?`<span class="badge b-vehicle">PAID IN FULL</span>`:`<span class="muted">balance ${money(t.balance)}</span>`}
+      <div class="grow"></div>
+      <button class="sm" onclick="askPayment()">Record payment…</button>
+      ${clear&&canonStatus(o.status)!=="Paid / Closed"?`<button class="sm primary" onclick="closePaid()">Mark Paid / Closed</button>`:""}
+    </div>${rows}</div>`;
+}
+function askPayment(){
+  pullWO();
+  const t=orderTotals(cur);
+  const raw=prompt("Amount received:",String(t.balance>0?t.balance:0));
+  if(raw==null)return;
+  const amt=Number(raw);
+  if(!isFinite(amt)||amt<=0){alert("That is not an amount.");return;}
+  const method=prompt("Method? "+PAY_METHODS.join(" / "),"Card");
+  if(method==null)return;
+  const m=PAY_METHODS.find(x=>x.toLowerCase()===String(method).trim().toLowerCase())||"Other";
+  const note=prompt("Note (optional):","")||"";
+  /* Taking money means the ticket is an invoice, whatever it was a moment ago. */
+  if(!isFinal(cur)) setStatus(cur,"Invoiced","payment recorded");
+  recordPayment(cur,amt,m,note);
+  save(); drawWO();
+}
+function closePaid(){ pullWO(); setStatus(cur,"Paid / Closed","balance cleared"); save(); drawWO(); }
+/* The fees the shop has configured, added to this ticket as real lines it can
+   see and edit, rather than an invisible number folded into the total. */
+function applyShopFees(){
+  pullWO();
+  (db.settings.fees||[]).filter(f=>f.active).forEach(f=>{
+    if((cur.extras||[]).some(x=>x.feeId===f.id))return;
+    cur.extras.push({id:uid("ln"),type:"fee",feeId:f.id,desc:f.name,mode:f.mode,value:f.value,base:f.base||"labor",taxable:f.taxable});
+  });
+  renderLines(); updateTotals();
 }
 function renderLines(){const o=cur;
   $("#laborRows").innerHTML=(o.labor||[]).map((l,i)=>laborRow(l,i,o)).join("");
-  $("#partsRows").innerHTML=(o.parts||[]).map((p,i)=>`<div class="linerow"><input data-k="parts" data-i="${i}" data-f="desc" value="${esc(p.desc)}" placeholder="e.g. Brake pads (front)"><input data-k="parts" data-i="${i}" data-f="qty" value="${esc(p.qty)}" inputmode="decimal"><input data-k="parts" data-i="${i}" data-f="price" value="${esc(p.price)}" inputmode="decimal"><div class="right">${money((Number(p.qty)||0)*(Number(p.price)||0))}</div><button class="x" onclick="delLine('parts',${i})">✕</button></div>`).join("");
-  $("#woSheet").querySelectorAll("input[data-k]").forEach(inp=>inp.oninput=()=>{
-    const k=inp.dataset.k,i=+inp.dataset.i,f=inp.dataset.f;
-    cur[k][i][f]=inp.value;
-    /* Typing a rate over the shop rate makes it this shop decision for this
-       line, so it stops following the door rate from then on. */
-    if(k==="labor"&&f==="rate")cur.labor[i].rateSource="manual";
-    updateTotals();
+  $("#partsRows").innerHTML=(o.parts||[]).map((x,i)=>partRow(x,i,o)).join("");
+  $("#extraRows").innerHTML=(o.extras||[]).map((x,i)=>extraRow(x,i,o)).join("");
+  $("#woSheet").querySelectorAll("[data-k]").forEach(inp=>{
+    const handler=()=>{
+      const k=inp.dataset.k,i=+inp.dataset.i,f=inp.dataset.f;
+      const line=cur[k][i]; if(!line)return;
+      line[f]=(inp.type==="checkbox")?inp.checked:inp.value;
+      if(k==="labor"&&f==="rate")line.rateSource="manual";
+      /* Cost or markup moves the suggested price, but only while the writer has
+         not set a price of their own. Their number is never overwritten. */
+      if(k==="parts"&&(f==="cost"||f==="markup")&&!line.priceEdited){
+        line.price=suggestedPrice(line.cost,line.markup!=null&&line.markup!==""?line.markup:db.settings.partsMarkup);
+        const pf=$("#woSheet").querySelector(`[data-k="parts"][data-i="${i}"][data-f="price"]`);
+        if(pf)pf.value=line.price;
+      }
+      if(k==="parts"&&f==="price")line.priceEdited=true;
+      if(k==="extras"&&f==="type")return renderLines(),updateTotals();
+      updateTotals();
+    };
+    if(inp.type==="checkbox"||inp.tagName==="SELECT")inp.onchange=handler; else inp.oninput=handler;
   });
   drawVerifyBanner();
 }
-/* A labor line shows the number AND where the number came from. The second
-   row is not decoration: a service writer quoting a customer needs to know in
-   one glance whether this is a menu price, a catalog time, or someone hand
-   overriding the catalog, and whether the job still needs checking. */
+/* Parts carry cost AND price, always. The difference is the shop's margin and
+   the whole basis of any profit reporting later, so a price typed over the top
+   of a suggestion must never be allowed to erase what the part actually cost. */
+function partRow(x,i,o){
+  const ext=partSelling(x);
+  const kind=x.type==="tire"?"Tire":x.type==="fluid"?"Fluid / material":"Part";
+  return `<div class="lineblk">
+    <div class="linerow parts">
+      <input data-k="parts" data-i="${i}" data-f="desc" value="${esc(x.desc)}" placeholder="${esc(kind)}">
+      <input data-k="parts" data-i="${i}" data-f="partNo" value="${esc(x.partNo||"")}" placeholder="part #">
+      <input data-k="parts" data-i="${i}" data-f="qty" value="${esc(x.qty)}" inputmode="decimal">
+      <input data-k="parts" data-i="${i}" data-f="cost" value="${esc(x.cost==null?"":x.cost)}" inputmode="decimal" placeholder="cost">
+      <input data-k="parts" data-i="${i}" data-f="markup" value="${esc(x.markup==null?"":x.markup)}" inputmode="decimal" placeholder="${esc(db.settings.partsMarkup)}">
+      <input data-k="parts" data-i="${i}" data-f="price" value="${esc(x.price)}" inputmode="decimal">
+      <div class="right">${money(ext)}</div>
+      <button class="x" onclick="delLine('parts',${i})">✕</button>
+    </div>
+    <div class="linemeta">
+      <span class="badge b-manual">${esc(kind.toUpperCase())}</span>
+      ${(Number(x.cost)>0)?`<span>cost ${money(partCost(x))} · margin ${money(r2(ext-partCost(x)))}</span>`:`<span>no cost entered — profit reporting will not see this line</span>`}
+      <label style="display:flex;align-items:center;gap:4px;margin:0;font-weight:400"><input type="checkbox" data-k="parts" data-i="${i}" data-f="taxable" ${lineTaxable(x,taxCfg(o).taxParts)?"checked":""} style="width:auto"> taxable</label>
+      <input data-k="parts" data-i="${i}" data-f="vendor" value="${esc(x.vendor||"")}" placeholder="vendor" style="max-width:120px;height:24px;font-size:11.5px">
+      <input data-k="parts" data-i="${i}" data-f="intNote" value="${esc(x.intNote||"")}" placeholder="internal note" style="max-width:180px;height:24px;font-size:11.5px">
+    </div>
+  </div>`;
+}
+function extraRow(x,i,o){
+  const base=(()=>{const t=orderTotals(o);return {labor:t.labor,parts:t.parts,sublet:t.sublet,pre:r2(t.labor+t.parts+t.sublet)};})();
+  const amt=extraAmount(x,base);
+  const isPct=x.mode==="percent";
+  const types=[["sublet","Sublet"],["fee","Fee"],["discount","Discount"]];
+  const deflt=x.type==="fee"?taxCfg(o).taxFees:taxCfg(o).taxParts;
+  return `<div class="lineblk">
+    <div class="linerow extra">
+      <select data-k="extras" data-i="${i}" data-f="type">${types.map(([v,l])=>`<option value="${v}" ${x.type===v?"selected":""}>${l}</option>`).join("")}</select>
+      <input data-k="extras" data-i="${i}" data-f="desc" value="${esc(x.desc||"")}" placeholder="${x.type==="sublet"?"e.g. machine shop — head resurface":x.type==="discount"?"e.g. repeat customer":"e.g. shop supplies"}">
+      ${x.type==="sublet"
+        ? `<input data-k="extras" data-i="${i}" data-f="price" value="${esc(x.price||"")}" inputmode="decimal" placeholder="charge">`
+        : `<input data-k="extras" data-i="${i}" data-f="value" value="${esc(x.value||"")}" inputmode="decimal" placeholder="${isPct?"%":"$"}">`}
+      <label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11.5px"><input type="checkbox" data-k="extras" data-i="${i}" data-f="taxable" ${lineTaxable(x,deflt)?"checked":""} style="width:auto"> taxable</label>
+      <div class="right">${money(amt)}</div>
+      <button class="x" onclick="delLine('extras',${i})">✕</button>
+    </div>
+    <div class="linemeta">
+      ${x.type!=="sublet"?`<select data-k="extras" data-i="${i}" data-f="mode" style="max-width:110px;height:24px;font-size:11.5px"><option value="amount" ${!isPct?"selected":""}>flat amount</option><option value="percent" ${isPct?"selected":""}>percent</option></select>`:""}
+      ${(x.type==="fee"&&isPct)?`<select data-k="extras" data-i="${i}" data-f="base" style="max-width:130px;height:24px;font-size:11.5px">
+        <option value="labor" ${x.base!=="parts"&&x.base!=="laborparts"?"selected":""}>of labor</option>
+        <option value="parts" ${x.base==="parts"?"selected":""}>of parts</option>
+        <option value="laborparts" ${x.base==="laborparts"?"selected":""}>of labor + parts</option></select>`:""}
+      ${x.type==="sublet"?`<input data-k="extras" data-i="${i}" data-f="cost" value="${esc(x.cost==null?"":x.cost)}" placeholder="what it cost you" style="max-width:150px;height:24px;font-size:11.5px">`:""}
+    </div>
+  </div>`;
+}
 function laborRow(l,i,o){
   const fixed=l.bill==="F";
   const amt=lineAmount(l,o);
@@ -1418,47 +1907,204 @@ function drawVerifyBanner(){
     depends on the exact vehicle: ${esc(need.map(l=>l.desc).join("; "))}.<br>
     Check the labor time against this VIN and configuration in an approved labor guide before the customer is given a price.</div>`:"";
 }
-function updateTotals(){const t=orderTotals(cur);$("#tLabor").textContent=money(t.labor);$("#tParts").textContent=money(t.parts);$("#tTax").textContent=money(t.tax);$("#tTotal").textContent=money(t.total);
+/* Totals are recalculated from the ticket on every keystroke rather than nudged,
+   so a rounding error cannot accumulate as somebody edits. */
+function updateTotals(){const t=orderTotals(cur);
+  /* The authorization box has to keep up with the total, not with the next
+     full redraw: the moment work is added past what the customer agreed to is
+     the moment somebody needs to be told. */
+  const aw=$("#authWrap"); if(aw) aw.innerHTML=authPanel(cur,t);
+  const pw=$("#payWrap");  if(pw) pw.innerHTML=paymentPanel(cur,t);
+  const set=(id,v)=>{const el=$("#"+id);if(el)el.textContent=money(v);};
+  set("tLabor",t.labor);set("tParts",t.parts);set("tSub",t.subtotal);set("tTax",t.tax);set("tTotal",t.total);set("tPaid",t.paid);set("tBal",t.balance);
   const lrows=$("#laborRows").querySelectorAll(".linerow");
   cur.labor.forEach((l,i)=>{const row=lrows[i];if(row)row.children[3].textContent=money(lineAmount(l,cur));});
-  cur.parts.forEach((p,i)=>{const row=$("#partsRows").children[i];if(row)row.children[3].textContent=money((Number(p.qty)||0)*(Number(p.price)||0));});}
-function addLine(k){pullWO();if(k==="labor")cur.labor.push({desc:"",hours:"",rate:shopRate(),bill:"H",rateSource:"shop",source:SRC_MANUAL});else cur.parts.push({desc:"",qty:"1",price:""});renderLines();updateTotals();}
+  const prows=$("#partsRows").querySelectorAll(".linerow");
+  cur.parts.forEach((x,i)=>{const row=prows[i];if(row)row.children[6].textContent=money(partSelling(x));});
+  const base={labor:t.labor,parts:t.parts,sublet:t.sublet,pre:r2(t.labor+t.parts+t.sublet)};
+  const erows=$("#extraRows").querySelectorAll(".linerow");
+  (cur.extras||[]).forEach((x,i)=>{const row=erows[i];if(row)row.children[4].textContent=money(extraAmount(x,base));});}
+function addLine(k,kind){pullWO();
+  if(k==="labor")cur.labor.push({id:uid("ln"),type:"manual-labor",desc:"",hours:"",rate:shopRate(),bill:"H",rateSource:"shop",source:SRC_MANUAL});
+  else if(k==="parts")cur.parts.push({id:uid("ln"),type:kind||"part",desc:"",qty:"1",cost:"",markup:db.settings.partsMarkup,price:""});
+  else cur.extras.push({id:uid("ln"),type:kind||"fee",desc:"",mode:"amount",value:"",base:"labor"});
+  renderLines();updateTotals();}
 function delLine(k,i){pullWO();cur[k].splice(i,1);renderLines();updateTotals();}
-function pullWO(){const g=id=>{const el=$("#"+id);return el?el.value:undefined;};if(g("o_cust")!==undefined)cur.customerId=g("o_cust");if(g("o_veh")!==undefined)cur.vehicleId=g("o_veh");if(g("o_date")!==undefined)cur.date=g("o_date");if(g("o_status")!==undefined)cur.status=g("o_status");if(g("o_mIn")!==undefined)cur.mileageIn=g("o_mIn");if(g("o_mOut")!==undefined)cur.mileageOut=g("o_mOut");if(g("o_complaint")!==undefined)cur.complaint=g("o_complaint");if(g("o_notes")!==undefined)cur.notes=g("o_notes");}
+function pullWO(){if(!cur)return;const g=id=>{const el=$("#"+id);return el?el.value:undefined;};
+  const map={o_cust:"customerId",o_veh:"vehicleId",o_date:"date",o_mIn:"mileageIn",o_mOut:"mileageOut",
+             o_complaint:"complaint",o_notes:"notes",o_recommendation:"recommendation",
+             o_custNotes:"custNotes",o_internalNotes:"internalNotes"};
+  Object.keys(map).forEach(id=>{const v=g(id);if(v!==undefined)cur[map[id]]=v;});}
 function quickCustomer(){pullWO();editCustomer(null,cid=>{cur.customerId=cid;cur.vehicleId="";drawWO();});}
 function quickVehicle(){pullWO();editVehicle(null,cur.customerId,vid=>{const v=db.vehicles[vid];if(v&&!cur.customerId)cur.customerId=v.customerId;cur.vehicleId=vid;drawWO();});}
-function saveOrder(){pullWO();if(!cur.customerId){alert("Select a customer.");return;}if(!cur.invoiceNo){cur.invoiceNo=db.settings.nextInvoice++;}freezeIfFinal(cur);db.orders[cur.id]=JSON.parse(JSON.stringify(cur));save();closeWO();render();}
+function saveOrder(){pullWO();if(!cur.customerId){alert("Select a customer.");return;}
+  ensureNumber(cur,"estimate");                     /* every ticket is at least an estimate */
+  freezeIfFinal(cur);
+  db.orders[cur.id]=JSON.parse(JSON.stringify(cur));save();closeWO();render();}
 function delOrder(id){if(!confirm("Delete this work order?"))return;delete db.orders[id];save();closeWO();render();}
 function closeWO(){$("#woOverlay").classList.remove("on");cur=null;}
 
 /* ---------- print invoice / estimate ---------- */
-function printDoc(kind){pullWO();const o=cur,s=db.settings,c=db.customers[o.customerId]||{},v=db.vehicles[o.vehicleId]||{},t=orderTotals(o);
-  if(!o.invoiceNo&&kind==="Invoice"){o.invoiceNo=db.settings.nextInvoice++;db.orders[o.id]=JSON.parse(JSON.stringify(o));save();}
-  const num=o.invoiceNo||"(draft)";
-  const laborRows=(o.labor||[]).filter(l=>l.desc||l.hours||l.rate||l.price).map(l=>{
-    const fixed=l.bill==="F";
-    return `<tr><td>${esc(l.desc)||"Labor"}</td><td>${fixed?"—":esc(lineHours(l))+" hr"}</td><td>${fixed?"Menu price":money(effRate(l,o))}</td><td style="text-align:right">${money(lineAmount(l,o))}</td></tr>`;
-  }).join("");
-  const partsRows=(o.parts||[]).filter(p=>p.desc||p.price).map(p=>`<tr><td>${esc(p.desc)||"Part"}</td><td>${esc(p.qty)||1}</td><td>${money(p.price)}</td><td style="text-align:right">${money((Number(p.qty)||0)*(Number(p.price)||0))}</td></tr>`).join("");
-  $("#printArea").innerHTML=`<div class="inv">
-    <div class="top"><div><div class="shop">${esc(s.shopName)}</div><div>${esc(s.tagline||"")}</div><div class="muted">${esc(s.addr||"")}${s.phone?" · "+esc(s.phone):""}${s.email?" · "+esc(s.email):""}</div></div>
-      <div><div class="doctype">${kind}</div><div style="text-align:right">#${num}<br>${esc(o.date||"")}</div></div></div>
-    <div class="meta"><div><b>Bill To</b><br>${esc(c.name||"")}<br>${esc(c.phone||"")}<br>${esc(c.email||"")}<br>${esc(c.address||"")}</div>
-      <div><b>Vehicle</b><br>${esc(vehLabel(o.vehicleId))}${v.color?" · "+esc(v.color):""}<br>VIN: ${esc(v.vin||"—")}<br>Plate: ${esc(v.plate||"—")}<br>Mileage: ${esc(o.mileageIn||v.mileage||"—")}${o.mileageOut?" → "+esc(o.mileageOut):""}</div></div>
-    ${o.complaint?`<div style="margin-bottom:8px"><b>Work requested:</b> ${esc(o.complaint)}</div>`:""}
-    ${laborRows?`<table><thead><tr><th>Labor</th><th>Hours</th><th>Rate</th><th style="text-align:right">Amount</th></tr></thead><tbody>${laborRows}</tbody></table>`:""}
-    ${partsRows?`<table><thead><tr><th>Parts</th><th>Qty</th><th>Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>${partsRows}</tbody></table>`:""}
-    <table class="tot"><tbody>
-      <tr><td>Labor</td><td style="text-align:right">${money(t.labor)}</td></tr>
-      <tr><td>Parts</td><td style="text-align:right">${money(t.parts)}</td></tr>
-      <tr><td>Tax (${s.taxRate}%)</td><td style="text-align:right">${money(t.tax)}</td></tr>
-      <tr><td><b>Total</b></td><td style="text-align:right"><b>${money(t.total)}</b></td></tr>
-    </tbody></table>
-    ${o.notes?`<div style="margin-top:14px"><b>Notes:</b> ${esc(o.notes)}</div>`:""}
-    <div class="foot">${esc(s.terms||"")}</div>
-  </div>`;
+function printDoc(kind){
+  pullWO();
+  const o=cur;
+  /* Printing an invoice is the act that makes it one: it takes the number and
+     freezes the rates. Printing an estimate or a shop copy changes nothing. */
+  if(kind==="Invoice"&&!isFinal(o)){
+    if(!confirm("Printing an invoice finalizes this ticket: it takes an invoice number and locks the labor rate and tax rate it was billed at.\n\nContinue?")) return;
+    setStatus(o,"Invoiced","invoice printed");
+  }
+  if(kind==="RepairOrder") ensureNumber(o,"ro");
+  if(kind==="Estimate") ensureNumber(o,"estimate");
+  db.orders[o.id]=JSON.parse(JSON.stringify(o)); save();
+  $("#printArea").innerHTML = kind==="RepairOrder" ? docRepairOrder(o) : kind==="Estimate" ? docEstimate(o) : docInvoice(o);
   window.print();
+  drawWO();
 }
+/* ---------- the three documents ----------
+   One header, one totals block, three audiences. The customer's documents show
+   what they are being charged; the shop's copy shows what the technician needs
+   and the notes that must never leave the building. */
+function docHead(o,title,number){
+  const s=db.settings,c=db.customers[o.customerId]||{},v=db.vehicles[o.vehicleId]||{};
+  const d=(v.vin&&db.vinCache[v.vin])||null;
+  const engine=d?[d.cylinders?d.cylinders+"-cyl":"",d.displacementL?d.displacementL+"L":"",d.fuelType,d.driveType].filter(Boolean).join(" "):"";
+  return `<div class="top">
+    <div><div class="shop">${esc(s.shopName)}</div><div>${esc(s.tagline||"")}</div>
+      <div class="muted">${esc(s.addr||"")}${s.phone?" · "+esc(s.phone):""}${s.email?" · "+esc(s.email):""}</div></div>
+    <div><div class="doctype">${esc(title)}</div><div style="text-align:right">${esc(number)}<br>${esc(o.date||"")}</div></div></div>
+  <div class="meta">
+    <div><b>Customer</b><br>${esc(c.name||"")}<br>${esc(c.phone||"")}<br>${esc(c.email||"")}<br>${esc(c.address||"")}</div>
+    <div><b>Vehicle</b><br>${esc(vehLabel(o.vehicleId))}${(d&&d.trim)?" "+esc(d.trim):""}${v.color?" · "+esc(v.color):""}
+      <br>VIN: ${esc(v.vin||"—")}<br>Plate: ${esc(v.plate||"—")}
+      ${engine?`<br>${esc(engine)}`:""}
+      <br>Mileage: ${esc(o.mileageIn||v.mileage||"—")}${o.mileageOut?" → "+esc(o.mileageOut):""}</div></div>`;
+}
+/* The customer's money, itemized the way they expect to read it. Cost and
+   markup never appear here - what the shop paid is the shop's business. */
+function docCharges(o){
+  const t=orderTotals(o),cfg=taxCfg(o);
+  const labor=(o.labor||[]).filter(l=>l.desc||lineAmount(l,o)).map(l=>
+    `<tr><td>${esc(l.desc)||"Labor"}</td><td>${l.bill==="F"?"—":esc(lineHours(l))+" hr"}</td><td>${l.bill==="F"?"Menu price":money(effRate(l,o))}</td><td style="text-align:right">${money(lineAmount(l,o))}</td></tr>`).join("");
+  const parts=(o.parts||[]).filter(x=>x.desc||partSelling(x)).map(x=>
+    `<tr><td>${esc(x.desc)||"Part"}${x.partNo?` <span class="muted">${esc(x.partNo)}</span>`:""}</td><td>${esc(x.qty)||1}</td><td>${money(x.price)}</td><td style="text-align:right">${money(partSelling(x))}</td></tr>`).join("");
+  const base={labor:t.labor,parts:t.parts,sublet:t.sublet,pre:r2(t.labor+t.parts+t.sublet)};
+  const extras=(o.extras||[]).filter(x=>extraAmount(x,base)).map(x=>
+    `<tr><td>${esc(x.desc)||(x.type==="sublet"?"Sublet":x.type==="discount"?"Discount":"Fee")}</td><td colspan="2">${x.type==="fee"&&x.mode==="percent"?esc(x.value)+"%":""}</td><td style="text-align:right">${money(extraAmount(x,base))}</td></tr>`).join("");
+  return `
+    ${labor?`<table><thead><tr><th>Labor</th><th>Hours</th><th>Rate</th><th style="text-align:right">Amount</th></tr></thead><tbody>${labor}</tbody></table>`:""}
+    ${parts?`<table><thead><tr><th>Parts &amp; materials</th><th>Qty</th><th>Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>${parts}</tbody></table>`:""}
+    ${extras?`<table><thead><tr><th>Other charges</th><th colspan="2"></th><th style="text-align:right">Amount</th></tr></thead><tbody>${extras}</tbody></table>`:""}
+    <table class="tot"><tbody>
+      ${t.labor?`<tr><td>Labor</td><td style="text-align:right">${money(t.labor)}</td></tr>`:""}
+      ${t.parts?`<tr><td>Parts &amp; materials</td><td style="text-align:right">${money(t.parts)}</td></tr>`:""}
+      ${t.sublet?`<tr><td>Sublet</td><td style="text-align:right">${money(t.sublet)}</td></tr>`:""}
+      ${t.fees?`<tr><td>Fees</td><td style="text-align:right">${money(t.fees)}</td></tr>`:""}
+      ${t.discounts?`<tr><td>Discounts</td><td style="text-align:right">${money(t.discounts)}</td></tr>`:""}
+      <tr><td>Subtotal</td><td style="text-align:right">${money(t.subtotal)}</td></tr>
+      <tr><td>Tax (${cfg.taxRate}%)</td><td style="text-align:right">${money(t.tax)}</td></tr>
+      <tr class="grand"><td><b>Total</b></td><td style="text-align:right"><b>${money(t.total)}</b></td></tr>
+      ${t.paid?`<tr><td>Amount paid</td><td style="text-align:right">${money(t.paid)}</td></tr>
+      <tr class="grand"><td><b>Balance due</b></td><td style="text-align:right"><b>${money(t.balance)}</b></td></tr>`:""}
+    </tbody></table>`;
+}
+function authStamp(o){
+  const a=o.auth||{};
+  const last=(a.entries||[]).filter(e=>e.decision==="Approved").slice(-1)[0];
+  if(!last) return `<div class="authstamp"><b>Authorization:</b> ${esc(a.state||"Not Requested")}</div>`;
+  return `<div class="authstamp"><b>Authorized:</b> ${money(authorizedTotal(o))} by ${esc(last.who||"customer")}
+    (${esc(last.method)}) on ${esc(String(last.at).slice(0,16).replace("T"," "))}${(a.entries||[]).filter(e=>e.decision==="Approved").length>1?` — ${(a.entries||[]).filter(e=>e.decision==="Approved").length} authorizations on file`:""}</div>`;
+}
+function docEstimate(o){
+  const t=orderTotals(o);
+  return `<div class="inv">${docHead(o,"Estimate","EST-"+(o.estimateNo||"draft"))}
+    ${o.complaint?`<h4>Customer concern</h4><div class="note">${esc(o.complaint)}</div>`:""}
+    ${docCharges(o)}
+    ${needsAdditionalAuth(o)?`<div class="warnbox">ADDITIONAL AUTHORIZATION REQUIRED — this estimate exceeds the ${money(authorizedTotal(o))} previously approved.</div>`:""}
+    ${o.recommendation?`<h4>Recommendation</h4><div class="note">${esc(o.recommendation)}</div>`:""}
+    ${o.custNotes?`<h4>Notes</h4><div class="note">${esc(o.custNotes)}</div>`:""}
+    ${authStamp(o)}
+    <div class="sigline">Customer authorization — signature and date</div>
+    <div class="foot">${esc(db.settings.terms||"")}<br>
+    This is an estimate. Additional parts or labor found during the repair will be quoted for approval before the work is carried out.</div>
+  </div>`;
+}
+/* The shop's own copy. It carries the internal notes and the verification
+   warnings, and it deliberately carries no prices: a technician needs the job
+   and the hours, and a sheet covered in money invites the wrong conversation. */
+function docRepairOrder(o){
+  const need=(o.labor||[]).filter(l=>l.verify&&!l.verified);
+  const jobs=(o.labor||[]).filter(l=>l.desc).map(l=>
+    `<tr><td>${esc(l.desc)}${l.serviceId?` <span class="muted">${esc(l.serviceId)}</span>`:""}</td>
+      <td>${l.bill==="F"?"menu":esc(lineHours(l))+" hr"}</td>
+      <td>${l.verify?"VERIFY TIME":""}</td><td>${esc(l.custNote||"")}</td></tr>`).join("");
+  const parts=(o.parts||[]).filter(x=>x.desc).map(x=>
+    `<tr><td>${esc(x.desc)}</td><td>${esc(x.partNo||"")}</td><td>${esc(x.qty)||1}</td><td>${esc(x.vendor||"")}</td><td>${esc(x.intNote||"")}</td></tr>`).join("");
+  return `<div class="inv">${docHead(o,"Repair Order","RO-"+(o.roNo||"draft"))}
+    <div><b>Status:</b> ${esc(canonStatus(o.status))} &nbsp; <b>Authorization:</b> ${esc((o.auth||{}).state||"Not Requested")}
+      ${authorizedTotal(o)?" — approved to "+money(authorizedTotal(o)):""}</div>
+    ${needsAdditionalAuth(o)?`<div class="warnbox">ADDITIONAL AUTHORIZATION REQUIRED — do not proceed past the approved amount without checking with the customer.</div>`:""}
+    ${o.complaint?`<h4>Customer concern</h4><div class="note">${esc(o.complaint)}</div>`:""}
+    ${jobs?`<table><thead><tr><th>Job</th><th>Hours</th><th></th><th>Note</th></tr></thead><tbody>${jobs}</tbody></table>`:""}
+    ${need.length?`<div class="warnbox">Verify the labor time against this VIN and configuration in an approved labor guide before quoting:
+      ${esc(need.map(l=>l.desc).join("; "))}. These are shop catalog times, not a licensed labor guide.</div>`:""}
+    ${parts?`<h4>Parts</h4><table><thead><tr><th>Part</th><th>Part #</th><th>Qty</th><th>Vendor</th><th>Note</th></tr></thead><tbody>${parts}</tbody></table>`:""}
+    ${o.notes?`<h4>Technician findings</h4><div class="note">${esc(o.notes)}</div>`:""}
+    ${o.recommendation?`<h4>Recommendation</h4><div class="note">${esc(o.recommendation)}</div>`:""}
+    ${o.internalNotes?`<h4>Internal notes — shop copy only</h4><div class="note">${esc(o.internalNotes)}</div>`:""}
+    <div class="sigline">Technician — signature and date</div>
+    <div class="foot">Shop copy. Not for the customer: it carries internal notes and no pricing.</div>
+  </div>`;
+}
+function docInvoice(o){
+  const t=orderTotals(o);
+  return `<div class="inv">${docHead(o,"Invoice","INV-"+(o.invoiceNo||"draft"))}
+    ${o.complaint?`<h4>Customer concern</h4><div class="note">${esc(o.complaint)}</div>`:""}
+    ${o.notes?`<h4>Work performed</h4><div class="note">${esc(o.notes)}</div>`:""}
+    ${docCharges(o)}
+    ${(o.payments||[]).length?`<h4>Payments</h4><table><tbody>${(o.payments||[]).map(pm=>
+      `<tr><td>${esc(String(pm.at).slice(0,10))}</td><td>${esc(pm.method)}</td><td>${esc(pm.note||"")}</td><td style="text-align:right">${money(pm.amount)}</td></tr>`).join("")}</tbody></table>`:""}
+    ${o.recommendation?`<h4>Recommended next visit</h4><div class="note">${esc(o.recommendation)}</div>`:""}
+    ${o.custNotes?`<h4>Notes</h4><div class="note">${esc(o.custNotes)}</div>`:""}
+    ${authStamp(o)}
+    <div class="foot">${esc(db.settings.terms||"")}${t.balance>0.004?`<br><b>Balance due: ${money(t.balance)}</b>`:`<br>Paid in full — thank you.`}</div>
+  </div>`;
+}
+
+/* Shop fees the owner has set up once and can drop onto a ticket. Nothing is
+   added to a ticket automatically: a charge the shop did not put there is a
+   charge it cannot explain to a customer. */
+function feeCard(){
+  const fees=db.settings.fees||[];
+  return `<div class="card"><div class="toolbar"><h3 style="margin:0">Shop fees</h3><div class="grow"></div><button class="sm primary" onclick="addFee()">+ Add fee</button></div>
+  ${fees.length?`<table><thead><tr><th>Name</th><th>Amount</th><th>Taxable</th><th>On new tickets</th><th></th></tr></thead><tbody>
+  ${fees.map((f,i)=>`<tr><td><b>${esc(f.name)}</b></td>
+    <td>${f.mode==="percent"?esc(f.value)+"% of "+esc(f.base==="parts"?"parts":f.base==="laborparts"?"labor + parts":"labor"):money(f.value)}</td>
+    <td>${f.taxable?"Yes":"No"}</td>
+    <td>${f.active?"offered":"off"}</td>
+    <td class="right"><button class="sm" onclick="toggleFee(${i})">${f.active?"Turn off":"Turn on"}</button><button class="sm" onclick="delFee(${i})">Delete</button></td></tr>`).join("")}
+  </tbody></table>`:`<div class="empty">No shop fees set up. Add one — shop supplies, environmental, disposal — and it becomes available on tickets with <b>Apply shop fees</b>.</div>`}
+  <p class="muted" style="font-size:12px;margin-bottom:0">Whether a fee is taxable is your call and your accountant's, not this program's.</p></div>`;
+}
+function addFee(){
+  const name=prompt("Fee name (e.g. Shop supplies, Environmental, Disposal):","Shop supplies");
+  if(name==null||!name.trim())return;
+  const mode=(prompt("Flat amount or percent? Type: amount / percent","percent")||"").trim().toLowerCase()==="amount"?"amount":"percent";
+  const raw=prompt(mode==="percent"?"Percent:":"Amount ($):",mode==="percent"?"8":"25");
+  if(raw==null)return;
+  const value=Number(raw); if(!isFinite(value)||value<0){alert("That is not a number.");return;}
+  let base="labor";
+  if(mode==="percent"){
+    const b=(prompt("Percent of what? labor / parts / both","labor")||"labor").trim().toLowerCase();
+    base=b==="parts"?"parts":b==="both"||b==="laborparts"?"laborparts":"labor";
+  }
+  const taxable=confirm("Is this fee taxable? OK = taxable, Cancel = not taxable.");
+  db.settings.fees=db.settings.fees||[];
+  db.settings.fees.push({id:uid("fee"),name:name.trim(),mode,value,base,taxable,active:true});
+  save(); render();
+}
+function toggleFee(i){ const f=db.settings.fees[i]; if(!f)return; f.active=!f.active; save(); render(); }
+function delFee(i){ if(!confirm("Delete this fee? Tickets that already carry it keep it."))return; db.settings.fees.splice(i,1); save(); render(); }
 
 /* What is actually answering questions right now, and what would answer them
    if the shop bought a licence. Stated plainly so nobody quotes a seed time
@@ -1548,6 +2194,7 @@ function addJob(serviceId){
   const e=effectiveSeed(row);
   const fixed=isFixed(row);
   const line={
+    id:uid("ln"), type:"catalog-labor",
     desc:row.svc, serviceId:row.id, bill:fixed?"F":"H",
     hours:fixed?"":e.hours, billedHours:fixed?null:e.hours, overlap:0,
     rate:fixed?0:shopRate(), rateSource:fixed?"fixed":"shop",
