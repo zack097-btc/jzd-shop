@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the studio window is allowed to do. The serial commands are our own, declared in main.rs, so nothing beyond the core window set is needed here — no filesystem plugin, no shell, no network permissions. The app asks the machine for nothing it does not use.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

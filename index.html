@@ -98,6 +98,9 @@
     <button data-view="settings">Settings</button>
   </nav>
   <div class="grow"></div>
+  <!-- The old app never said whether anything had been written. This does,
+       every time, so a save that is not happening is visible immediately. -->
+  <span id="saveState" style="font-size:12px;color:#cdd6e0;margin-right:12px;white-space:nowrap" title="">All changes saved</span>
   <button class="hbtn" id="newWO">+ New Work Order</button>
 </header>
 
@@ -118,9 +121,143 @@ const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;
 
 /* ---------- data ---------- */
 const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:120,taxRate:8.25,taxLabor:false,nextInvoice:1001,terms:"Thank you for your business. Payment due on receipt."},customers:{},vehicles:{},orders:{},catalog:{labor:{},parts:{}}};
-let db=load();
-function load(){try{const d=JSON.parse(localStorage.getItem("jzd.shop.db"));if(d&&d.settings)return Object.assign({},DEFAULT,d,{settings:Object.assign({},DEFAULT.settings,d.settings),catalog:Object.assign({labor:{},parts:{}},d.catalog||{})});}catch(e){}return JSON.parse(JSON.stringify(DEFAULT));}
-function save(){try{localStorage.setItem("jzd.shop.db",JSON.stringify(db));}catch(e){alert("Couldn't save (browser storage full or blocked).");}}
+let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot() */
+/* ---------- where the book actually lives ----------------------------------
+
+   THE OLD VERSION LOST TWO HOURS OF CATALOGUE, and it is worth writing down
+   exactly how, because the replacement is shaped entirely by it.
+
+   Everything went into localStorage under one key. localStorage is tied to the
+   ORIGIN the page was opened from, so the hosted page and a downloaded copy of
+   the same file keep two different, invisible sets of books. It is also wiped
+   by "clear browsing data", by a private window closing, and by the browser
+   itself when disk runs short. Worse, the old load() ended in `catch(e){}` and
+   then returned an empty shop — so a book that merely failed to PARSE came up
+   blank, and the next keystroke saved that blank over the top. A recoverable
+   problem became a permanent one in a single edit.
+
+   So: on the desktop the book is a real file this program owns, written to a
+   temporary name, flushed to the disk, renamed into place and then read back
+   to prove it landed, with a copy of the previous book kept every time. In a
+   browser we still use localStorage because there is nothing better, but with
+   the same two rules that actually matter:
+
+     * a store that exists but cannot be read is an EMERGENCY, never an empty
+       shop, and we refuse to save over it;
+     * every write is read back, and a write that did not land says so loudly
+       instead of pretending.
+*/
+const JZD_VERSION = "2.1.0";
+const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
+const LS_KEY = "jzd.shop.db";
+const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
+
+/* Set when the book is unreadable. While this is set NOTHING may be written —
+   see persist(). It is the difference between "your data is hiding" and "your
+   data is gone". */
+let storageLocked = null;
+let storeHint = DESKTOP ? "this computer" : "this browser";
+
+function shapeDb(d){
+  return Object.assign({}, DEFAULT, d, {
+    settings: Object.assign({}, DEFAULT.settings, d.settings),
+    catalog: Object.assign({labor:{},parts:{}}, d.catalog||{})
+  });
+}
+
+async function loadDb(){
+  if(DESKTOP){
+    let r;
+    try{ r = await invoke("db_load"); }
+    catch(e){ storageLocked = "Could not reach the data file: " + e; return JSON.parse(JSON.stringify(DEFAULT)); }
+    storeHint = r.path;
+    if(r.error){ storageLocked = "The data file exists but could not be read: " + r.error; return JSON.parse(JSON.stringify(DEFAULT)); }
+    if(!r.existed || !r.text.trim()) return JSON.parse(JSON.stringify(DEFAULT));
+    try{ return shapeDb(JSON.parse(r.text)); }
+    catch(e){
+      storageLocked = "The data file is there but is not readable as a shop book (" + e + "). Nothing has been changed. Use Restore from backup.";
+      return JSON.parse(JSON.stringify(DEFAULT));
+    }
+  }
+  const raw = localStorage.getItem(LS_KEY);
+  if(raw === null) return JSON.parse(JSON.stringify(DEFAULT));
+  try{ return shapeDb(JSON.parse(raw)); }
+  catch(e){
+    storageLocked = "Saved data was found in this browser but could not be read (" + e + "). Nothing has been changed, so it may still be recoverable. Do not clear your browser data.";
+    return JSON.parse(JSON.stringify(DEFAULT));
+  }
+}
+
+/* save() stays the same call the rest of the program already makes, so every
+   existing button keeps working. It no longer writes directly: it marks the
+   book dirty and lets persist() do the real work, which keeps typing smooth
+   and means a burst of edits costs one write, not twenty. */
+let saveTimer = null, saving = false, dirty = false;
+function save(){
+  dirty = true;
+  markSaveState("saving");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(persist, 120);
+}
+
+/* Belt and braces: never let the window close with an unwritten change. */
+window.addEventListener("beforeunload", e => {
+  if(dirty || saving){ persistNow(); e.preventDefault(); e.returnValue = ""; }
+});
+
+async function persist(){
+  if(saving){ return; }
+  if(storageLocked){
+    markSaveState("blocked");
+    return;
+  }
+  saving = true; dirty = false;
+  const text = JSON.stringify(db);
+  try{
+    if(DESKTOP){
+      const r = await invoke("db_save", { text });
+      storeHint = r.path;
+    } else {
+      localStorage.setItem(LS_KEY, text);
+      /* Read it back. localStorage can silently refuse when the quota is gone,
+         and a save that did not land must never look like one that did. */
+      const back = localStorage.getItem(LS_KEY);
+      if(back !== text) throw new Error("the browser did not keep what was saved (storage may be full)");
+    }
+    markSaveState("saved");
+  }catch(e){
+    markSaveState("failed", String(e));
+    alert("YOUR LAST CHANGE WAS NOT SAVED.\n\n" + e +
+      "\n\nDo not close this window. Use Export backup now to get your work out to a file.");
+  }finally{
+    saving = false;
+    if(dirty) setTimeout(persist, 50);
+  }
+}
+/* Synchronous best effort for the moment the window is closing. */
+function persistNow(){
+  if(storageLocked) return;
+  try{ if(!DESKTOP) localStorage.setItem(LS_KEY, JSON.stringify(db)); }catch(e){}
+  if(DESKTOP){ try{ invoke("db_save", { text: JSON.stringify(db) }); }catch(e){} }
+}
+
+/* A visible, honest indicator. The old app gave no sign either way, which is
+   why two hours could disappear without a single warning on screen. */
+function markSaveState(state, detail){
+  const el = document.getElementById("saveState");
+  if(!el) return;
+  const M = {
+    saving: ["Saving…", "#6b7684"],
+    saved:  ["All changes saved", "#187a4b"],
+    blocked:["NOT SAVING — read the warning above", "#c0392b"],
+    failed: ["SAVE FAILED", "#c0392b"]
+  };
+  const [txt, col] = M[state] || M.saved;
+  el.textContent = txt;
+  el.style.color = col;
+  el.title = detail || storeHint;
+}
+
 function vals(o){return Object.values(o||{});}
 
 /* ---------- helpers ---------- */
@@ -233,7 +370,9 @@ function renderSettings(){const s=db.settings;
   <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveSettings()">Save Settings</button></div>
   </div>
   <div class="card"><h3>Backup</h3><p class="muted" style="margin-top:0">Your data lives in this browser. Export a backup regularly, or to move to another computer.</p>
-  <div class="toolbar"><button onclick="exportData()">Export backup (.json)</button><button onclick="document.getElementById('impFile').click()">Import backup</button><input type="file" id="impFile" accept=".json" style="display:none"></div></div>`;
+  <div class="toolbar"><button onclick="exportData()">Export backup (.json)</button><button onclick="document.getElementById('impFile').click()">Import backup</button><input type="file" id="impFile" accept=".json" style="display:none"><button onclick="openRestore()">Restore from backup…</button><button onclick="showWhere()">Where is my data?</button></div>
+  <p class="muted" style="margin:10px 0 0;font-size:12px">JZD Shop Manager <span id="verLbl"></span> — every change is written straight to disk and read back to prove it landed, and a copy of the previous book is kept before each change.</p></div>`;
+  const vl=document.getElementById("verLbl"); if(vl) vl.textContent = "v"+JZD_VERSION;
   $("#impFile").onchange=importData;
 }
 function saveSettings(){const g=id=>$("#"+id).value;db.settings.shopName=g("s_shopName")||"JZD Inc.";db.settings.tagline=g("s_tagline");db.settings.addr=g("s_addr");db.settings.phone=g("s_phone");db.settings.email=g("s_email");db.settings.laborRate=Number(g("s_laborRate"))||0;db.settings.taxRate=Number(g("s_taxRate"))||0;db.settings.nextInvoice=parseInt(g("s_nextInvoice"))||1001;db.settings.taxLabor=$("#s_taxLabor").checked;db.settings.terms=g("s_terms");save();render();alert("Settings saved.");}
@@ -376,14 +515,102 @@ function printDoc(kind){pullWO();const o=cur,s=db.settings,c=db.customers[o.cust
 $("#woOverlay").addEventListener("mousedown",e=>{if(e.target===$("#woOverlay"))closeWO();});
 $("#recOverlay").addEventListener("mousedown",e=>{if(e.target===$("#recOverlay"))closeRec();});
 
-render();
+/* Nothing is drawn until the book has actually been read off the disk. The
+   old version rendered an empty shop first and filled it in afterwards, which
+   is exactly how an unreadable book came to look like a brand new one. */
+async function boot(){
+  db = await loadDb();
+  render();
+  /* The indicator must never say "saved" when saving is switched off. An
+     indicator that lies is worse than none, because it is exactly what a shop
+     owner glances at before closing the lid. */
+  if(storageLocked){ markSaveState("blocked"); showStorageAlarm(); }
+  else markSaveState("saved");
+}
+boot();
 
-/* Installable app: register the service worker so the shop manager loads with
-   no internet — the data already lives in this browser via localStorage. */
-if ("serviceWorker" in navigator && location.protocol === "https:") {
+/* Installable app: register the service worker so the browser version loads
+   with no internet. The desktop build keeps its book in a real file and does
+   not use this at all. */
+if (!DESKTOP && "serviceWorker" in navigator && location.protocol === "https:") {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   });
+}
+
+/* An unreadable book is the one situation where the program must get in the
+   way. It refuses to save, says why in plain words, and points at the two
+   things that actually recover the work. */
+function showStorageAlarm(){
+  const d = document.createElement("div");
+  d.style.cssText = "position:fixed;inset:0;background:rgba(20,24,30,.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px";
+  d.innerHTML = `<div style="background:#fff;max-width:640px;border-radius:12px;padding:22px 24px;font:14px/1.6 'Segoe UI',Arial,sans-serif">
+    <h2 style="margin:0 0 10px;color:#c0392b">Your data could not be read</h2>
+    <p style="margin:0 0 10px"><b>Nothing has been deleted and nothing has been changed.</b>
+       Saving is switched off so this program cannot write over whatever is still there.</p>
+    <p style="margin:0 0 10px;color:#444">${esc(storageLocked)}</p>
+    <p style="margin:0 0 14px">Where it lives: <code style="font-size:12px">${esc(storeHint)}</code></p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${DESKTOP ? '<button onclick="openRestore()" style="padding:9px 14px;border-radius:8px;border:1px solid #1f6feb;background:#1f6feb;color:#fff;cursor:pointer">Restore from a backup</button>' : ''}
+      <button onclick="document.getElementById('impFile').click()" style="padding:9px 14px;border-radius:8px;border:1px solid #dde3ea;background:#fff;cursor:pointer">Import a backup file</button>
+      <button onclick="this.closest('div').parentNode.remove()" style="padding:9px 14px;border-radius:8px;border:1px solid #dde3ea;background:#fff;cursor:pointer">Carry on read-only</button>
+    </div></div>`;
+  document.body.appendChild(d);
+}
+
+/* The backups the desktop build keeps before every single write. */
+/* People need to know where their business lives, and be able to go and copy
+   it. This tells them, in a path they can paste into Explorer. */
+async function showWhere(){
+  if(!DESKTOP){
+    alert("This is the browser version, so the data is held inside this browser on this computer only.\n\n" +
+          "Clearing browsing data will erase it. The installed desktop version keeps a real file you can back up — that is the one to use for the shop.");
+    return;
+  }
+  let dir = storeHint;
+  try{ dir = await invoke("db_where"); }catch(e){}
+  alert("Your shop data is kept here:\n\n" + dir +
+        "\n\nshop.json is the book. The backups folder holds a copy from before every change.\n" +
+        "Copy that whole folder to a USB stick or cloud drive now and then and you can never lose the shop.");
+}
+
+async function openRestore(){
+  if(!DESKTOP){ alert("Backups on disk are a desktop feature. In a browser, use Import backup."); return; }
+  let list;
+  try{ list = await invoke("db_backups"); }
+  catch(e){ alert("Could not read the backup folder: " + e); return; }
+  if(!list.length){ alert("There are no backups yet. Backups are written from the first change onward."); return; }
+  const rows = list.map((b,i)=>{
+    const when = b.modified ? new Date(Number(b.modified)*1000).toLocaleString() : b.name;
+    return `<tr><td style="padding:6px 10px">${esc(when)}</td><td style="padding:6px 10px;color:#6b7684">${(b.bytes/1024).toFixed(1)} KB</td>
+      <td style="padding:6px 10px"><button onclick="restoreBackup('${esc(b.name)}')" style="padding:5px 10px;border-radius:6px;border:1px solid #1f6feb;background:#1f6feb;color:#fff;cursor:pointer">Restore</button></td></tr>`;
+  }).join("");
+  const d = document.createElement("div");
+  d.id = "restoreWrap";
+  d.style.cssText = "position:fixed;inset:0;background:rgba(20,24,30,.92);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px";
+  d.innerHTML = `<div style="background:#fff;max-width:620px;width:100%;max-height:80vh;overflow:auto;border-radius:12px;padding:20px;font:14px/1.5 'Segoe UI',Arial,sans-serif">
+    <h2 style="margin:0 0 4px">Restore from a backup</h2>
+    <p style="margin:0 0 14px;color:#6b7684">A copy is kept every time anything changes. Newest first.</p>
+    <table style="width:100%;border-collapse:collapse">${rows}</table>
+    <div style="margin-top:14px"><button onclick="document.getElementById('restoreWrap').remove()" style="padding:9px 14px;border-radius:8px;border:1px solid #dde3ea;background:#fff;cursor:pointer">Cancel</button></div>
+  </div>`;
+  document.body.appendChild(d);
+}
+
+async function restoreBackup(name){
+  if(!confirm("Restore this backup?\n\nWhat is on screen now will be replaced. A copy of the current book is kept first, so this can itself be undone."))return;
+  let text;
+  try{ text = await invoke("db_read_backup", { name }); }
+  catch(e){ alert("Could not read that backup: " + e); return; }
+  let parsed;
+  try{ parsed = JSON.parse(text); }
+  catch(e){ alert("That backup is not readable: " + e); return; }
+  db = shapeDb(parsed);
+  storageLocked = null;          /* the book is good again, saving may resume */
+  const w = document.getElementById("restoreWrap"); if(w) w.remove();
+  save();
+  render();
+  alert("Restored.");
 }
 </script>
 </body>

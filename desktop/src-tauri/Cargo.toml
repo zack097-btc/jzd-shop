@@ -1,0 +1,27 @@
+[package]
+name = "jzd-shop"
+version = "2.1.0"
+description = "JZD Shop Manager — customers, vehicles, work orders"
+authors = ["JZac Designs"]
+edition = "2021"
+rust-version = "1.77"
+
+# Desktop only, so this is a plain program — no library crate of the kind the
+# Tauri template carries for phone builds.
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# MIT/Apache-2.0 — permissive, so it does not affect what we may charge for this
+
+[profile.release]
+# a shop program is opened all day: make it small and quick to start
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
