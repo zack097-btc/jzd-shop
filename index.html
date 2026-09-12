@@ -47,6 +47,44 @@
   .totbox .totrow.sub{border-top:1px solid var(--line);margin-top:5px;padding-top:5px}
   .totbox .totrow.bal b{color:var(--bad)}
   .totbox .totrow.bal.clear b{color:var(--accent2)}
+  /* The inspection is filled in standing at the car, often on a touchscreen and
+     often with dirty hands. Everything here is sized to be hit accurately the
+     first time: nothing smaller than about 38px, and never colour alone. */
+  .ibar{position:sticky;top:54px;z-index:15;background:var(--card);border:1px solid var(--line);border-radius:9px;
+        padding:9px 11px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+  .icount{border:1px solid var(--line);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:12.5px;background:#fff;white-space:nowrap}
+  .icount.on{outline:2px solid var(--accent);outline-offset:-2px}
+  .icount b{font-size:15px;margin-right:4px}
+  .igroup{margin-bottom:14px}
+  .igroup h3{margin:0 0 6px;font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--steel)}
+  .irow{border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-bottom:6px;background:#fff}
+  .irow.hit{border-color:var(--accent)}
+  .itop{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .iname{font-weight:600;min-width:190px;flex:1}
+  .sbtns{display:flex;gap:4px;flex-wrap:wrap}
+  .sbtn{min-width:40px;height:38px;padding:0 11px;border:1px solid var(--line);background:#fff;border-radius:7px;
+        cursor:pointer;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted)}
+  .sbtn:hover{background:#f3f6fa}
+  .sbtn.on.is-good{background:#187a4b;border-color:#187a4b;color:#fff}
+  .sbtn.on.is-mon{background:#c9770a;border-color:#c9770a;color:#fff}
+  .sbtn.on.is-att{background:#c0392b;border-color:#c0392b;color:#fff}
+  .sbtn.on.is-urg{background:#7b1a10;border-color:#7b1a10;color:#fff}
+  .sbtn.on.is-non,.sbtn.on.is-na{background:#5b6673;border-color:#5b6673;color:#fff}
+  .sbtn.on{color:#fff}
+  .meas{display:flex;gap:5px;align-items:center}
+  .meas input{width:74px;height:38px;text-align:right;font-size:14px;padding:0 7px}
+  .meas span{font-size:11.5px;color:var(--muted);min-width:26px}
+  .flags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+  .flag{border:1px solid var(--line);background:#fff;border-radius:20px;padding:5px 11px;font-size:11.5px;cursor:pointer;color:var(--muted)}
+  .flag.on{background:#fdf0dc;border-color:#e0b268;color:#7a4a00;font-weight:600}
+  .inote{display:flex;gap:6px;margin-top:6px}
+  .inote input{height:34px;font-size:12.5px}
+  .imatrix{width:100%;border-collapse:collapse}
+  .imatrix th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);text-align:left;padding:3px 6px}
+  .imatrix td{padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .imatrix input{width:72px;height:38px;text-align:right;font-size:14px}
+  .imatrix .pos{font-weight:700;width:52px}
+  .sugg{font-size:11px;color:var(--accent);cursor:pointer;text-decoration:underline}
   .vinbar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
   .vinbar input{font-family:ui-monospace,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase}
   .decoded{background:#f2f7f4;border:1px solid #cfe4d8;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:13px}
@@ -125,6 +163,19 @@
   .inv .sigline{margin-top:26px;border-top:1px solid #111;width:300px;padding-top:5px;font-size:11.5px}
   .inv .tot td{border-bottom:none;padding:3px 8px}
   .inv .tot tr.grand td{border-top:1.5px solid #111;font-size:14px;padding-top:7px}
+  /* Status must survive a grayscale printer and a photocopier, so every status
+     carries its word as well as its colour and a heavy left edge. */
+  .inv .st{display:inline-block;padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;border:1px solid #666}
+  .inv .st-g{background:#e6f2ea;border-color:#2f7d52}
+  .inv .st-m{background:#fdf3e2;border-color:#b5801f}
+  .inv .st-a{background:#fbe9e6;border-color:#b03a2b}
+  .inv .st-u{background:#f7d9d5;border-color:#7b1a10}
+  .inv tr.lvl-u td{border-left:4px solid #7b1a10}
+  .inv tr.lvl-a td{border-left:4px solid #b03a2b}
+  .inv tr.lvl-m td{border-left:4px solid #b5801f}
+  .inv .sumgrid{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+  .inv .sumcell{border:1px solid #999;border-radius:5px;padding:6px 12px;font-size:12.5px}
+  .inv .sumcell b{font-size:17px;display:block}
   @page{margin:14mm}
 </style>
 </head>
@@ -134,6 +185,7 @@
   <nav id="nav">
     <button data-view="dash" class="on">Dashboard</button>
     <button data-view="orders">Work Orders</button>
+    <button data-view="board">Shop Board</button>
     <button data-view="customers">Customers</button>
     <button data-view="vehicles">Vehicles</button>
     <button data-view="services">Services</button>
@@ -469,7 +521,7 @@ const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;
    not know the law. taxParts defaults true because the version before this one
    always taxed parts, and a silent change to that would rewrite what every
    existing draft charges. */
-const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:112.50,rateMin:100,rateMax:125,taxRate:8.25,taxLabor:false,taxParts:true,taxFees:false,partsMarkup:40,nextInvoice:1001,nextEstimate:1,nextRO:1,fees:[],terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[]};
+const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repair",addr:"",phone:"",email:"",laborRate:112.50,rateMin:100,rateMax:125,taxRate:8.25,taxLabor:false,taxParts:true,taxFees:false,partsMarkup:40,nextInvoice:1001,nextEstimate:1,nextRO:1,nextInspection:1,fees:[],techs:[],thresholds:{treadMonitor:5,treadUrgent:3,padMonitor:4,padUrgent:2,moistureMonitor:2,moistureUrgent:3},terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},recommendations:{},catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[],inspections:{},attachments:{}};
 let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot() */
 /* ---------- where the book actually lives ----------------------------------
 
@@ -496,7 +548,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.3.0";
+const JZD_VERSION = "2.4.0";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -518,7 +570,10 @@ function shapeDb(d){
     }),
     catalog: Object.assign({labor:{},parts:{},overrides:{},disabled:{}}, d.catalog||{}),
     vinCache: d.vinCache || {},
-    audit: Array.isArray(d.audit) ? d.audit : []
+    audit: Array.isArray(d.audit) ? d.audit : [],
+    inspections: d.inspections || {},
+    attachments: d.attachments || {},
+    recommendations: d.recommendations || {}
   });
 }
 
@@ -1237,6 +1292,1173 @@ function recordPayment(o, amount, method, note){
   return pay;
 }
 
+
+/* ====================================================================
+   The shop floor: check-in, the multipoint inspection, and what
+   comes out of it
+   ====================================================================
+   A multipoint inspection is not a checklist with three colours. What
+   makes it worth anything in a real shop is the NUMBER: 4/32 of tread,
+   3 mm of pad, 3% moisture in the brake fluid, -34F of coolant
+   protection. A number is what a customer can be shown, what a second
+   technician can check, and what the shop can still defend in a year.
+   So every item can carry a measurement with its own unit and its own
+   specification, quite separately from the technician's judgement of
+   it.
+
+   The template below is data. One renderer draws all of it, which is
+   why adding a test later is a line in a list rather than a new screen,
+   and why a completed inspection can keep its own copy of the template
+   it was filled in against - a shop that adds an item next month has
+   not retroactively left a hole in every inspection it has already
+   given a customer. */
+
+const INSP_STATES = ["Good","Monitor","Needs Attention","Urgent","Not Inspected","N/A"];
+const INSP_SHORT  = {"Good":"G","Monitor":"M","Needs Attention":"A","Urgent":"U","Not Inspected":"—","N/A":"N/A"};
+const INSP_CLASS  = {"Good":"is-good","Monitor":"is-mon","Needs Attention":"is-att","Urgent":"is-urg","Not Inspected":"is-non","N/A":"is-na"};
+
+/* m: a measurement this item expects. {k:key, label, unit, hint} */
+function M(k, label, unit, hint){ return {k, label, unit, hint:hint || ""}; }
+
+const INSPECTION_TEMPLATE = {
+  version: "2.4.0",
+  groups: [
+    {id:"tires", name:"Tires", perWheel:true, positions:["LF","RF","LR","RR","Spare"],
+     items:[{id:"tire", name:"Tire",
+        meas:[M("tread","Tread","/32"), M("psi","Pressure","PSI"), M("psiSpec","Placard","PSI")],
+        flags:["Uneven wear","Inside-edge wear","Outside-edge wear","Center wear","Cupping","Feathering",
+               "Cracking / dry rot","Puncture","Bulge","Sidewall damage","Exposed cords","Foreign object",
+               "Incorrect size","Mismatched","Age concern"],
+        note:"DOT date / notes"}]},
+
+    {id:"wheels", name:"Wheels", perWheel:true, positions:["LF","RF","LR","RR"],
+     items:[{id:"wheel", name:"Wheel",
+        flags:["Curb rash","Bent","Cracked","Missing lug","Damaged lug / stud","Wheel lock present","Abnormal corrosion"]}]},
+
+    {id:"brakes", name:"Brakes", perWheel:true, positions:["LF","RF","LR","RR"],
+     items:[{id:"pads", name:"Pads",
+        meas:[M("inner","Inner pad","mm"), M("outer","Outer pad","mm")],
+        flags:["Uneven wear","Contaminated","Delaminating"]},
+       {id:"rotor", name:"Rotor",
+        meas:[M("thick","Thickness","mm"), M("min","Minimum spec","mm")],
+        flags:["Worn","Grooved","Scored","Heat spotted","Rusted","Cracked","Below specification","Not measured"]},
+       {id:"hardware", name:"Caliper & hardware",
+        flags:["Slides seized","Slides dry","Hose cracked / swollen","Line corroded","Leaking","Hardware missing"]}]},
+
+    {id:"brakesys", name:"Brake system",
+     items:[{id:"fluid", name:"Brake fluid",
+        meas:[M("moisture","Moisture","%"), M("level","Level","")],
+        flags:["Level low","Dark / discoloured","Contaminated","Not tested"],
+        note:"Test method and recommendation",
+        states:["Good","Service Recommended","Contaminated","Low","Not Tested","N/A"]},
+       {id:"parking", name:"Parking brake",
+        flags:["Adjustment needed","Cable seized","Electronic fault light","Not applicable"]},
+       {id:"pedal", name:"Pedal feel",
+        flags:["Soft","Pulsation","Travels far","Firm and normal"]}]},
+
+    {id:"oil", name:"Engine oil",
+     items:[{id:"oil", name:"Engine oil",
+        meas:[M("life","Oil life remaining","%")],
+        flags:["Slightly low","Low","Very low","Overfilled","Dark / contaminated","Sludge present",
+               "Filter housing leak","Drain plug leak","Service due","Service overdue","Not checked"],
+        note:"Colour, condition, what was seen"}]},
+
+    {id:"cooling", name:"Cooling system",
+     items:[{id:"coolant", name:"Coolant",
+        meas:[M("freeze","Freeze protection","°F"), M("freezeC","Freeze protection","°C")],
+        flags:["Level low","Contaminated","Oil in coolant","Rusty","Wrong colour / mixed","Not tested"],
+        note:"Type and colour observed, test method"},
+       {id:"radiator", name:"Radiator & cap", flags:["Leaking","Fins damaged","Cap weak","Corrosion"]},
+       {id:"hoses", name:"Hoses & connections", flags:["Soft","Swollen","Cracked","Weeping","Clamp loose"]},
+       {id:"pump", name:"Water pump / thermostat area", flags:["Weeping","Stain present","Noise"]},
+       {id:"fan", name:"Cooling fan", flags:["Inoperative","Noisy","Damaged","Clutch weak"]},
+       {id:"heater", name:"Heater hoses / heat output", flags:["Leaking","No heat","Weak heat"]}]},
+
+    {id:"fluids", name:"Other fluids",
+     items:[{id:"trans", name:"Transmission fluid",
+        flags:["Level low","Dark","Burnt smell","Contaminated","Leaking","Sealed - not serviceable","Not applicable"]},
+       {id:"ps", name:"Power steering", flags:["Level low","Dark","Leaking","Electric - not applicable"]},
+       {id:"frontdiff", name:"Front differential", flags:["Leaking","Level low","Not applicable"]},
+       {id:"reardiff", name:"Rear differential", flags:["Leaking","Level low","Not applicable"]},
+       {id:"tcase", name:"Transfer case", flags:["Leaking","Level low","Not applicable"]},
+       {id:"washer", name:"Washer fluid", flags:["Empty","Low","Pump inoperative","Nozzles blocked"]},
+       {id:"def", name:"DEF (diesel)", meas:[M("level","Level","%")],
+        flags:["Low","Warning present","Contamination concern","Not applicable"]}]},
+
+    {id:"lighting", name:"Lighting",
+     itemStates:["Good","Inoperative","Dim","Damaged housing","Moisture present","N/A"],
+     items:[{id:"lowbeam",name:"Low beams"},{id:"highbeam",name:"High beams"},{id:"drl",name:"Daytime running lights"},
+       {id:"turnfront",name:"Front turn signals"},{id:"turnrear",name:"Rear turn signals"},{id:"hazard",name:"Hazards"},
+       {id:"brake",name:"Brake lights"},{id:"chmsl",name:"Third brake light"},{id:"tail",name:"Taillights"},
+       {id:"reverse",name:"Reverse lights"},{id:"plate",name:"License plate lights"},
+       {id:"markfront",name:"Front markers"},{id:"markrear",name:"Rear markers"},{id:"fog",name:"Fog lights"},
+       {id:"dome",name:"Interior / dome"},{id:"cluster",name:"Instrument illumination"},{id:"trailer",name:"Trailer lighting"}]},
+
+    {id:"glass", name:"Wipers, washers & glass",
+     items:[{id:"wiperf",name:"Front wiper blades",flags:["Streaking","Chattering","Torn","Hardened"]},
+       {id:"wiperr",name:"Rear wiper",flags:["Streaking","Torn","Not applicable"]},
+       {id:"washf",name:"Front washer operation",flags:["Weak","Inoperative","Nozzle blocked"]},
+       {id:"washr",name:"Rear washer",flags:["Weak","Inoperative","Not applicable"]},
+       {id:"windshield",name:"Windshield",flags:["Chip","Crack","Pitting","Delamination","Obstructs view"],
+        note:"Where on the glass"},
+       {id:"sideglass",name:"Side glass",flags:["Chip","Crack","Regulator concern"]},
+       {id:"rearglass",name:"Rear glass",flags:["Chip","Crack","Defroster inoperative"]},
+       {id:"mirrors",name:"Mirrors",flags:["Cracked","Loose","Adjuster inoperative"]}]},
+
+    {id:"battery", name:"Battery & charging",
+     items:[{id:"battery", name:"Battery",
+        meas:[M("volts","Resting voltage","V"), M("cca","Measured CCA","CCA"), M("ccaRated","Rated CCA","CCA")],
+        flags:["Corrosion","Terminals loose","Hold-down loose","Case swollen","Leaking","Age concern"],
+        note:"Date code, test method",
+        states:["Good","Good / Recharge","Recharge and Retest","Replace Battery","Bad Cell","Test Not Performed","N/A"]},
+       {id:"charging", name:"Charging system",
+        meas:[M("charge","Charging voltage","V")],
+        flags:["Low output","High output","Belt slipping","Noise","Warning light"]},
+       {id:"starter", name:"Starting system", flags:["Slow crank","Click","Intermittent","Noise"]}]},
+
+    {id:"underhood", name:"Belts, hoses & underhood",
+     items:[{id:"belt",name:"Serpentine / accessory belt",flags:["Cracked","Glazed","Frayed","Missing rib","Noise"]},
+       {id:"tensioner",name:"Tensioner & idlers",flags:["Noise","Play","Weak tension","Wobble"]},
+       {id:"vacuum",name:"Vacuum hoses",flags:["Cracked","Disconnected","Brittle"]},
+       {id:"intake",name:"Intake boots / air intake",flags:["Cracked","Loose clamp","Unmetered air"]},
+       {id:"airfilter",name:"Engine air filter",flags:["Dirty","Very dirty","Damaged","Wrong fitment"]},
+       {id:"cabinfilter",name:"Cabin air filter",flags:["Dirty","Very dirty","Debris","Not accessible"]},
+       {id:"wiring",name:"Visible wiring",flags:["Chafed","Repaired","Corroded","Rodent damage"]},
+       {id:"mounts",name:"Engine mounts (visible)",flags:["Cracked","Collapsed","Separated","Fluid-filled leaking"]}]},
+
+    {id:"steering", name:"Steering & suspension",
+     items:[{id:"innertie",name:"Inner tie rods",flags:["Play","Boot torn","Leaking"]},
+       {id:"outertie",name:"Outer tie rods",flags:["Play","Boot torn","Seized"]},
+       {id:"rack",name:"Steering rack / gear",flags:["Leaking","Play","Noise","Boot torn"]},
+       {id:"psleak",name:"Power steering leaks",flags:["Seeping","Leaking","Not applicable"]},
+       {id:"upperball",name:"Upper ball joints",flags:["Play","Boot torn","Not applicable"]},
+       {id:"lowerball",name:"Lower ball joints",flags:["Play","Boot torn"]},
+       {id:"controlarm",name:"Control arms & bushings",flags:["Bushing cracked","Bushing separated","Play","Bent"]},
+       {id:"swaylink",name:"Sway bar links",flags:["Play","Noise","Broken"]},
+       {id:"swaybush",name:"Sway bar bushings",flags:["Cracked","Worn","Loose"]},
+       {id:"struts",name:"Struts / shocks",flags:["Leaking","Weak","Noise","Mount worn","Bent"]},
+       {id:"springs",name:"Springs",flags:["Broken","Sagging","Corroded"]},
+       {id:"bearings",name:"Wheel bearings",flags:["Noise","Play","Rough"]},
+       {id:"cv",name:"CV axles & boots",flags:["Boot torn","Grease slung","Clicking","Play"]},
+       {id:"axleseal",name:"Axle seals",flags:["Seeping","Leaking"]},
+       {id:"column",name:"Steering column / coupler",flags:["Play","Noise","Binding"]}]},
+
+    {id:"trucksteer", name:"Truck steering & suspension", truckOnly:true,
+     items:[{id:"draglink",name:"Drag link",flags:["Play","Boot torn"]},
+       {id:"trackbar",name:"Track bar",flags:["Play","Bushing worn","Loose"]},
+       {id:"pitman",name:"Pitman arm",flags:["Play","Loose"]},
+       {id:"idlerarm",name:"Idler arm",flags:["Play","Loose"]},
+       {id:"stabilizer",name:"Steering stabilizer",flags:["Leaking","Weak","Broken"]},
+       {id:"radiusarm",name:"Radius arms",flags:["Bushing worn","Cracked"]},
+       {id:"leaf",name:"Leaf springs",flags:["Cracked","Broken leaf","Sagging","Corroded"]},
+       {id:"shackle",name:"Shackles & bushings",flags:["Worn","Seized","Corroded"]},
+       {id:"ubolt",name:"U-bolts",flags:["Loose","Corroded","Stretched"]}]},
+
+    {id:"underbody", name:"Underbody & leaks",
+     leaks:true,
+     items:[{id:"oilleak",name:"Engine oil leak"},{id:"coolantleak",name:"Coolant leak"},
+       {id:"transleak",name:"Transmission leak"},{id:"diffleak",name:"Differential leak"},
+       {id:"tcaseleak",name:"Transfer case leak"},{id:"psleak2",name:"Power steering leak"},
+       {id:"brakeleak",name:"Brake fluid leak"},{id:"fuelleak",name:"Fuel leak"},
+       {id:"exhleak",name:"Exhaust leak"},
+       {id:"rust",name:"Rust / corrosion",leak:false,flags:["Surface","Scaling","Perforation","Structural concern"]},
+       {id:"shields",name:"Shields & undertray",leak:false,flags:["Loose","Missing","Damaged","Dragging"]},
+       {id:"frame",name:"Frame / body damage",leak:false,flags:["Prior repair","Bent","Cracked","Corrosion"]}]},
+
+    {id:"exhaust", name:"Exhaust",
+     items:[{id:"manifold",name:"Manifolds",flags:["Leaking","Cracked","Studs broken"]},
+       {id:"pipes",name:"Pipes",flags:["Corroded","Leaking","Damaged"]},
+       {id:"flex",name:"Flex section",flags:["Cracked","Separating","Leaking"]},
+       {id:"cat",name:"Catalytic converter",flags:["Rattling","Damaged","Missing","Aftermarket"]},
+       {id:"muffler",name:"Muffler",flags:["Corroded","Leaking","Damaged","Aftermarket"]},
+       {id:"hangers",name:"Hangers & clamps",flags:["Broken","Missing","Corroded"]},
+       {id:"diesel",name:"Diesel aftertreatment (DPF / SCR / sensors)",
+        flags:["DPF concern","SCR concern","Sensor concern","Warning present","Not applicable"],
+        note:"What was observed - not an emissions compliance judgement"}]},
+
+    {id:"driveline", name:"Driveline",
+     items:[{id:"driveshaft",name:"Driveshaft",flags:["Play","Dented","Out of balance","Missing weight"]},
+       {id:"centersupport",name:"Center support bearing",flags:["Worn","Noise","Separated","Not applicable"]},
+       {id:"guibo",name:"Flex disc / guibo",flags:["Cracked","Separated","Not applicable"]},
+       {id:"ujoint",name:"U-joints",flags:["Play","Dry","Rusty","Not applicable"]},
+       {id:"diffmount",name:"Differential mounts",flags:["Cracked","Collapsed","Not applicable"]},
+       {id:"transmount",name:"Transmission mounts",flags:["Cracked","Collapsed","Separated"]},
+       {id:"outputseal",name:"Output seals",flags:["Seeping","Leaking"]}]},
+
+    {id:"enginebay", name:"Engine bay leaks",
+     items:[{id:"filterhousing",name:"Oil filter housing",flags:["Seeping","Leaking"]},
+       {id:"valvecover",name:"Valve cover",flags:["Seeping","Leaking"]},
+       {id:"oilpan",name:"Oil pan",flags:["Seeping","Leaking"]},
+       {id:"frontengine",name:"Front of engine",flags:["Seeping","Leaking"]},
+       {id:"rearengine",name:"Rear of engine",flags:["Seeping","Leaking"]},
+       {id:"turbo",name:"Turbo oil / coolant lines",flags:["Seeping","Leaking","Not applicable"]},
+       {id:"fuelvis",name:"Fuel system (visible)",flags:["Seeping","Leaking","Odour"]},
+       {id:"connectors",name:"Wiring & connectors",flags:["Damaged","Corroded","Repaired"]}]},
+
+    {id:"safety", name:"Safety & operation",
+     items:[{id:"horn",name:"Horn",flags:["Inoperative","Weak"]},
+       {id:"belts",name:"Seat belts",flags:["Frayed","Retractor faulty","Buckle faulty"]},
+       {id:"hood",name:"Hood latch & struts",flags:["Latch sticky","Struts weak","Safety catch worn"]},
+       {id:"doors",name:"Doors & latches",flags:["Latch worn","Hinge worn","Check strap"]},
+       {id:"camera",name:"Backup camera",flags:["Inoperative","Poor image","Not applicable"]},
+       {id:"roadtest",name:"Road test",
+        flags:["Not road tested","Steering pull","Vibration","Brake pulsation","Abnormal noise",
+               "Transmission behaviour","Engine performance concern"],
+        note:"What was felt on the road test"}]},
+
+    {id:"warnings", name:"Warning lights at check-in",
+     itemStates:["Not present","Illuminated now","Reported by customer","Intermittent","N/A"],
+     noSummary:true,
+     items:[{id:"cel",name:"Check Engine"},{id:"abs",name:"ABS"},{id:"srs",name:"Airbag / SRS"},
+       {id:"brakewarn",name:"Brake"},{id:"tpms",name:"TPMS"},{id:"batt",name:"Battery"},
+       {id:"temp",name:"Coolant temperature"},{id:"oilpress",name:"Oil pressure"},
+       {id:"traction",name:"Traction / stability"},{id:"transwarn",name:"Transmission"},
+       {id:"defdpf",name:"DEF / DPF"},{id:"otherwarn",name:"Other"}]}
+  ]
+};
+
+/* Groups a vehicle does not have are not shown. A BMW does not have a drag
+   link and a pickup does not have a guibo, and a technician made to tick
+   "not applicable" thirty times stops reading the sheet. */
+function templateFor(profile){
+  const t = JSON.parse(JSON.stringify(INSPECTION_TEMPLATE));
+  const truck = !!(profile && profile.truck);
+  t.groups = t.groups.filter(g => !g.truckOnly || truck);
+  return t;
+}
+function inspItemKey(g, item, pos){ return g.id + "." + item.id + (pos ? "." + pos : ""); }
+
+/* A measurement may SUGGEST a condition - 2/32 of tread is not a judgement
+   call - but it never overrules the technician, who is standing at the car. */
+function suggestState(key, meas){
+  const th = db.settings.thresholds || {};
+  const n = v => (v === "" || v == null) ? null : Number(v);
+  if (/^tires\./.test(key)){
+    const t = n(meas.tread); if (t == null || !isFinite(t)) return null;
+    if (t <= (th.treadUrgent != null ? th.treadUrgent : 3)) return "Urgent";
+    if (t <= (th.treadMonitor != null ? th.treadMonitor : 5)) return "Monitor";
+    return "Good";
+  }
+  if (/^brakes\.pads\./.test(key)){
+    const vals = [n(meas.inner), n(meas.outer)].filter(v => v != null && isFinite(v));
+    if (!vals.length) return null;
+    const m = Math.min.apply(null, vals);
+    if (m <= (th.padUrgent != null ? th.padUrgent : 2)) return "Urgent";
+    if (m <= (th.padMonitor != null ? th.padMonitor : 4)) return "Monitor";
+    return "Good";
+  }
+  if (key === "brakesys.fluid"){
+    const m = n(meas.moisture); if (m == null || !isFinite(m)) return null;
+    if (m >= (th.moistureUrgent != null ? th.moistureUrgent : 3)) return "Contaminated";
+    if (m >= (th.moistureMonitor != null ? th.moistureMonitor : 2)) return "Service Recommended";
+    return "Good";
+  }
+  return null;
+}
+
+/* ---------- an inspection ---------- */
+function newInspection(orderId, vehicleId){
+  const v = db.vehicles[vehicleId];
+  const o = db.orders[orderId] || (cur && cur.id === orderId ? cur : null);
+  const insp = {
+    id: uid("insp"), no: nextNumber("inspection"),
+    orderId, vehicleId,
+    vin: (v && v.vin) || "", mileage: (o && o.mileageIn) || (v && v.mileage) || "",
+    roNo: (o && o.roNo) || null,
+    tech: db.settings.lastTech || "",
+    state: "Not Started", startedAt: null, completedAt: null,
+    template: templateFor(vehicleProfile(v)),   /* the sheet as it was on this day */
+    items: {}
+  };
+  db.inspections[insp.id] = insp;
+  if (o) o.inspectionId = insp.id;
+  return insp;
+}
+function inspectionFor(o){
+  if (!o) return null;
+  if (o.inspectionId && db.inspections[o.inspectionId]) return db.inspections[o.inspectionId];
+  return null;
+}
+function inspItem(insp, key){
+  if (!insp.items[key]) insp.items[key] = {state:"Not Inspected", meas:{}, flags:[], note:"", custNote:"", photos:[], at:null, tech:""};
+  return insp.items[key];
+}
+function setInspState(insp, key, state){
+  const it = inspItem(insp, key);
+  it.state = state;
+  it.at = new Date().toISOString();
+  it.tech = insp.tech || db.settings.lastTech || "";
+  if (insp.state === "Not Started"){ insp.state = "In Progress"; insp.startedAt = new Date().toISOString(); }
+}
+/* Counts for the summary. Warning lights are observations, not conditions, so
+   they are deliberately left out of the good/bad arithmetic. */
+const STATE_BUCKET = {
+  "Good":"Good", "Not present":"Good", "Test Not Performed":"Not Inspected",
+  "Monitor":"Monitor", "Dim":"Monitor", "Damaged housing":"Monitor", "Moisture present":"Monitor",
+  "Service Recommended":"Monitor", "Good / Recharge":"Monitor", "Recharge and Retest":"Monitor",
+  "Reported by customer":"Monitor", "Intermittent":"Monitor",
+  "Needs Attention":"Needs Attention", "Inoperative":"Needs Attention", "Contaminated":"Needs Attention",
+  "Low":"Needs Attention", "Replace Battery":"Needs Attention", "Bad Cell":"Needs Attention",
+  "Illuminated now":"Needs Attention",
+  "Urgent":"Urgent", "Not Inspected":"Not Inspected", "N/A":"N/A"
+};
+function summaryBucket(st){ return STATE_BUCKET[st] || "Not Inspected"; }
+function inspSummary(insp){
+  const c = {"Good":0,"Monitor":0,"Needs Attention":0,"Urgent":0,"Not Inspected":0,"N/A":0,other:0,total:0};
+  if (!insp) return c;
+  (insp.template.groups || []).forEach(g => {
+    if (g.noSummary) return;
+    (g.items || []).forEach(item => {
+      (g.perWheel ? g.positions : [null]).forEach(pos => {
+        const key = inspItemKey(g, item, pos);
+        const it = insp.items[key];
+        const st = summaryBucket(it ? it.state : "Not Inspected");
+        c.total++;
+        if (c[st] != null) c[st]++; else c.other++;
+      });
+    });
+  });
+  return c;
+}
+/* What a service writer actually needs out of an inspection: the list of
+   things wrong, ready to be turned into work. */
+function inspFindings(insp){
+  if (!insp) return [];
+  const out = [];
+  (insp.template.groups || []).forEach(g => {
+    (g.items || []).forEach(item => {
+      (g.perWheel ? g.positions : [null]).forEach(pos => {
+        const key = inspItemKey(g, item, pos);
+        const it = insp.items[key];
+        if (!it) return;
+        const bad = it.state === "Needs Attention" || it.state === "Urgent" ||
+                    it.state === "Monitor" || it.state === "Inoperative" ||
+                    it.state === "Contaminated" || it.state === "Replace Battery" ||
+                    it.state === "Bad Cell" || it.state === "Service Recommended" ||
+                    it.state === "Dim" || it.state === "Damaged housing" || it.state === "Moisture present";
+        if (!bad) return;
+        out.push({key, group:g.name, name:(pos ? pos + " " : "") + item.name, state:it.state,
+                  meas:it.meas, flags:it.flags, note:it.note, custNote:it.custNote, photos:it.photos});
+      });
+    });
+  });
+  const rank = {"Urgent":0,"Replace Battery":0,"Bad Cell":0,"Contaminated":1,"Needs Attention":1,
+                "Inoperative":1,"Service Recommended":2,"Monitor":3,"Dim":3,"Damaged housing":3,"Moisture present":3};
+  out.sort((a,b) => (rank[a.state] == null ? 4 : rank[a.state]) - (rank[b.state] == null ? 4 : rank[b.state]));
+  return out;
+}
+function completeInspection(insp, tech){
+  insp.tech = tech || insp.tech;
+  insp.state = "Completed";
+  insp.completedAt = new Date().toISOString();
+  if (!insp.startedAt) insp.startedAt = insp.completedAt;
+  db.settings.lastTech = insp.tech || db.settings.lastTech;
+}
+
+/* ---------- check-in and the condition record ----------
+   The damage record exists for one reason: so that a month later nobody has to
+   argue about whether the shop put that scratch in the door. It is written
+   before anyone touches the car, and it is never quietly edited afterwards. */
+const DAMAGE_AREAS = ["Front bumper","Hood","Windshield","Roof","Trunk / tailgate","Rear bumper",
+  "LF fender","RF fender","LF door","RF door","LR door","RR door",
+  "LF quarter","RF quarter","LF rocker","RF rocker",
+  "LF wheel","RF wheel","LR wheel","RR wheel",
+  "Mirrors","Headlights","Taillights","Interior","Other"];
+const DAMAGE_TYPES = ["Dent","Ding","Scratch","Scuff","Paint chip","Crack","Broken","Curb rash",
+  "Rust / corrosion","Stain / tear","Missing / damaged trim","Other"];
+const DAMAGE_SEVERITY = ["Light","Moderate","Heavy"];
+const FUEL_LEVELS = ["Empty","1/8","1/4","3/8","1/2","5/8","3/4","7/8","Full"];
+
+function shapeCheckin(o){
+  if (!o.checkin) o.checkin = {at:null, by:"", fuel:"", keys:"", keyTag:"", location:"",
+    wheelLockLoc:"", warningsReported:"", drivability:"", noises:"", leaks:"", valuables:"",
+    condition:"", damage:[]};
+  if (!o.checkin.damage) o.checkin.damage = [];
+  return o.checkin;
+}
+function addDamage(o, area, type, severity, note, by){
+  const d = {id:uid("dmg"), area, type, severity:severity || "Light", note:note || "",
+             by:by || db.settings.lastTech || "", at:new Date().toISOString(), photos:[]};
+  shapeCheckin(o).damage.push(d);
+  return d;
+}
+
+
+/* ---------- the multipoint inspection screen ----------
+   Speed is the feature. A technician with the car on a lift will not walk back
+   to a desk to open a dialog per item, so everything is on one page: status is
+   one tap, a measurement is one number typed into a box already the right
+   shape, and a note only appears when somebody wants one. */
+let inspId = null, inspFilter = "";
+function openInspection(orderId){
+  const o = db.orders[orderId] || (cur && cur.id === orderId ? cur : null);
+  if(!o) return;
+  if(cur && cur.id === orderId){ pullWO(); db.orders[o.id] = JSON.parse(JSON.stringify(cur)); closeWO(); }
+  const ord = db.orders[orderId];
+  let insp = inspectionFor(ord);
+  if(!insp){ insp = newInspection(orderId, ord.vehicleId); save(); }
+  inspId = insp.id; inspFilter = ""; go("insp");
+}
+function renderInspection(){
+  const insp = db.inspections[inspId];
+  if(!insp){ go("dash"); return; }
+  const o = db.orders[insp.orderId] || {};
+  const v = db.vehicles[insp.vehicleId] || {};
+  const c = db.customers[o.customerId] || {};
+  const sum = inspSummary(insp);
+  const done = insp.state === "Completed";
+  const counts = [["Good","is-good"],["Monitor","is-mon"],["Needs Attention","is-att"],["Urgent","is-urg"],["Not Inspected","is-non"],["N/A","is-na"]];
+  $("#app").innerHTML = `
+  <div class="toolbar">
+    <button onclick="backToOrder('${insp.orderId}')">← Work order</button>
+    <h2 style="margin:0">Multipoint Inspection</h2>
+    <span class="pill st-${done?"Completed":"InProgress"}">${esc(insp.state)}</span>
+    <div class="grow"></div>
+    <button onclick="printInspection('${insp.id}')">Print customer report</button>
+    ${done?"":`<button class="green" onclick="signOffInspection()">Complete inspection…</button>`}
+  </div>
+  <div class="card" style="padding:11px 13px">
+    <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px">
+      <div><b>${esc(vehLabel(insp.vehicleId))}</b>${v.plate?" · "+esc(v.plate):""}</div>
+      <div class="muted">VIN ${esc(insp.vin||"—")}</div>
+      <div class="muted">Mileage ${esc(insp.mileage||"—")}</div>
+      <div class="muted">${esc(custName(o.customerId))}</div>
+      <div class="muted">Ticket ${esc(ticketNo(o))}</div>
+      <div class="grow"></div>
+      <div>Technician <input id="i_tech" value="${esc(insp.tech)}" list="techlist" style="height:30px;width:150px;display:inline-block" ${done?"disabled":""}></div>
+    </div>
+    ${techDatalist()}
+  </div>
+  <div class="ibar">
+    ${counts.map(([n,cl])=>`<div class="icount ${inspFilter===n?"on":""}" onclick="filterInsp('${n}')"><b class="${cl}" style="color:inherit">${sum[n]||0}</b>${esc(n)}</div>`).join("")}
+    <div class="icount ${inspFilter===""?"on":""}" onclick="filterInsp('')">All ${sum.total}</div>
+    <div class="grow"></div>
+    <button class="sm" onclick="markRestGood()" ${done?"disabled":""}>Mark remaining Good</button>
+  </div>
+  ${(insp.template.groups||[]).map(g=>inspGroupHtml(insp,g,done)).join("")}
+  <div class="card"><div class="toolbar"><div class="grow"></div>
+    ${done?`<span class="muted">Completed by ${esc(insp.tech||"—")} on ${esc(String(insp.completedAt).slice(0,16).replace("T"," "))}</span>`
+          :`<button class="green" onclick="signOffInspection()">Complete inspection…</button>`}</div></div>`;
+  const te = $("#i_tech"); if(te) te.onchange = () => { insp.tech = te.value; save(); };
+}
+function backToOrder(orderId){ inspId=null; go("dash"); editOrder(orderId); }
+function filterInsp(f){ inspFilter = (inspFilter===f?"":f); renderInspection(); }
+function techDatalist(){
+  const list=(db.settings.techs||[]);
+  return `<datalist id="techlist">${list.map(t=>`<option value="${esc(t)}">`).join("")}</datalist>`;
+}
+function inspVisible(insp,key){
+  if(!inspFilter) return true;
+  const it=insp.items[key];
+  return (it?it.state:"Not Inspected")===inspFilter;
+}
+function inspGroupHtml(insp,g,done){
+  const rows = g.perWheel ? matrixHtml(insp,g,done) : (g.items||[]).map(item=>itemRowHtml(insp,g,item,null,done)).join("");
+  if(!rows.trim()) return "";
+  return `<div class="card igroup"><h3>${esc(g.name)}</h3>${rows}</div>`;
+}
+/* Tyres and brakes are the same three numbers four or five times over. A
+   matrix is the difference between a job that takes one minute and one that
+   takes five, so those groups get a table and everything else gets a row. */
+function matrixHtml(insp,g,done){
+  return (g.items||[]).map(item=>{
+    const anyVisible=g.positions.some(pos=>inspVisible(insp,inspItemKey(g,item,pos)));
+    if(!anyVisible) return "";
+    const meas=item.meas||[];
+    return `<div style="margin-bottom:10px">
+      <div style="font-weight:600;margin-bottom:3px">${esc(item.name)}</div>
+      <table class="imatrix"><thead><tr><th></th>${meas.map(m=>`<th>${esc(m.label)} <span class="muted">${esc(m.unit)}</span></th>`).join("")}<th>Condition</th><th></th></tr></thead><tbody>
+      ${g.positions.map(pos=>{
+        const key=inspItemKey(g,item,pos);
+        if(!inspVisible(insp,key)) return "";
+        const it=inspItem(insp,key);
+        return `<tr><td class="pos">${esc(pos)}</td>
+          ${meas.map(m=>`<td><input inputmode="decimal" data-ik="${key}" data-m="${m.k}" value="${esc(it.meas[m.k]==null?"":it.meas[m.k])}" ${done?"disabled":""}></td>`).join("")}
+          <td>${stateBtns(insp,key,item,g,done)}</td>
+          <td>${flagsAndNote(insp,key,item,done)}</td></tr>`;
+      }).join("")}
+      </tbody></table></div>`;
+  }).join("");
+}
+function itemRowHtml(insp,g,item,pos,done){
+  const key=inspItemKey(g,item,pos);
+  if(!inspVisible(insp,key)) return "";
+  const it=inspItem(insp,key);
+  const meas=item.meas||[];
+  return `<div class="irow" id="row_${key.replace(/[^A-Za-z0-9]/g,'_')}">
+    <div class="itop">
+      <div class="iname">${esc(item.name)}</div>
+      ${meas.map(m=>`<div class="meas"><input inputmode="decimal" placeholder="${esc(m.label)}" data-ik="${key}" data-m="${m.k}" value="${esc(it.meas[m.k]==null?"":it.meas[m.k])}" ${done?"disabled":""}><span>${esc(m.unit)}</span></div>`).join("")}
+      ${stateBtns(insp,key,item,g,done)}
+    </div>
+    ${flagChips(insp,key,item,done)}
+    ${noteRow(insp,key,done)}
+  </div>`;
+}
+function statesFor(item,g){ return item.states || g.itemStates || INSP_STATES; }
+function stateBtns(insp,key,item,g,done){
+  const it=inspItem(insp,key);
+  const states=statesFor(item,g);
+  return `<div class="sbtns">${states.map(st=>{
+    const cl=INSP_CLASS[st]||(st==="Inoperative"||st==="Replace Battery"||st==="Bad Cell"||st==="Contaminated"?"is-att":
+      st==="Dim"||st==="Moisture present"||st==="Damaged housing"||st==="Service Recommended"||st==="Recharge and Retest"||st==="Good / Recharge"?"is-mon":
+      st==="Good"||st==="Not present"?"is-good":"is-na");
+    const label=states===INSP_STATES?INSP_SHORT[st]:st;
+    return `<button class="sbtn ${cl} ${it.state===st?"on":""}" title="${esc(st)}" onclick="tapState('${key}','${st.replace(/'/g,"")}')" ${done?"disabled":""}>${esc(label)}</button>`;
+  }).join("")}</div>`;
+}
+function flagChips(insp,key,item,done){
+  if(!item.flags) return "";
+  const it=inspItem(insp,key);
+  return `<div class="flags">${item.flags.map(f=>
+    `<button class="flag ${it.flags.indexOf(f)>=0?"on":""}" onclick="tapFlag('${key}','${f.replace(/'/g,"")}')" ${done?"disabled":""}>${esc(f)}</button>`).join("")}</div>`;
+}
+/* In the matrix the flags and note live behind one button so the table stays a
+   table; in a normal row they are already on screen. */
+function flagsAndNote(insp,key,item,done){
+  const it=inspItem(insp,key);
+  const n=(it.flags||[]).length+((it.note||it.custNote)?1:0);
+  return `<button class="sm" onclick="openItemDetail('${key}')">Notes${n?" ("+n+")":""}</button>`;
+}
+function noteRow(insp,key,done){
+  const it=inspItem(insp,key);
+  return `<div class="inote">
+    <input placeholder="Technician note — internal" data-ik="${key}" data-n="note" value="${esc(it.note)}" ${done?"disabled":""}>
+    <input placeholder="Note for the customer — prints on their report" data-ik="${key}" data-n="custNote" value="${esc(it.custNote)}" ${done?"disabled":""}>
+  </div>`;
+}
+function openItemDetail(key){
+  const insp=db.inspections[inspId]; if(!insp) return;
+  const it=inspItem(insp,key);
+  let item=null,gname="";
+  (insp.template.groups||[]).forEach(g=>(g.items||[]).forEach(i=>{ if(key.indexOf(g.id+"."+i.id)===0){item=i;gname=g.name;} }));
+  const done=insp.state==="Completed";
+  $("#recSheet").innerHTML=`<div class="sheet-head"><h2>${esc(gname)} — ${esc(item?item.name:key)}</h2><div class="grow"></div><button onclick="closeRec();renderInspection()">Close</button></div>
+    ${item&&item.flags?`<label>What was found</label>${flagChips(insp,key,item,done)}`:""}
+    <label style="margin-top:10px">Technician note — internal, never printed for the customer</label>
+    <input id="d_note" value="${esc(it.note)}" ${done?"disabled":""}>
+    <label>Note for the customer — prints on their report</label>
+    <input id="d_cust" value="${esc(it.custNote)}" ${done?"disabled":""}>
+    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveItemDetail('${key}')">Done</button></div>`;
+  $("#recOverlay").classList.add("on");
+}
+function saveItemDetail(key){
+  const insp=db.inspections[inspId]; const it=inspItem(insp,key);
+  it.note=$("#d_note").value; it.custNote=$("#d_cust").value;
+  save(); closeRec(); renderInspection();
+}
+function tapState(key,state){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const it=inspItem(insp,key);
+  setInspState(insp,key,it.state===state?"Not Inspected":state);
+  save(); renderInspection();
+}
+function tapFlag(key,flag){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const it=inspItem(insp,key);
+  const i=it.flags.indexOf(flag);
+  if(i>=0) it.flags.splice(i,1); else it.flags.push(flag);
+  if(it.state==="Not Inspected"&&it.flags.length) setInspState(insp,key,"Needs Attention");
+  save();
+  if($("#recOverlay").classList.contains("on")) openItemDetail(key); else renderInspection();
+}
+/* Everything the technician did not flag is, by definition, what they looked at
+   and were happy with. One button beats 120 taps. */
+function markRestGood(){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  if(!confirm("Mark every item still showing Not Inspected as Good? Anything you have already set is left alone.")) return;
+  (insp.template.groups||[]).forEach(g=>{
+    if(g.noSummary) return;
+    (g.items||[]).forEach(item=>{
+      (g.perWheel?g.positions:[null]).forEach(pos=>{
+        const key=inspItemKey(g,item,pos);
+        const it=inspItem(insp,key);
+        if(it.state==="Not Inspected"){
+          const states=statesFor(item,g);
+          setInspState(insp,key,states.indexOf("Good")>=0?"Good":states[0]);
+        }
+      });
+    });
+  });
+  save(); renderInspection();
+}
+function signOffInspection(){
+  const insp=db.inspections[inspId]; if(!insp) return;
+  const sum=inspSummary(insp);
+  const tech=prompt("Technician completing this inspection:",insp.tech||db.settings.lastTech||"");
+  if(tech==null||!tech.trim()) return;
+  if(sum["Not Inspected"]>0&&!confirm(sum["Not Inspected"]+" item(s) are still Not Inspected. Complete the inspection anyway?")) return;
+  completeInspection(insp,tech.trim());
+  if(db.settings.techs.indexOf(tech.trim())<0) db.settings.techs.push(tech.trim());
+  save(); renderInspection();
+}
+/* Measurements and notes are typed, so they are saved as they are typed rather
+   than on a button nobody remembers to press. */
+document.addEventListener("input",e=>{
+  const t=e.target;
+  if(!t.dataset||!t.dataset.ik) return;
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const it=inspItem(insp,t.dataset.ik);
+  if(t.dataset.m){
+    it.meas[t.dataset.m]=t.value;
+    /* A measurement can propose a condition. It never imposes one: the
+       technician is at the car and this program is not. */
+    const sug=suggestState(t.dataset.ik,it.meas);
+    if(sug&&it.state==="Not Inspected"){ setInspState(insp,t.dataset.ik,sug); }
+  }
+  else if(t.dataset.n){ it[t.dataset.n]=t.value; }
+  it.at=new Date().toISOString();
+  save();
+});
+
+
+/* ---------- jobs, on the floor ----------
+   A job's state on the lift is not the ticket's state at the counter. A car with
+   four jobs can have one finished, one waiting on a part and two not started,
+   and the RO is still just "In Progress". Keeping them separate is what makes
+   the shop board tell the truth. */
+const JOB_STATES = ["Not Started","Diagnosing","Waiting Approval","Waiting Parts","Ready","In Progress","Completed","Unable to Complete","Deferred"];
+const PART_STATES = ["Needed","Quote Requested","Ordered","Backordered","Shipped","Received","Installed","Returned","Cancelled"];
+const PART_HELD = ["Needed","Quote Requested","Ordered","Backordered","Shipped"];   /* not yet in the building */
+const REC_STATES = ["Proposed","Awaiting Approval","Approved","Declined","Deferred","Completed"];
+const SEVERITIES = ["Monitor","Needs Attention","Urgent"];
+
+function jobState(l){ return l.jobState || "Not Started"; }
+function startJob(o,i){
+  const l=o.labor[i]; if(!l) return;
+  l.jobState="In Progress"; l.startedAt=l.startedAt||new Date().toISOString();
+  l.tech=l.tech||db.settings.lastTech||"";
+}
+function completeJob(o,i){
+  const l=o.labor[i]; if(!l) return;
+  l.jobState="Completed"; l.completedAt=new Date().toISOString();
+}
+/* Clock time is recorded because it is useful. It is never allowed anywhere
+   near the billed hours: what the shop sold and what the job took are two
+   different numbers and conflating them is how a shop loses money quietly. */
+function jobsDone(o){ return (o.labor||[]).filter(l=>jobState(l)==="Completed").length; }
+function jobsTotal(o){ return (o.labor||[]).length; }
+
+/* ---------- parts, on order ---------- */
+function partState(x){ return x.procurement || (x.desc ? "Needed" : "Needed"); }
+function partsOutstanding(o){
+  return (o.parts||[]).filter(x=>x.desc&&PART_HELD.indexOf(partState(x))>=0);
+}
+function waitingOnParts(o){ return partsOutstanding(o).length>0; }
+
+/* ---------- recommendations ----------
+   Declined work is an asset, not a rejection. It is the single most useful
+   thing a shop knows about a car on its next visit, so it is kept against the
+   vehicle with the mileage and the date it was first raised, and it outlives
+   the invoice that closed without it. */
+function addRecommendation(rec){
+  const r=Object.assign({id:uid("rec"),at:new Date().toISOString(),status:"Proposed",
+    vehicleId:"",orderId:"",inspKey:"",severity:"Needs Attention",desc:"",reason:"",
+    serviceId:"",amount:null,custNote:"",lineId:"",mileage:"",decidedAt:null,decidedBy:"",photos:[]},rec);
+  db.recommendations[r.id]=r;
+  return r;
+}
+function recsFor(o){ return vals(db.recommendations).filter(r=>r.orderId===o.id); }
+/* What this vehicle was told about before and did not do. */
+function priorDeclined(vehicleId,exceptOrderId){
+  return vals(db.recommendations)
+    .filter(r=>r.vehicleId===vehicleId&&r.orderId!==exceptOrderId)
+    .filter(r=>r.status==="Declined"||r.status==="Deferred")
+    .sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+}
+function recFromFinding(o,f){
+  const insp=inspectionFor(o);
+  return addRecommendation({
+    vehicleId:o.vehicleId, orderId:o.id, inspKey:f.key,
+    severity:f.state==="Urgent"?"Urgent":f.state==="Monitor"?"Monitor":"Needs Attention",
+    desc:f.name+" — "+f.group, reason:describeFinding(f),
+    custNote:f.custNote||"", mileage:(insp&&insp.mileage)||o.mileageIn||""
+  });
+}
+function describeFinding(f){
+  const bits=[];
+  if(f.flags&&f.flags.length) bits.push(f.flags.join(", "));
+  Object.keys(f.meas||{}).forEach(k=>{ if(f.meas[k]!=="" && f.meas[k]!=null) bits.push(k+" "+f.meas[k]); });
+  if(f.note) bits.push(f.note);
+  return bits.join(" · ");
+}
+/* Turning a recommendation into work uses the same catalog and the same pricing
+   engine as everything else. There is exactly one place in this program that
+   knows what a job costs. */
+function recToOrder(o,rec){
+  let line=null;
+  if(rec.serviceId&&SEED_BY_ID[rec.serviceId]){
+    const before=(o.labor||[]).length;
+    const keep=cur; cur=o;
+    addJob(rec.serviceId);
+    cur=keep;
+    line=o.labor[before];
+  } else {
+    line={id:uid("ln"),type:"manual-labor",desc:rec.desc,hours:"",rate:shopRate(),bill:"H",
+          rateSource:"shop",source:SRC_MANUAL,finding:rec.reason};
+    if(rec.amount!=null&&isFinite(Number(rec.amount))&&shopRate()>0){
+      line.hours=r2(Number(rec.amount)/shopRate());
+      line.billedHours=line.hours;
+    }
+    o.labor.push(line);
+  }
+  if(line){ line.recId=rec.id; rec.lineId=line.id; }
+  rec.status="Awaiting Approval";
+  return line;
+}
+
+
+/* ---------- check-in ----------
+   Written with the customer standing there, so it is one panel of short fields
+   and nothing is mandatory. The damage record underneath it is the part that
+   matters six weeks later when somebody asks who scratched the door. */
+function checkinPanel(o){
+  const ci=shapeCheckin(o);
+  /* Open when it is the thing you are about to do. A new ticket is a vehicle
+     arriving, so the check-in panel is open; once the car is checked in and the
+     ticket has moved past being an estimate it folds away again. */
+  const open=!ci.at||canonStatus(o.status)==="Estimate"||((ci.damage||[]).length>0);
+  return `<details class="card" style="margin-top:12px" ${open?"open":""}><summary style="cursor:pointer;font-weight:700">Vehicle check-in${ci.at?` <span class="muted" style="font-weight:400">— ${esc(String(ci.at).slice(0,16).replace("T"," "))} by ${esc(ci.by||"—")}</span>`:""}${(ci.damage||[]).length?` <span class="badge b-override">${(ci.damage||[]).length} pre-existing</span>`:""}</summary>
+    <div class="row" style="margin-top:10px">
+      <div><label>Fuel level</label><select id="ci_fuel">${["",...FUEL_LEVELS].map(f=>`<option value="${f}" ${ci.fuel===f?"selected":""}>${f||"—"}</option>`).join("")}</select></div>
+      <div><label>Keys received</label><input id="ci_keys" value="${esc(ci.keys)}" inputmode="numeric"></div>
+      <div><label>Key tag #</label><input id="ci_keyTag" value="${esc(ci.keyTag)}"></div>
+      <div><label>Vehicle location</label><input id="ci_location" value="${esc(ci.location)}" placeholder="bay 2 / lot"></div>
+    </div>
+    <div class="row">
+      <div><label>Warning lights reported</label><input id="ci_warningsReported" value="${esc(ci.warningsReported)}"></div>
+      <div><label>Drivability concern</label><input id="ci_drivability" value="${esc(ci.drivability)}"></div>
+      <div><label>Noises / vibrations</label><input id="ci_noises" value="${esc(ci.noises)}"></div>
+    </div>
+    <div class="row">
+      <div><label>Visible fluid leaks</label><input id="ci_leaks" value="${esc(ci.leaks)}"></div>
+      <div><label>Wheel-lock key location</label><input id="ci_wheelLockLoc" value="${esc(ci.wheelLockLoc)}"></div>
+      <div><label>Valuables / items in vehicle</label><input id="ci_valuables" value="${esc(ci.valuables)}"></div>
+    </div>
+    <label>Condition notes</label><input id="ci_condition" value="${esc(ci.condition)}">
+    <div class="toolbar" style="margin-top:10px">
+      <button class="sm ${ci.at?"":"primary"}" onclick="stampCheckin()">${ci.at?"Update check-in":"Check vehicle in"}</button>
+      <button class="sm" onclick="printCheckin('${o.id}')">Print condition report</button>
+    </div>
+    <h3 style="margin:14px 0 4px;font-size:13px">Pre-existing damage <span class="muted" style="font-weight:400">— recorded before the shop touches the vehicle</span></h3>
+    ${(ci.damage||[]).length?`<table><thead><tr><th>Area</th><th>Damage</th><th>Severity</th><th>Note</th><th>Recorded</th><th></th></tr></thead><tbody>
+      ${ci.damage.map((d,i)=>`<tr><td><b>${esc(d.area)}</b></td><td>${esc(d.type)}</td><td>${esc(d.severity)}</td><td>${esc(d.note||"")}</td>
+        <td class="muted">${esc(String(d.at).slice(0,16).replace("T"," "))} ${esc(d.by||"")}</td>
+        <td class="right"><button class="sm" onclick="delDamage(${i})">Remove</button></td></tr>`).join("")}
+      </tbody></table>`:`<div class="empty">No pre-existing damage recorded.</div>`}
+    <div class="toolbar" style="margin-top:8px"><button class="sm primary" onclick="addDamageDialog()">+ Record damage</button></div>
+  </details>`;
+}
+function pullCheckin(){
+  if(!cur) return;
+  const ci=shapeCheckin(cur);
+  ["fuel","keys","keyTag","location","warningsReported","drivability","noises","leaks","wheelLockLoc","valuables","condition"]
+    .forEach(k=>{ const el=$("#ci_"+k); if(el) ci[k]=el.value; });
+}
+function stampCheckin(){
+  pullWO(); pullCheckin();
+  const ci=shapeCheckin(cur);
+  const by=prompt("Checked in by:",ci.by||db.settings.lastTech||"");
+  if(by==null||!by.trim()) return;
+  ci.by=by.trim(); ci.at=new Date().toISOString();
+  db.settings.lastTech=ci.by;
+  if(db.settings.techs.indexOf(ci.by)<0) db.settings.techs.push(ci.by);
+  save(); drawWO();
+}
+function addDamageDialog(){
+  pullWO(); pullCheckin();
+  $("#recSheet").innerHTML=`<div class="sheet-head"><h2>Record pre-existing damage</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <label>Where on the vehicle</label>
+    <div class="flags" id="dmgAreas">${DAMAGE_AREAS.map(a=>`<button class="flag" data-area="${esc(a)}" onclick="pickDamage('area',this)">${esc(a)}</button>`).join("")}</div>
+    <label style="margin-top:10px">What kind</label>
+    <div class="flags" id="dmgTypes">${DAMAGE_TYPES.map(t=>`<button class="flag" data-type="${esc(t)}" onclick="pickDamage('type',this)">${esc(t)}</button>`).join("")}</div>
+    <label style="margin-top:10px">Severity</label>
+    <div class="flags" id="dmgSev">${DAMAGE_SEVERITY.map((v,i)=>`<button class="flag ${i===0?"on":""}" data-sev="${esc(v)}" onclick="pickDamage('sev',this)">${esc(v)}</button>`).join("")}</div>
+    <label style="margin-top:10px">Note</label><input id="dmg_note" placeholder="e.g. 3 inch scratch below the handle">
+    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveDamage()">Record it</button></div>`;
+  $("#recOverlay").classList.add("on");
+}
+function pickDamage(kind,btn){
+  const wrap=btn.parentElement;
+  if(kind!=="type") wrap.querySelectorAll(".flag").forEach(b=>b.classList.remove("on"));
+  btn.classList.toggle("on");
+}
+function saveDamage(){
+  const area=($("#dmgAreas").querySelector(".flag.on")||{}).dataset;
+  const types=Array.from($("#dmgTypes").querySelectorAll(".flag.on")).map(b=>b.dataset.type);
+  const sev=($("#dmgSev").querySelector(".flag.on")||{}).dataset;
+  if(!area||!types.length){ alert("Pick where on the vehicle, and at least one kind of damage."); return; }
+  types.forEach(t=>addDamage(cur,area.area,t,sev?sev.sev:"Light",$("#dmg_note").value,db.settings.lastTech));
+  save(); closeRec(); drawWO();
+}
+function delDamage(i){
+  if(!confirm("Remove this damage record? It is the shop's evidence of what the vehicle looked like on arrival.")) return;
+  shapeCheckin(cur).damage.splice(i,1); save(); drawWO();
+}
+/* ---------- the inspection, from the ticket ---------- */
+function inspectionPanel(o){
+  const insp=inspectionFor(o);
+  if(!insp) return `<div class="card" style="margin-top:12px"><div class="toolbar"><b>Multipoint inspection</b><span class="muted">not started</span><div class="grow"></div>
+    <button class="sm primary" onclick="openInspection('${o.id}')">Start inspection</button></div></div>`;
+  const sum=inspSummary(insp);
+  const finds=inspFindings(insp);
+  return `<div class="card" style="margin-top:12px">
+    <div class="toolbar"><b>Multipoint inspection</b><span class="pill st-${insp.state==="Completed"?"Completed":"InProgress"}">${esc(insp.state)}</span>
+      <span class="muted">${sum.Good} good · ${sum.Monitor} monitor · ${sum["Needs Attention"]} attention · ${sum.Urgent} urgent${sum["Not Inspected"]?" · "+sum["Not Inspected"]+" not inspected":""}</span>
+      <div class="grow"></div>
+      <button class="sm" onclick="printInspection('${insp.id}')">Customer report</button>
+      <button class="sm primary" onclick="openInspection('${o.id}')">Open inspection</button></div>
+    ${finds.length?`<table><thead><tr><th>Finding</th><th>Status</th><th>Detail</th><th></th></tr></thead><tbody>
+      ${finds.map(f=>{const rec=recsFor(o).find(r=>r.inspKey===f.key);
+        return `<tr><td><b>${esc(f.name)}</b> <span class="muted">${esc(f.group)}</span></td>
+        <td><span class="badge ${f.state==="Urgent"?"b-verify":"b-override"}">${esc(f.state)}</span></td>
+        <td class="muted">${esc(describeFinding(f)).slice(0,90)}</td>
+        <td class="right">${rec?`<span class="muted">${esc(rec.status)}</span>`:`<button class="sm" onclick="makeRec('${f.key.replace(/'/g,"")}')">Recommend</button>`}</td></tr>`;}).join("")}
+      </tbody></table>`:""}
+    ${recPanel(o)}</div>`;
+}
+function makeRec(key){
+  pullWO();
+  const insp=inspectionFor(cur); if(!insp) return;
+  const f=inspFindings(insp).find(x=>x.key===key); if(!f) return;
+  recFromFinding(cur,f);
+  db.orders[cur.id]=JSON.parse(JSON.stringify(cur));
+  save(); drawWO();
+}
+function recPanel(o){
+  const rs=recsFor(o);
+  if(!rs.length) return "";
+  return `<h3 style="margin:14px 0 4px;font-size:13px">Recommendations</h3>
+  <table><thead><tr><th>Recommended</th><th>Severity</th><th>Status</th><th class="right">Amount</th><th></th></tr></thead><tbody>
+  ${rs.map(r=>`<tr><td><b>${esc(r.desc)}</b>${r.reason?`<div class="muted" style="font-size:11.5px">${esc(r.reason).slice(0,110)}</div>`:""}</td>
+    <td><span class="badge ${r.severity==="Urgent"?"b-verify":"b-override"}">${esc(r.severity)}</span></td>
+    <td>${esc(r.status)}</td>
+    <td class="right">${r.amount!=null?money(r.amount):"—"}</td>
+    <td class="right">
+      ${r.lineId?`<span class="muted">on ticket</span>`:`<button class="sm primary" onclick="addRecToTicket('${r.id}')">Add to estimate</button>`}
+      ${r.status!=="Declined"?`<button class="sm" onclick="decideRec('${r.id}','Declined')">Declined</button>`:""}
+      ${r.status!=="Deferred"?`<button class="sm" onclick="decideRec('${r.id}','Deferred')">Defer</button>`:""}
+    </td></tr>`).join("")}
+  </tbody></table>`;
+}
+function addRecToTicket(id){
+  pullWO();
+  const rec=db.recommendations[id]; if(!rec) return;
+  if(!rec.serviceId){
+    const q=prompt("Search the labor catalog for this job, or leave blank to add it as a manual line:",rec.desc.split(" — ")[0]);
+    if(q===null) return;
+    if(q.trim()){
+      const hits=searchCatalog(vehicleProfile(db.vehicles[cur.vehicleId]),q);
+      if(hits.length){
+        const pick=prompt("Which job?\n"+hits.slice(0,5).map((h,i)=>(i+1)+". "+h.row.svc+"  "+money(seedCharge(h.row))).join("\n")+"\n\nNumber, or blank for a manual line:","1");
+        if(pick===null) return;
+        const n=parseInt(pick,10);
+        if(isFinite(n)&&hits[n-1]) rec.serviceId=hits[n-1].row.id;
+      }
+    }
+  }
+  recToOrder(cur,rec);
+  db.orders[cur.id]=JSON.parse(JSON.stringify(cur));
+  save(); drawWO();
+}
+function decideRec(id,decision){
+  const rec=db.recommendations[id]; if(!rec) return;
+  const who=prompt("Who did the customer speak to, or who recorded this?",db.settings.lastTech||"");
+  if(who==null) return;
+  rec.status=decision; rec.decidedAt=new Date().toISOString(); rec.decidedBy=who.trim();
+  save(); if(cur) drawWO(); else render();
+}
+/* Work this vehicle was told about on an earlier visit and did not have done.
+   Surfacing it is the single most useful thing the shop knows about the car. */
+function priorDeclinedPanel(o){
+  if(!o.vehicleId) return "";
+  const prior=priorDeclined(o.vehicleId,o.id);
+  if(!prior.length) return "";
+  return `<div class="card authbox wait" style="margin-top:12px">
+    <b>PREVIOUSLY DECLINED</b>
+    <div class="authline">This vehicle was told about the following on an earlier visit and did not have it done.</div>
+    <table><thead><tr><th>Work</th><th>Recommended</th><th>Mileage</th><th class="right">Estimated</th><th></th></tr></thead><tbody>
+    ${prior.map(r=>`<tr><td><b>${esc(r.desc)}</b></td>
+      <td>${esc(String(r.at).slice(0,10))}</td><td>${esc(r.mileage||"—")}</td>
+      <td class="right">${r.amount!=null?money(r.amount):"—"}</td>
+      <td class="right"><button class="sm primary" onclick="readdRec('${r.id}')">Add to this estimate</button>
+        <button class="sm" onclick="retireRec('${r.id}')">No longer applies</button></td></tr>`).join("")}
+    </tbody></table></div>`;
+}
+function readdRec(id){
+  pullWO();
+  const old=db.recommendations[id]; if(!old) return;
+  const rec=addRecommendation({vehicleId:old.vehicleId,orderId:cur.id,inspKey:old.inspKey,severity:old.severity,
+    desc:old.desc,reason:old.reason,serviceId:old.serviceId,amount:old.amount,custNote:old.custNote,
+    mileage:cur.mileageIn||"",carriedFrom:old.id});
+  recToOrder(cur,rec);
+  db.orders[cur.id]=JSON.parse(JSON.stringify(cur));
+  save(); drawWO();
+}
+function retireRec(id){
+  const r=db.recommendations[id]; if(!r) return;
+  if(!confirm("Mark this as no longer applicable? It stays in the vehicle history but stops being offered.")) return;
+  r.status="Completed"; r.decidedAt=new Date().toISOString(); r.decidedBy="no longer applicable";
+  save(); drawWO();
+}
+
+
+/* ---------- the shop board ----------
+   One screen that answers the only question the owner asks all day: where is
+   every car, and what is stopping it. */
+let boardQuery="";
+function renderBoard(){
+  const q=boardQuery.toLowerCase().trim();
+  const all=vals(db.orders).filter(o=>!isDead(o));
+  const live=all.filter(o=>canonStatus(o.status)!=="Paid / Closed");
+  const match=o=>!q||searchHay(o).indexOf(q)>=0;
+  const groups=[
+    ["Awaiting Approval", o=>canonStatus(o.status)==="Awaiting Approval"||needsAdditionalAuth(o)],
+    ["Waiting Parts",     o=>waitingOnParts(o)||canonStatus(o.status)==="Waiting on Parts"],
+    ["In Progress",       o=>canonStatus(o.status)==="In Progress"],
+    ["Ready",             o=>jobsTotal(o)>0&&jobsDone(o)===jobsTotal(o)&&canonStatus(o.status)!=="Completed"],
+    ["Completed",         o=>canonStatus(o.status)==="Completed"],
+    ["Ready for Invoice", o=>canonStatus(o.status)==="Completed"&&orderTotals(o).total>0],
+    ["Estimates",         o=>canonStatus(o.status)==="Estimate"]
+  ];
+  const seen={};
+  const sections=groups.map(([name,fn])=>{
+    const list=live.filter(o=>fn(o)&&match(o)&&!seen[o.id]);
+    list.forEach(o=>seen[o.id]=1);
+    if(!list.length) return "";
+    return `<div class="card"><div class="toolbar"><h2 style="margin:0">${esc(name)}</h2><span class="muted">${list.length}</span></div>${boardRows(list)}</div>`;
+  }).join("");
+  $("#app").innerHTML=`
+  <div class="toolbar"><h2 style="margin:0">Shop Board</h2>
+    <input class="search" id="bq" placeholder="Customer, VIN, plate, RO #, invoice #, year/make/model…" value="${esc(boardQuery)}">
+    <div class="grow"></div><button class="primary" onclick="editOrder(null)">+ New Work Order</button></div>
+  ${sections||`<div class="card"><div class="empty">${q?"Nothing matches that.":"Nothing open."}</div></div>`}
+  ${q?searchOtherResults(q,seen):""}`;
+  const el=$("#bq");
+  el.oninput=()=>{const at=el.selectionStart;boardQuery=el.value;renderBoard();const n=$("#bq");n.focus();n.setSelectionRange(at,at);};
+}
+/* Everything a writer might type at the counter, in one string per ticket. */
+function searchHay(o){
+  const v=db.vehicles[o.vehicleId]||{}, c=db.customers[o.customerId]||{};
+  return [c.name,c.phone,c.email,v.year,v.make,v.model,v.plate,v.vin,
+          v.vin?String(v.vin).slice(-8):"",ticketNo(o),o.estimateNo?"EST-"+o.estimateNo:"",
+          o.roNo?"RO-"+o.roNo:"",o.invoiceNo?"INV-"+o.invoiceNo:"",o.invoiceNo,o.roNo,o.estimateNo,
+          o.complaint,canonStatus(o.status)].filter(Boolean).join(" ").toLowerCase();
+}
+function boardRows(list){
+  return `<table><thead><tr><th>#</th><th>Customer</th><th>Vehicle</th><th>Tech</th><th>Status</th><th>Inspection</th><th>Jobs</th><th>Parts</th><th class="right">Total</th><th>Updated</th></tr></thead><tbody>
+  ${list.map(o=>{const t=orderTotals(o);const insp=inspectionFor(o);const out=partsOutstanding(o);
+    const techs=Array.from(new Set((o.labor||[]).map(l=>l.tech).filter(Boolean)));
+    const upd=(o.history||[]).slice(-1)[0];
+    return `<tr class="clk" onclick="editOrder('${o.id}')">
+      <td><b>${esc(ticketNo(o))}</b></td>
+      <td>${esc(custName(o.customerId))}</td>
+      <td>${esc(vehLabel(o.vehicleId))}</td>
+      <td>${esc(techs.join(", ")||"—")}</td>
+      <td><span class="pill st-${statusClass(o.status)}">${esc(canonStatus(o.status))}</span>${needsAdditionalAuth(o)?` <span class="badge b-verify">AUTH</span>`:""}</td>
+      <td>${insp?`<span class="badge ${insp.state==="Completed"?"b-vehicle":"b-override"}">${esc(insp.state)}</span>`:`<span class="muted">—</span>`}</td>
+      <td>${jobsTotal(o)?`${jobsDone(o)}/${jobsTotal(o)}`:"—"}</td>
+      <td>${out.length?`<span class="badge b-verify">${out.length} WAITING</span>`:`<span class="muted">—</span>`}</td>
+      <td class="right">${money(t.total)}</td>
+      <td class="muted">${esc(upd?String(upd.at).slice(0,10):(o.date||""))}</td></tr>`;}).join("")}
+  </tbody></table>`;
+}
+/* A search should also find the closed ones - a customer ringing about a job
+   from March is the commonest reason anybody searches at all. */
+function searchOtherResults(q,seen){
+  const rest=vals(db.orders).filter(o=>!seen[o.id]&&searchHay(o).indexOf(q)>=0)
+    .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const vehs=vals(db.vehicles).filter(v=>
+    [v.year,v.make,v.model,v.plate,v.vin,custName(v.customerId)].filter(Boolean).join(" ").toLowerCase().indexOf(q)>=0);
+  if(!rest.length&&!vehs.length) return "";
+  return `${rest.length?`<div class="card"><div class="toolbar"><h2 style="margin:0">Closed &amp; other tickets</h2><span class="muted">${rest.length}</span></div>${boardRows(rest.slice(0,40))}</div>`:""}
+  ${vehs.length?`<div class="card"><div class="toolbar"><h2 style="margin:0">Vehicles</h2><span class="muted">${vehs.length}</span></div>
+    <table><thead><tr><th>Vehicle</th><th>Plate</th><th>VIN</th><th>Owner</th></tr></thead><tbody>
+    ${vehs.slice(0,25).map(v=>`<tr class="clk" onclick="openVehicle('${v.id}')"><td><b>${esc(vehLabel(v.id))}</b></td><td>${esc(v.plate||"—")}</td><td>${esc(v.vin||"—")}</td><td>${esc(custName(v.customerId))}</td></tr>`).join("")}
+    </tbody></table></div>`:""}`;
+}
+
+/* ---------- the technician view ----------
+   The same ticket with the money taken out. This is a screen, not a permission
+   boundary: it hides what a technician does not need in order to work, and it
+   does not pretend to be security. */
+let techViewOrder=null;
+function openTechView(orderId){ techViewOrder=orderId; go("techview"); }
+function renderTechView(){
+  const o=db.orders[techViewOrder];
+  if(!o){ go("board"); return; }
+  const v=db.vehicles[o.vehicleId]||{}, ci=shapeCheckin(o), insp=inspectionFor(o);
+  const out=partsOutstanding(o);
+  $("#app").innerHTML=`
+  <div class="toolbar"><button onclick="go('board')">← Shop board</button><h2 style="margin:0">${esc(ticketNo(o))} — shop copy</h2>
+    <div class="grow"></div><button class="sm" onclick="editOrder('${o.id}')">Full ticket</button></div>
+  <div class="card"><div style="display:flex;gap:20px;flex-wrap:wrap">
+    <div><b style="font-size:16px">${esc(vehLabel(o.vehicleId))}</b><div class="muted">VIN ${esc(v.vin||"—")} · ${esc(v.plate||"—")}</div>
+      <div class="muted">Mileage in ${esc(o.mileageIn||"—")}${ci.fuel?" · fuel "+esc(ci.fuel):""}${ci.keys?" · "+esc(ci.keys)+" keys":""}${ci.location?" · "+esc(ci.location):""}</div></div>
+    <div class="grow"></div>
+    ${insp?`<button class="primary" onclick="openInspection('${o.id}')">${insp.state==="Completed"?"View":"Continue"} inspection</button>`
+          :`<button class="primary" onclick="openInspection('${o.id}')">Start inspection</button>`}
+  </div>
+  ${o.complaint?`<div style="margin-top:10px"><b>Customer concern</b><div>${esc(o.complaint)}</div></div>`:""}
+  ${(ci.damage||[]).length?`<div style="margin-top:10px"><b>Pre-existing damage noted at check-in</b>
+    <div class="muted">${esc(ci.damage.map(d=>d.area+": "+d.type+(d.note?" ("+d.note+")":"")).join(" · "))}</div></div>`:""}
+  </div>
+  ${out.length?`<div class="card authbox wait"><b>WAITING ON PARTS</b>${out.map(x=>`<div class="authline">• ${esc(x.desc||"part")} — ${esc(partState(x))}</div>`).join("")}</div>`:""}
+  <div class="card"><h2 style="margin-top:0">Jobs</h2>
+  ${(o.labor||[]).length?`<table><thead><tr><th>Job</th><th>Sold hours</th><th>Tech</th><th>Status</th><th></th></tr></thead><tbody>
+    ${o.labor.map((l,i)=>`<tr><td><b>${esc(l.desc)}</b>${l.verify?` <span class="badge b-verify">VERIFY TIME</span>`:""}
+      ${l.finding?`<div class="muted">Found: ${esc(l.finding)}</div>`:""}
+      ${l.workPerformed?`<div class="muted">Done: ${esc(l.workPerformed)}</div>`:""}</td>
+      <td>${l.bill==="F"?"menu":esc(lineHours(l))+" hr"}</td>
+      <td>${esc(l.tech||"—")}</td>
+      <td>${esc(jobState(l))}</td>
+      <td class="right">${jobState(l)!=="Completed"?`<button class="sm" onclick="techJob('${o.id}',${i},'start')">Start</button>
+        <button class="sm primary" onclick="techJob('${o.id}',${i},'done')">Complete</button>`:`<span class="muted">done</span>`}</td></tr>`).join("")}
+    </tbody></table>`:`<div class="empty">No jobs on this ticket yet.</div>`}
+  </div>
+  ${(o.parts||[]).length?`<div class="card"><h2 style="margin-top:0">Parts</h2>
+    <table><thead><tr><th>Part</th><th>Part #</th><th>Qty</th><th>Status</th></tr></thead><tbody>
+    ${o.parts.filter(x=>x.desc).map(x=>`<tr><td>${esc(x.desc)}</td><td>${esc(x.partNo||"")}</td><td>${esc(x.qty)}</td><td>${esc(partState(x))}</td></tr>`).join("")}
+    </tbody></table></div>`:""}
+  ${o.notes?`<div class="card"><h2 style="margin-top:0">Technician findings</h2><div style="white-space:pre-wrap">${esc(o.notes)}</div></div>`:""}`;
+}
+function techJob(orderId,i,which){
+  const o=db.orders[orderId]; if(!o) return;
+  if(which==="start") startJob(o,i);
+  else {
+    const done=prompt("Work performed on this job:",o.labor[i].workPerformed||"");
+    if(done===null) return;
+    o.labor[i].workPerformed=done.trim();
+    completeJob(o,i);
+  }
+  save(); renderTechView();
+}
+
+
+/* ---------- the customer's inspection report ----------
+   The point is not to show a customer 150 rows. It is to let them see, in the
+   order that matters, what is wrong now, what to keep an eye on, and that
+   somebody actually looked at the rest. Measurements are included because a
+   number is the difference between being told and being shown. */
+function statusMark(st){
+  const m={"Good":"g","Monitor":"m","Needs Attention":"a","Urgent":"u","Service Recommended":"m",
+           "Contaminated":"a","Inoperative":"a","Replace Battery":"a","Bad Cell":"a","Dim":"m",
+           "Damaged housing":"m","Moisture present":"m","Good / Recharge":"m","Recharge and Retest":"m"};
+  return m[st]||"";
+}
+function measText(it,item){
+  if(!item||!item.meas) return "";
+  return item.meas.map(m=>{
+    const v=it.meas[m.k];
+    if(v===""||v==null) return "";
+    return m.label+" "+v+(m.unit?" "+m.unit:"");
+  }).filter(Boolean).join(" · ");
+}
+function docInspection(insp){
+  const o=db.orders[insp.orderId]||{}, v=db.vehicles[insp.vehicleId]||{}, c=db.customers[o.customerId]||{}, sh=db.settings;
+  const sum=inspSummary(insp);
+  const rows=[];
+  (insp.template.groups||[]).forEach(g=>{
+    if(g.noSummary) return;
+    (g.items||[]).forEach(item=>{
+      (g.perWheel?g.positions:[null]).forEach(pos=>{
+        const key=inspItemKey(g,item,pos);
+        const it=insp.items[key];
+        if(!it||it.state==="Not Inspected"||it.state==="N/A") return;
+        rows.push({g:g.name,name:(pos?pos+" ":"")+item.name,st:it.state,
+                   meas:measText(it,item),
+                   /* the customer sees the note written for them, never the
+                      internal one, and never the shop's shorthand */
+                   note:it.custNote||"", flags:(it.flags||[]).join(", "), mark:statusMark(it.state)});
+      });
+    });
+  });
+  const order={u:0,a:1,m:2,"":3,g:3};
+  const attention=rows.filter(r=>r.mark==="u"||r.mark==="a");
+  const monitor=rows.filter(r=>r.mark==="m");
+  const good=rows.filter(r=>r.mark==="g"||r.mark==="");
+  const recs=vals(db.recommendations).filter(r=>r.orderId===o.id);
+  const tbl=(list,title)=>list.length?`<h4>${esc(title)}</h4>
+    <table><thead><tr><th>Item</th><th>Status</th><th>Measured</th><th>Note</th></tr></thead><tbody>
+    ${list.map(r=>`<tr class="lvl-${r.mark}"><td>${esc(r.name)} <span class="muted">${esc(r.g)}</span></td>
+      <td><span class="st st-${r.mark}">${esc(r.st)}</span></td>
+      <td>${esc(r.meas||"—")}</td>
+      <td>${esc(r.note||r.flags||"")}</td></tr>`).join("")}</tbody></table>`:"";
+  return `<div class="inv">
+    ${docHead(o,"Inspection Report","INSP-"+insp.no)}
+    <div class="sumgrid">
+      <div class="sumcell"><b>${sum.Good}</b>Good</div>
+      <div class="sumcell"><b>${sum.Monitor}</b>Monitor</div>
+      <div class="sumcell"><b>${sum["Needs Attention"]}</b>Needs attention</div>
+      <div class="sumcell"><b>${sum.Urgent}</b>Urgent</div>
+      <div class="sumcell"><b>${sum["Not Inspected"]}</b>Not inspected</div>
+    </div>
+    <div class="muted" style="font-size:12px">Inspected by ${esc(insp.tech||"—")}${insp.completedAt?" on "+esc(String(insp.completedAt).slice(0,16).replace("T"," ")):""} at ${esc(insp.mileage||"—")} miles.</div>
+    ${tbl(attention,"Needs attention now")}
+    ${tbl(monitor,"Worth keeping an eye on")}
+    ${recs.length?`<h4>What we recommend</h4>
+      <table><thead><tr><th>Work</th><th>Why</th><th>Priority</th><th style="text-align:right">Estimated</th></tr></thead><tbody>
+      ${recs.map(r=>`<tr><td>${esc(r.desc)}</td><td>${esc(r.custNote||r.reason||"")}</td><td>${esc(r.severity)}</td>
+        <td style="text-align:right">${r.amount!=null?money(r.amount):"—"}</td></tr>`).join("")}</tbody></table>`:""}
+    ${goodList(good)}
+    <div class="foot">Statuses are the technician's assessment on the day, at the mileage shown. Measurements are recorded as found.
+    ${esc(sh.terms||"")}</div></div>`;
+}
+/* The reassuring half of the report: everything that was looked at and found
+   sound, named so the customer can see the scope of the inspection, grouped so
+   it reads in a column instead of running to three pages. */
+function goodList(rows){
+  if(!rows.length) return "";
+  const byGroup={};
+  rows.forEach(r=>{ (byGroup[r.g]=byGroup[r.g]||[]).push(r.name+(r.meas?" ("+r.meas+")":"")); });
+  return `<h4>Checked and in good order — ${rows.length} items</h4>
+    <table><tbody>${Object.keys(byGroup).map(g=>
+      `<tr><td style="width:150px;vertical-align:top"><b>${esc(g)}</b></td><td>${esc(byGroup[g].join(", "))}</td></tr>`).join("")}</tbody></table>`;
+}
+function printInspection(id){
+  const insp=db.inspections[id]; if(!insp) return;
+  $("#printArea").innerHTML=docInspection(insp);
+  window.print();
+}
+/* ---------- the intake condition report ----------
+   Signed at the counter, before the keys change hands. */
+function docCheckin(o){
+  const ci=shapeCheckin(o), v=db.vehicles[o.vehicleId]||{};
+  const dmg=ci.damage||[];
+  return `<div class="inv">
+    ${docHead(o,"Vehicle Condition","EST-"+(o.estimateNo||"draft"))}
+    <div class="meta">
+      <div><b>At check-in</b><br>
+        Time: ${esc(ci.at?String(ci.at).slice(0,16).replace("T"," "):"—")}<br>
+        Checked in by: ${esc(ci.by||"—")}<br>
+        Mileage: ${esc(o.mileageIn||"—")}<br>
+        Fuel: ${esc(ci.fuel||"—")}<br>
+        Keys received: ${esc(ci.keys||"—")}${ci.keyTag?" (tag "+esc(ci.keyTag)+")":""}</div>
+      <div><b>Reported by the customer</b><br>
+        ${ci.warningsReported?"Warning lights: "+esc(ci.warningsReported)+"<br>":""}
+        ${ci.drivability?"Drivability: "+esc(ci.drivability)+"<br>":""}
+        ${ci.noises?"Noises: "+esc(ci.noises)+"<br>":""}
+        ${ci.leaks?"Leaks: "+esc(ci.leaks)+"<br>":""}
+        ${ci.valuables?"Items left in vehicle: "+esc(ci.valuables)+"<br>":""}</div></div>
+    ${o.complaint?`<h4>Customer concern</h4><div class="note">${esc(o.complaint)}</div>`:""}
+    <h4>Pre-existing condition recorded before work began</h4>
+    ${dmg.length?`<table><thead><tr><th>Area</th><th>Damage</th><th>Severity</th><th>Note</th></tr></thead><tbody>
+      ${dmg.map(d=>`<tr><td>${esc(d.area)}</td><td>${esc(d.type)}</td><td>${esc(d.severity)}</td><td>${esc(d.note||"")}</td></tr>`).join("")}
+      </tbody></table>`:`<div class="note">No pre-existing damage was recorded at check-in.</div>`}
+    ${ci.condition?`<h4>Condition notes</h4><div class="note">${esc(ci.condition)}</div>`:""}
+    <div class="authstamp">This record describes the vehicle as received. Damage not listed here was not observed at check-in.</div>
+    <div class="sigline">Customer — signature and date</div>
+    <div class="sigline">${esc(db.settings.shopName)} — signature and date</div>
+    <div class="foot">${esc(db.settings.terms||"")}</div></div>`;
+}
+function printCheckin(orderId){
+  pullWO();
+  const o=(cur&&cur.id===orderId)?cur:db.orders[orderId];
+  if(!o) return;
+  $("#printArea").innerHTML=docCheckin(o);
+  window.print();
+}
+
 /* ---------- the audit trail ---------- */
 /* An override is a person deciding to charge something other than what the
    catalog says. That is a defensible decision; an unexplained one is not. So
@@ -1265,6 +2487,9 @@ $("#newWO").onclick=()=>editOrder(null);
 $("#brandTop").onclick=()=>go("dash");
 
 function render(){$("#brandTop").innerHTML=esc(db.settings.shopName).replace(/(Inc\.?)$/i,'<span> $1</span>')||"JZD<span> Inc.</span>";
+  if(view==="insp")return renderInspection();
+  if(view==="board")return renderBoard();
+  if(view==="techview")return renderTechView();
   if(view==="dash")renderDash();else if(view==="orders")renderOrders();else if(view==="customers")renderCustomers();else if(view==="vehicles")renderVehicles();else if(view==="vehDetail")renderVehicleDetail(detailVeh);else if(view==="services")renderServices();else if(view==="catalog")renderCatalog();else renderSettings();}
 
 /* ---------- dashboard ---------- */
@@ -1365,12 +2590,24 @@ function renderVehicleDetail(id){const v=db.vehicles[id];if(!v){go("vehicles");r
   </div>
   ${(v.vin&&db.vinCache[v.vin])?decodedCard(db.vinCache[v.vin]):""}
   </div>
+  ${vehicleDeclinedPanel(id)}
   <div class="card"><h2 style="margin-top:0">Service History</h2>
   ${hist.length?`<table><thead><tr><th>#</th><th>Date</th><th>Mileage</th><th>Work performed</th><th>Status</th><th class="right">Total</th></tr></thead><tbody>
-  ${hist.map(o=>{const t=orderTotals(o);const work=o.complaint||(o.labor||[]).map(l=>l.desc).filter(Boolean).join(", ")||"—";return `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${esc(ticketNo(o))}</b></td><td>${esc(o.date||"")}</td><td>${esc(o.mileageOut||o.mileageIn||"")}</td><td>${esc(work).slice(0,70)}</td><td><span class="pill st-${statusClass(o.status)}">${esc(canonStatus(o.status))}</span></td><td class="right">${money(t.total)}</td></tr>`;}).join("")}
+  ${hist.map(o=>{const t=orderTotals(o);const insp=inspectionFor(o);const work=o.complaint||(o.labor||[]).map(l=>l.desc).filter(Boolean).join(", ")||"—";return `<tr class="clk" onclick="editOrder('${o.id}')"><td><b>${esc(ticketNo(o))}</b>${insp?`<div class="muted" style="font-size:11px">MPI ${insp.state==="Completed"?inspSummary(insp).Urgent+"U/"+inspSummary(insp)["Needs Attention"]+"A":"in progress"}</div>`:""}</td><td>${esc(o.date||"")}</td><td>${esc(o.mileageOut||o.mileageIn||"")}</td><td>${esc(work).slice(0,70)}</td><td><span class="pill st-${statusClass(o.status)}">${esc(canonStatus(o.status))}</span></td><td class="right">${money(t.total)}</td></tr>`;}).join("")}
   </tbody></table>`:`<div class="empty">No service history yet. Click <b>+ New Work Order</b> to log the first visit for this vehicle.</div>`}</div>`;
 }
 /* ---------- catalog ---------- */
+/* Everything this vehicle has been told about and not done, newest first. */
+function vehicleDeclinedPanel(vehicleId){
+  const prior=priorDeclined(vehicleId,null);
+  if(!prior.length) return "";
+  return `<div class="card authbox wait"><b>PREVIOUSLY DECLINED OR DEFERRED</b>
+    <table><thead><tr><th>Work</th><th>Recommended</th><th>Mileage</th><th class="right">Estimated</th><th>Status</th></tr></thead><tbody>
+    ${prior.map(r=>`<tr><td><b>${esc(r.desc)}</b>${r.reason?`<div class="muted" style="font-size:11.5px">${esc(r.reason).slice(0,100)}</div>`:""}</td>
+      <td>${esc(String(r.at).slice(0,10))}</td><td>${esc(r.mileage||"—")}</td>
+      <td class="right">${r.amount!=null?money(r.amount):"—"}</td><td>${esc(r.status)}</td></tr>`).join("")}
+    </tbody></table></div>`;
+}
 function renderCatalog(){const lab=vals(db.catalog.labor).sort((a,b)=>(a.desc||"").localeCompare(b.desc||""));const par=vals(db.catalog.parts).sort((a,b)=>(a.name||"").localeCompare(b.name||""));
   $("#app").innerHTML=`
   <div class="card"><div class="toolbar"><h2 style="margin:0">Labor Catalog</h2><div class="grow"></div><button class="primary" onclick="editCatItem('labor',null)">+ Add labor</button></div>
@@ -1479,6 +2716,8 @@ function renderSettings(){const s=db.settings;
   <label>Invoice footer / terms</label><textarea id="s_terms">${esc(s.terms)}</textarea>
   <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveSettings()">Save Settings</button></div>
   </div>
+  ${techCard()}
+  ${thresholdCard()}
   ${feeCard()}
   ${providerCard()}
   ${auditCard()}
@@ -1508,7 +2747,11 @@ function saveSettings(){const g=id=>$("#"+id).value;db.settings.shopName=g("s_sh
   db.settings.managerPin=g("s_pin").trim();
   if(rate!==prevRate)audit("shop-rate",'$/hr',prevRate,rate,db.settings.lastTech||"shop","shop rate changed in Settings");db.settings.taxRate=Number(g("s_taxRate"))||0;db.settings.nextInvoice=parseInt(g("s_nextInvoice"))||1001;db.settings.taxLabor=$("#s_taxLabor").checked;db.settings.terms=g("s_terms");save();render();alert("Settings saved.");}
 function exportData(){const b=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="jzd-shop-backup.json";a.click();}
-function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.settings)throw 0;db=Object.assign({},DEFAULT,d,{settings:Object.assign({},DEFAULT.settings,d.settings)});save();render();alert("Backup imported.");}catch(err){alert("That isn't a valid JZD Shop backup file.");}};r.readAsText(f);}
+/* An imported backup goes through exactly the same shaping as a book read off
+   the disk. A backup written by an older version is missing whatever has been
+   added since, and filling that in here is the difference between restoring a
+   backup and crashing on one. */
+function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.settings)throw 0;db=shapeDb(d);save();render();alert("Backup imported.");}catch(err){alert("That isn't a valid JZD Shop backup file.");}};r.readAsText(f);}
 
 /* ---------- customer editor ---------- */
 function editCustomer(id,then){const c=id?db.customers[id]:{id:uid("c"),name:"",phone:"",email:"",address:"",notes:""};
@@ -1629,6 +2872,9 @@ function drawWO(){const o=cur;
     <div><label>Mileage Out</label><input id="o_mOut" value="${esc(o.mileageOut)}"></div>
   </div>
   <label>Customer concern / work requested</label><textarea id="o_complaint">${esc(o.complaint)}</textarea>
+  ${checkinPanel(o)}
+  ${inspectionPanel(o)}
+  ${priorDeclinedPanel(o)}
 
   <div class="secthead"><h3>Labor</h3></div>
   <div class="linerow"><div class="lbl">Description</div><div class="lbl">Hours</div><div class="lbl">Rate/hr</div><div class="lbl right">Amount</div><div></div></div>
@@ -1655,6 +2901,7 @@ function drawWO(){const o=cur;
     <div><label>Internal notes <span class="muted" style="font-weight:400">— never printed for the customer</span></label><textarea id="o_internalNotes">${esc(o.internalNotes||"")}</textarea></div>
   </div>
 
+  <div id="partsWrap">${partsBanner(o)}</div>
   <div id="authWrap">${authPanel(o,t)}</div>
   <div id="payWrap">${paymentPanel(o,t)}</div>
 
@@ -1675,6 +2922,7 @@ function drawWO(){const o=cur;
 
   <div class="toolbar" style="margin-top:16px">
     <button class="green" onclick="saveOrder()">Save</button>
+    <button onclick="openTechView('${o.id}')">Shop copy</button>
     <button onclick="printDoc('Estimate')">Print Estimate</button>
     <button onclick="printDoc('RepairOrder')">Print Repair Order</button>
     <button class="primary" onclick="printDoc('Invoice')">Print Invoice</button>
@@ -1825,12 +3073,32 @@ function partRow(x,i,o){
     </div>
     <div class="linemeta">
       <span class="badge b-manual">${esc(kind.toUpperCase())}</span>
+      <select class="sm" style="height:26px;font-size:11.5px;max-width:140px" onchange="setPartState(${i},this.value)">
+        ${PART_STATES.map(st=>`<option value="${st}" ${partState(x)===st?"selected":""}>${st}</option>`).join("")}</select>
+      <input value="${esc(x.orderNo||"")}" placeholder="order / ref #" style="max-width:130px;height:24px;font-size:11.5px" onchange="setPartField(${i},'orderNo',this.value)">
+      <input value="${esc(x.expected||"")}" type="date" style="max-width:140px;height:24px;font-size:11.5px" title="expected" onchange="setPartField(${i},'expected',this.value)">
       ${(Number(x.cost)>0)?`<span>cost ${money(partCost(x))} · margin ${money(r2(ext-partCost(x)))}</span>`:`<span>no cost entered — profit reporting will not see this line</span>`}
       <label style="display:flex;align-items:center;gap:4px;margin:0;font-weight:400"><input type="checkbox" data-k="parts" data-i="${i}" data-f="taxable" ${lineTaxable(x,taxCfg(o).taxParts)?"checked":""} style="width:auto"> taxable</label>
       <input data-k="parts" data-i="${i}" data-f="vendor" value="${esc(x.vendor||"")}" placeholder="vendor" style="max-width:120px;height:24px;font-size:11.5px">
       <input data-k="parts" data-i="${i}" data-f="intNote" value="${esc(x.intNote||"")}" placeholder="internal note" style="max-width:180px;height:24px;font-size:11.5px">
     </div>
   </div>`;
+}
+function setPartState(i,v){
+  pullWO();
+  const x=cur.parts[i]; x.procurement=v;
+  if(v==="Received"&&!x.receivedAt) x.receivedAt=new Date().toISOString();
+  save(); renderLines(); updateTotals();
+}
+function setPartField(i,f,v){ pullWO(); cur.parts[i][f]=v; save(); }
+/* If a job cannot be finished because a part is not in the building, the ticket
+   should say so in those words rather than sitting silently at In Progress. */
+function partsBanner(o){
+  const out=partsOutstanding(o);
+  if(!out.length) return "";
+  return `<div class="authbox wait" style="margin-top:10px"><b>WAITING ON PARTS</b>
+    <div class="authline">${out.length} part${out.length===1?"":"s"} still needed:</div>
+    ${out.map(x=>`<div class="authline">• ${esc(x.desc||"part")} — ${esc(partState(x))}${x.orderNo?" · "+esc(x.orderNo):""}${x.expected?" · expected "+esc(x.expected):""}</div>`).join("")}</div>`;
 }
 function extraRow(x,i,o){
   const base=(()=>{const t=orderTotals(o);return {labor:t.labor,parts:t.parts,sublet:t.sublet,pre:r2(t.labor+t.parts+t.sublet)};})();
@@ -1890,12 +3158,34 @@ function lineMeta(l,i,o){
   if(l.bill==="F") bits.push(`<span>menu price — not multiplied by the door rate</span>`);
   if(l.overlap) bits.push(`<span>overlap ${l.overlap>0?"+":""}${esc(l.overlap)} hr → ${esc(lineHours(l))} hr billed</span>`);
   if(l.override) bits.push(`<span>overridden by ${esc(l.override.who)}: ${esc(l.override.reason)}</span>`);
+  const js=jobState(l);
+  bits.push(`<select class="sm" style="height:26px;font-size:11.5px;max-width:150px" onchange="setJobState(${i},this.value)">
+    ${JOB_STATES.map(x=>`<option value="${x}" ${x===js?"selected":""}>${x}</option>`).join("")}</select>`);
+  bits.push(`<input value="${esc(l.tech||"")}" list="techlist" placeholder="tech" style="max-width:110px;height:26px;font-size:11.5px" onchange="setJobTech(${i},this.value)">`);
+  if(js!=="Completed") bits.push(`<button class="sm" onclick="jobBtn(${i},'start')">${js==="In Progress"?"Working":"Start job"}</button>`);
+  if(js!=="Completed") bits.push(`<button class="sm" onclick="jobBtn(${i},'done')">Complete job</button>`);
+  if(l.startedAt) bits.push(`<span class="muted">started ${esc(String(l.startedAt).slice(11,16))}${l.completedAt?" · done "+esc(String(l.completedAt).slice(11,16)):""}</span>`);
   if(l.serviceId){
     bits.push(`<button class="sm" onclick="overrideLine(${i})">Override…</button>`);
     if(l.override) bits.push(`<button class="sm" onclick="clearLineOverride(${i})">Undo override</button>`);
     bits.push(`<span class="muted">${esc(l.serviceId)}</span>`);
   }
-  return `<div class="linemeta">${bits.join("")}</div>`;
+  return `<div class="linemeta">${bits.join("")}</div>
+  ${(l.finding||l.workPerformed)?`<div class="linemeta" style="padding-top:0">${l.finding?`<span><b>Found:</b> ${esc(l.finding)}</span>`:""}${l.workPerformed?`<span><b>Done:</b> ${esc(l.workPerformed)}</span>`:""}</div>`:""}`;
+}
+function setJobState(i,v){ pullWO(); cur.labor[i].jobState=v; save(); renderLines(); updateTotals(); }
+function setJobTech(i,v){ pullWO(); cur.labor[i].tech=v; if(v&&db.settings.techs.indexOf(v)<0)db.settings.techs.push(v); save(); }
+function jobBtn(i,which){
+  pullWO();
+  if(which==="start"){ startJob(cur,i); }
+  else {
+    const l=cur.labor[i];
+    const done=prompt("Work performed on this job (prints on the invoice):",l.workPerformed||"");
+    if(done===null) return;
+    l.workPerformed=done.trim();
+    completeJob(cur,i);
+  }
+  save(); renderLines(); updateTotals();
 }
 /* Every job on the order that the catalog says to check, gathered in one place
    above the total, because that is where someone looks before they quote. */
@@ -1913,6 +3203,7 @@ function updateTotals(){const t=orderTotals(cur);
   /* The authorization box has to keep up with the total, not with the next
      full redraw: the moment work is added past what the customer agreed to is
      the moment somebody needs to be told. */
+  const pb=$("#partsWrap"); if(pb) pb.innerHTML=partsBanner(cur);
   const aw=$("#authWrap"); if(aw) aw.innerHTML=authPanel(cur,t);
   const pw=$("#payWrap");  if(pw) pw.innerHTML=paymentPanel(cur,t);
   const set=(id,v)=>{const el=$("#"+id);if(el)el.textContent=money(v);};
@@ -1934,7 +3225,8 @@ function pullWO(){if(!cur)return;const g=id=>{const el=$("#"+id);return el?el.va
   const map={o_cust:"customerId",o_veh:"vehicleId",o_date:"date",o_mIn:"mileageIn",o_mOut:"mileageOut",
              o_complaint:"complaint",o_notes:"notes",o_recommendation:"recommendation",
              o_custNotes:"custNotes",o_internalNotes:"internalNotes"};
-  Object.keys(map).forEach(id=>{const v=g(id);if(v!==undefined)cur[map[id]]=v;});}
+  Object.keys(map).forEach(id=>{const v=g(id);if(v!==undefined)cur[map[id]]=v;});
+  pullCheckin();}
 function quickCustomer(){pullWO();editCustomer(null,cid=>{cur.customerId=cid;cur.vehicleId="";drawWO();});}
 function quickVehicle(){pullWO();editVehicle(null,cur.customerId,vid=>{const v=db.vehicles[vid];if(v&&!cur.customerId)cur.customerId=v.customerId;cur.vehicleId=vid;drawWO();});}
 function saveOrder(){pullWO();if(!cur.customerId){alert("Select a customer.");return;}
@@ -2069,6 +3361,44 @@ function docInvoice(o){
     ${authStamp(o)}
     <div class="foot">${esc(db.settings.terms||"")}${t.balance>0.004?`<br><b>Balance due: ${money(t.balance)}</b>`:`<br>Paid in full — thank you.`}</div>
   </div>`;
+}
+
+/* The people who actually turn the wrenches. A list, not accounts: this program
+   has no login and does not pretend to. */
+function techCard(){
+  const list=db.settings.techs||[];
+  return `<div class="card"><div class="toolbar"><h3 style="margin:0">Technicians</h3><div class="grow"></div><button class="sm primary" onclick="addTech()">+ Add technician</button></div>
+  ${list.length?`<div class="flags">${list.map((t,i)=>`<span class="flag on">${esc(t)} <button class="x" style="height:18px;width:18px;line-height:1" onclick="delTech(${i})">✕</button></span>`).join("")}</div>`
+    :`<div class="empty">No technicians yet. Names typed on a job or an inspection are remembered here automatically.</div>`}
+  <p class="muted" style="font-size:12px;margin-bottom:0">Names only. There are no logins, no passwords and no permissions — the shop copy hides prices as a convenience, not as security.</p></div>`;
+}
+function addTech(){
+  const n=prompt("Technician name:","");
+  if(n==null||!n.trim()) return;
+  db.settings.techs=db.settings.techs||[];
+  if(db.settings.techs.indexOf(n.trim())<0) db.settings.techs.push(n.trim());
+  save(); render();
+}
+function delTech(i){ db.settings.techs.splice(i,1); save(); render(); }
+/* Where a measurement starts suggesting a condition. These are the shop's
+   numbers, not the law's, and a technician can always overrule the suggestion. */
+function thresholdCard(){
+  const t=db.settings.thresholds||{};
+  const f=(k,label,unit)=>`<div><label>${label}</label><div style="display:flex;align-items:center;gap:6px">
+    <input id="th_${k}" type="number" step="0.5" value="${t[k]}" style="max-width:90px"><span class="muted">${unit}</span></div></div>`;
+  return `<div class="card"><h3 style="margin-top:0">When a measurement should suggest a problem</h3>
+  <p class="muted" style="font-size:12px;margin-top:0">A measurement at or below these suggests a condition when the item is still untouched. It never overrides what the technician chose.</p>
+  <div class="row">${f("treadMonitor","Tire tread — monitor at","/32")}${f("treadUrgent","Tire tread — urgent at","/32")}
+    ${f("padMonitor","Brake pad — monitor at","mm")}${f("padUrgent","Brake pad — urgent at","mm")}</div>
+  <div class="row">${f("moistureMonitor","Brake fluid moisture — service at","%")}${f("moistureUrgent","Brake fluid moisture — contaminated at","%")}</div>
+  <div class="toolbar" style="margin-top:10px"><button class="sm green" onclick="saveThresholds()">Save thresholds</button></div></div>`;
+}
+function saveThresholds(){
+  const t=db.settings.thresholds;
+  ["treadMonitor","treadUrgent","padMonitor","padUrgent","moistureMonitor","moistureUrgent"].forEach(k=>{
+    const v=Number($("#th_"+k).value); if(isFinite(v)) t[k]=v;
+  });
+  save(); render(); alert("Thresholds saved.");
 }
 
 /* Shop fees the owner has set up once and can drop onto a ticket. Nothing is

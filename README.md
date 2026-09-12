@@ -71,8 +71,40 @@ subscription. Settings ▸ **Where is my data?** shows the folder.
   repair order carrying the internal notes and verification warnings and no
   line pricing, and a customer invoice. All print on US Letter and save as PDF
   through Windows, with no subscription and no internet.
-- **An open-work dashboard** — what is awaiting approval, approved, on a lift,
-  stuck on a part, finished, or invoiced and unpaid, with totals and balances.
+- **Vehicle check-in** — mileage, fuel, keys and key tag, where the car is
+  parked, what the customer reported, and a **pre-existing damage record**:
+  area, damage type, severity and note, stamped with who wrote it and when,
+  before anybody touches the vehicle. Prints as a condition report with
+  signature lines.
+- **A real multipoint inspection** — 129 checks across 18 groups, and it stores
+  the *number*, not just a colour: tread in 32nds per wheel, pad thickness
+  inner and outer per corner, rotor thickness against its minimum spec, brake
+  fluid moisture percentage, coolant freeze point, battery volts and measured
+  against rated CCA, oil life. Tyres and brakes are entered as a matrix, so four
+  wheels is four rows rather than four screens. **Mark remaining Good** handles
+  everything the technician was happy with in one tap.
+- **Measurements that suggest, never decide** — set your own thresholds in
+  Settings and a reading proposes a condition on an untouched item. The
+  technician is standing at the car and can always overrule it.
+- **Findings become work** — an inspection finding turns into a recommendation,
+  and a recommendation turns into a line on the estimate through the same
+  catalog and the same pricing engine as everything else.
+- **Declined work never disappears** — what a customer said no to is kept
+  against the *vehicle* with the date, the mileage and the amount, and it
+  surfaces automatically on their next visit under **PREVIOUSLY DECLINED**.
+- **Jobs and parts have their own states** — a job can be Waiting Parts while
+  the ticket is In Progress; a part is Needed, Ordered, Backordered, Received or
+  Installed, and anything not yet in the building raises **WAITING ON PARTS**
+  naming the parts.
+- **A shop board** — every open ticket by what is stopping it, with technician,
+  inspection state, jobs done out of total, missing parts and balance. Search
+  across customer, VIN (full or partial), plate, RO or invoice number.
+- **A shop-floor view** — the same ticket with the money taken out, for a
+  screen in the bay. It is a view, not a login: it hides prices as a
+  convenience and does not pretend to be security.
+- **A customer inspection report** — what needs attention now, what to keep an
+  eye on, and everything checked and sound, with the measurements. Statuses
+  print with words as well as colour so a grayscale copy still reads.
 - **Backup** — Export/Import a `.json`, plus **Restore from backup…**: the app
   keeps the last 60 copies of your book automatically, one taken before every
   single change.
@@ -122,6 +154,7 @@ python build.py        # stage into desktop/dist; refuses on version drift
 node testsave.cjs      # persistence suite
 node testvin.cjs       # VIN, matching, pricing, overrides, provenance
 node testflow.cjs      # estimate to paid invoice, and old books still opening
+node testshop.cjs      # check-in, inspection, recommendations, parts, history
 cd desktop/src-tauri && cargo test    # the storage layer
 ```
 
@@ -134,5 +167,9 @@ Once an invoice is finalized it carries its own copy of the labor rate and the
 tax rules it was billed under, so changing either afterwards cannot move a
 document a customer already has. Numbers, once issued, are never reused.
 
-Tag a version (`git tag v2.3.0 && git push origin v2.3.0`) and CI runs all four
+A completed inspection keeps its own copy of the template it was filled in
+against, so adding a check next month does not leave a hole in every inspection
+already handed to a customer.
+
+Tag a version (`git tag v2.4.0 && git push origin v2.4.0`) and CI runs all five
 suites, then builds and publishes the installer.
