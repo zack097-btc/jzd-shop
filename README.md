@@ -216,6 +216,77 @@ subscription. Settings ▸ **Where is my data?** shows the folder.
   backup…**: the app keeps the last 60 copies of your book automatically, one
   taken before every single change.
 
+## Maintenance: the manufacturer's, or nothing
+
+Each vehicle has **MAINTENANCE — OEM schedule** and, separately, the shop's own
+**Maintenance — SHOP RECOMMENDATION**. The two are never mixed.
+
+- An OEM schedule comes only from, in order: **MOTOR** (production, licensed),
+  **DataOne** OEM Service Schedules, **TecRMI**, **Autodata**, or an item a
+  person **verified by hand** against the manufacturer's own document (the
+  document and who verified it are required). Otherwise the screen says
+  **OEM MAINTENANCE SCHEDULE UNAVAILABLE** and **NO VERIFIED INTERVAL — DO NOT
+  GUESS**, and lists why each source was not used.
+- MOTOR's sandbox proves the field mapping (**MOTOR SANDBOX DTO TEST**) and is
+  never stored, calculated against a customer's vehicle, or put on a ticket.
+- Every schedule keeps its provider, environment, VIN, resolved vehicle, the
+  provider's vehicle, operation and schedule ids, the OEM wording, the
+  intervals, normal or severe, when it was retrieved and the data version. A
+  licensed schedule is kept in the book only when the provider's settings record
+  that the contract allows keeping its content; otherwise it is fetched for the
+  session.
+- Statuses: **OVERDUE, DUE NOW, DUE SOON, NOT YET DUE, COMPLETED, UNKNOWN, NO
+  VERIFIED SCHEDULE**. Mileage, time, whichever-first, first-then-repeat,
+  maintenance minder, condition-based and "manufacturer does not specify" are
+  each handled as stated. A service is never assumed: past a scheduled point
+  with no record the status is UNKNOWN — **DUE BY SCHEDULE + LAST SERVICE
+  UNKNOWN — SERVICE HISTORY REQUIRED**. **MARK PREVIOUSLY COMPLETED** records
+  mileage, date and where the record came from.
+- The usage profile starts **Unknown** (then normal and severe items are both
+  shown, marked) and the screen says how many operations a profile changes.
+- The inspection shows a quiet **OEM MAINTENANCE DUE** chip and never marks an
+  inspection item because of it. **ADD TO ESTIMATE** carries the operation, its
+  source, the reason and when it is due onto an estimate — not authorized, and
+  with no labor time claimed from the schedule's provider.
+
+## Shop Sync: the office desktop and the laptop
+
+One computer in the shop hosts the **Shop Hub**; the others connect to it over
+the shop's own network. No cloud, no subscription, no shared folder.
+
+- **Settings → Shop Sync → THIS COMPUTER HOSTS THE SHOP** takes a backup of the
+  book and every photo, loads the book into the hub's database, proves it reads
+  back identical field by field, copies each photo with its SHA-256 checked,
+  takes a verified hub backup, and only then switches over. The original book
+  file is kept.
+- **PAIR DEVICE** on the host shows a one-time code (valid 10 minutes, once).
+  **CONNECT TO EXISTING SHOP HUB** on the laptop finds the hub (or takes its
+  address) and the code; both screens then show the same six verification
+  digits and the host approves. The laptop keeps a device credential in
+  Windows Credential Manager. **REVOKE DEVICE** disconnects it at once.
+- The hub listens on **TCP 47811** (and answers discovery on **UDP 47812**) and
+  accepts only private-network addresses. Every message after pairing is
+  authenticated and encrypted (P-256 pairing, HMAC-SHA-256 session keys,
+  ChaCha20-Poly1305). **ALLOW ON PRIVATE NETWORKS** adds two Windows Firewall
+  rules for this program's executable only, on those two ports, local subnet,
+  Private profile — Windows asks for permission. Do not forward these ports to
+  the Internet.
+- Changes are field by field: two people changing different fields both keep
+  their change; the same field changed on two computers asks
+  (**LF TIRE TREAD DEPTH CHANGED ON ANOTHER DEVICE — USE 4/32 / USE 5/32**) and
+  the choice is recorded in the activity history. Ticket, RO, invoice and PO
+  numbers come from blocks the hub hands out, so they never collide.
+- The indicator says **SAVING…**, **SYNCED** (only after the hub acknowledged
+  it), **OFFLINE — N CHANGES WAITING TO SYNC**, **SHOP HUB OFFLINE** or **SYNC
+  ERROR**. Work done offline is kept on that computer and sent when the hub is
+  back. Photos upload in resumable pieces, checked by SHA-256: **PHOTO
+  UPLOADING → PHOTO SYNCED**.
+- The host keeps running in the notification area when its window is closed
+  (Quit there stops it), can start with Windows, backs the hub up daily (14
+  kept) and on **BACK UP NOW**, and verifies every backup by rebuilding it.
+- Provider credentials stay in each computer's Credential Manager; they are not
+  in the hub.
+
 ## The catalog is your catalog
 
 The 245 jobs are **this shop's own curated seed data**. They are not Mitchell,
@@ -268,6 +339,9 @@ node testparts.cjs     # stock, vendors, purchase orders, receiving, cores
 node testfloor.cjs     # bays, job clock, efficiency, QC, diagnosis, comebacks, maintenance
 node testdata.cjs      # provider hub: NHTSA, datasets, routing, provenance, sandbox, secrets
 node testmpi.cjs       # fast inspection entry: dropdowns, presets, Mark Good, completion, a v2.8.1 book
+node testmaint.cjs     # OEM maintenance: provenance, no-guess, mileage/time, severe/normal, history
+node testsync.cjs      # Shop Sync: two real processes, the real page, pairing to host restart
+cd desktop/shophub && cargo test      # sync engine, hub, crypto, and three computers over real sockets
 node testmotorlive.cjs # LIVE MOTOR sandbox through the page (needs MOTOR_SANDBOX_PUBLIC/PRIVATE)
 cd desktop/src-tauri && cargo test    # the storage layer and the provider hub's native side
 cargo test motor_sandbox_live -- --ignored --nocapture   # LIVE MOTOR sandbox through the shell
@@ -306,5 +380,5 @@ External data is supplemental. With the internet off, NHTSA down, or every
 provider disabled, customers, vehicles, inspections, repair orders, the SHOP SEED
 labor catalog, parts and the floor all keep working from this computer.
 
-Tag a version (`git tag v2.8.2 && git push origin v2.8.2`) and CI runs every
+Tag a version (`git tag v2.8.3 && git push origin v2.8.3`) and CI runs every
 suite and the live MOTOR sandbox check, then builds and publishes the installer.

@@ -81,7 +81,7 @@ const F = f => '[data-f="' + f.replace(/"/g, '\\"') + '"]';
   await wait(300);
 
   check('21a. the v2.8.1 book was written by v2.8.1 itself and opens in this version', results.old && results.old.version === '2.8.1' &&
-    await page.evaluate(() => JZD_VERSION === '2.8.2' && Object.keys(db.inspections).length === 2), JSON.stringify(results.old));
+    await page.evaluate(v => JZD_VERSION === v && Object.keys(db.inspections).length === 2, JSON.parse(fs.readFileSync('desktop/src-tauri/tauri.conf.json', 'utf8')).version), JSON.stringify(results.old));
 
   /* ---- the old in-progress inspection, on the new screen ---- */
   const oldView = await page.evaluate(id => {

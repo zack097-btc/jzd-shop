@@ -249,8 +249,8 @@ function shim(port){
     check('2h. the laptop says SYNCED', !!(await until(async () => (await saveState(laptop)) === 'SYNCED', 6000)), await saveState(laptop));
     const devs = await until(async () => { const s = await ctl(HOST_CTL, 'sync_status'); const d = (s.hub.devices || []).find(x => x.name === 'Shop Laptop'); return d && d.online ? s.hub.devices : null; }, 6000);
     check('2i. the host lists Shop Laptop as ONLINE', !!devs, JSON.stringify(devs));
-    await host.evaluate(() => drawShopSyncLive());
-    check('2j. the host device list shows ONLINE on screen', /Shop Laptop[\s\S]*ONLINE/.test(await host.textContent('#shopSyncBody')));
+    const onlineOnScreen = await until(async () => { await host.evaluate(() => syncRefresh()); return /Shop Laptop[\s\S]*ONLINE/.test(await host.textContent('#shopSyncBody')); }, 8000, 200);
+    check('2j. the host device list shows ONLINE on screen', !!onlineOnScreen, await host.textContent('#shopSyncBody'));
 
     /* ================= 3. live on the same inspection ================= */
     const openInsp = page => page.evaluate(() => { openInspection('o1'); });

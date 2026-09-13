@@ -291,6 +291,7 @@
   .captable td.cm{text-align:center;font-weight:700}
   .captable td.cm-y{color:#15803d}.captable td.cm-w{color:#b45309}.captable td.cm-n{color:#9ca3af}
   .presence{font-size:12px;font-weight:700;color:#b45309}
+  .oemdue{font-size:11.5px;font-weight:700;color:#1d4ed8;border:1px solid #93c5fd;background:#eff6ff;border-radius:999px;padding:2px 9px;cursor:pointer}
   .synced-flash{animation:syncflash .9s ease-out}
   @keyframes syncflash{from{background:#fff7d6}to{background:transparent}}
   .tag.sync{position:absolute;bottom:2px;left:2px;font-size:8px;padding:1px 3px;border-radius:3px;background:rgba(0,0,0,.55);color:#fff}
@@ -712,7 +713,7 @@ const DEFAULT={settings:{shopName:"JZD Inc.",tagline:"Automotive Service & Repai
      starting numbers, not rules - every tier is editable in Settings. */
   markupMatrix:[{upTo:10,pct:100},{upTo:25,pct:80},{upTo:50,pct:65},{upTo:100,pct:55},{upTo:250,pct:45},{upTo:500,pct:35},{upTo:null,pct:28}],
   inventoryUnits:["each","quart","gallon","liter","ounce","foot","set","pair"],
-  bays:["Bay 1","Bay 2","Bay 3","Alignment Rack","Diagnostic","Outside","Detail","Waiting Area"],qcRequired:true,timerWarnHours:10,dueSoonMiles:1000,dueSoonDays:30,maintItems:DEFAULT_MAINT_ITEMS,dayStart:8,dayEnd:18,slotMinutes:30,thresholds:{treadMonitor:5,treadUrgent:3,padMonitor:4,padUrgent:2,moistureMonitor:2,moistureUrgent:3},terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},appointments:{},recommendations:{},parts:{},vendors:{},purchaseOrders:{},movements:[],catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[],inspections:{},attachments:{},timeSessions:[],qcRecords:{},roadTests:{},diagnostics:{},comebacks:{},maintenance:{records:[],overrides:{}},providerHub:{}};
+  bays:["Bay 1","Bay 2","Bay 3","Alignment Rack","Diagnostic","Outside","Detail","Waiting Area"],qcRequired:true,timerWarnHours:10,dueSoonMiles:1000,dueSoonDays:30,maintItems:DEFAULT_MAINT_ITEMS,dayStart:8,dayEnd:18,slotMinutes:30,thresholds:{treadMonitor:5,treadUrgent:3,padMonitor:4,padUrgent:2,moistureMonitor:2,moistureUrgent:3},terms:"Thank you for your business. Payment due on receipt.",requireOverrideReason:true,managerPin:"",providers:{vehicle:"nhtsa",labor:"seed",motor:{enabled:false,baseUrl:"",keyRef:""},mitchell:{enabled:false},alldata:{enabled:false,openUrl:""}}},customers:{},vehicles:{},orders:{},appointments:{},recommendations:{},parts:{},vendors:{},purchaseOrders:{},movements:[],catalog:{labor:{},parts:{},overrides:{},disabled:{}},vinCache:{},audit:[],inspections:{},attachments:{},timeSessions:[],qcRecords:{},roadTests:{},diagnostics:{},comebacks:{},maintenance:{records:[],overrides:{}},oemMaint:{schedules:{},history:[],profiles:{},manual:{}},providerHub:{}};
 let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot() */
 /* ---------- where the book actually lives ----------------------------------
 
@@ -739,7 +740,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.8.2";
+const JZD_VERSION = "2.8.3";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -778,6 +779,7 @@ function shapeDb(d){
     diagnostics: d.diagnostics || {},
     comebacks: d.comebacks || {},
     maintenance: {records: Array.isArray(m.records) ? m.records : [], overrides: m.overrides || {}},
+    oemMaint: shapeOemMaint(d.oemMaint),
     /* configuration only: which providers are enabled, environments, subscription
        status, what was last tested. Credentials never live here. */
     providerHub: (d.providerHub && typeof d.providerHub === "object") ? d.providerHub : {}
@@ -2088,6 +2090,7 @@ function renderInspection(){
     <h2 style="margin:0">Multipoint Inspection</h2>
     <span class="pill st-${done?"Completed":"InProgress"}">${esc(insp.state)}</span>
     ${syncPresenceHtml("inspection:"+insp.id)}
+    ${oemMpiIndicatorHtml(insp)}
     <div class="grow"></div>
     <button onclick="printInspection('${insp.id}')">Print customer report</button>
     ${done?"":`<button class="green" onclick="signOffInspection()">Complete inspection…</button>`}
@@ -3522,6 +3525,588 @@ function maintStatus(vehicleId, item, opts){
 }
 function vehicleMaintenance(vehicleId, opts){ return maintItems().map(m => maintStatus(vehicleId, m, opts)); }
 
+/* ---------- OEM maintenance schedules ----------
+   What the manufacturer says this vehicle needs, and when - only from a source
+   that is allowed to say it:
+     1. MOTOR, production and licensed
+     2. DataOne OEM Service Schedules
+     3. TecRMI maintenance
+     4. Autodata service schedules
+     5. an item a person verified against the manufacturer's own document
+   and otherwise nothing: OEM MAINTENANCE SCHEDULE UNAVAILABLE. An interval is
+   never guessed, a service is never assumed done, sandbox data is never a
+   recommendation, and the shop's own intervals (Maintenance - SHOP
+   RECOMMENDATION) are never shown as the manufacturer's.
+
+   Everything a person records here - the usage profile, past services, items
+   verified by hand - is shop data and lives in the book (so it syncs). A
+   licensed provider's schedule is kept in the book only when the shop records
+   that its contract allows keeping that provider's content; otherwise it is
+   held for this session on this computer and fetched again when needed. */
+const OEM_PROVIDER_ORDER = ["motor_daas", "dataone", "tecrmi", "autodata"];
+const OEM_LABEL = {motor_daas:"OEM SCHEDULE — MOTOR", dataone:"OEM SCHEDULE — DATAONE", tecrmi:"OEM SCHEDULE — TECRMI",
+  autodata:"OEM SCHEDULE — AUTODATA", manual_oem:"MANUALLY VERIFIED OEM"};
+const USAGE_PROFILES = [["UNKNOWN", "Unknown"], ["NORMAL", "Normal"], ["SEVERE", "Severe"], ["COMMERCIAL", "Commercial / Fleet"],
+  ["TOWING", "Towing / Heavy load"], ["DUSTY", "Dusty / Off-road"]];
+const OEM_HISTORY_SOURCES = ["Shop history", "Customer states", "External record", "Service sticker", "Receipt", "Other"];
+const OEM_STATUS_ORDER = {"OVERDUE":0, "DUE NOW":1, "DUE SOON":2, "UNKNOWN":3, "NOT YET DUE":4, "COMPLETED":5, "NO VERIFIED SCHEDULE":6};
+const oemSessionSchedules = new Map();
+const oemLastTried = {};
+
+function shapeOemMaint(m){
+  m = (m && typeof m === "object") ? m : {};
+  return {schedules:m.schedules || {}, history:Array.isArray(m.history) ? m.history : [], profiles:m.profiles || {}, manual:m.manual || {}};
+}
+function oemData(){ if (!db.oemMaint) db.oemMaint = shapeOemMaint(null); return db.oemMaint; }
+function oemAttr(k){ return encodeURIComponent(String(k)).replace(/'/g, "%27"); }
+function posOrNull(v){ const n = Number(v); return v == null || v === "" || !isFinite(n) || n <= 0 ? null : n; }
+function oemAction(text){
+  const t = String(text || "");
+  if (/inspect|check/i.test(t)) return "INSPECT";
+  if (/rotate/i.test(t)) return "ROTATE";
+  if (/r&r|replace|drain|refill|flush|change/i.test(t)) return "REPLACE";
+  return "SERVICE";
+}
+function oemProfile(vehicleId){ const p = oemData().profiles[vehicleId]; return (p && p.profile) || "UNKNOWN"; }
+function oemProfileSeverity(profile){ return profile === "NORMAL" ? "normal" : profile === "UNKNOWN" || !profile ? null : "severe"; }
+function oemProfileName(profile){ return (USAGE_PROFILES.find(p => p[0] === profile) || ["", "Unknown"])[1]; }
+
+/* ---------- the normalized schedule ----------
+   {providerId, label, environment, production, sandbox, vin, resolvedVehicle,
+    providerVehicleId, retrievedAt, dataVersion, operations:[{
+      key, providerId, operationId, scheduleId, name, oemWording, action,
+      condition: normal|severe, notes, qualifiers,
+      rule:{type, miles, km, months, hours, initialMiles, initialMonths,
+            indicator, frequencyCode, frequencyText}}]}
+   rule.type: mileage | time | whichever-first | initial-then-repeat |
+   indicator | condition | unspecified | hours | service-point | unknown */
+function oemResolvedVehicle(v){
+  const p = vehicleProfile(v) || {};
+  return [p.year, p.make, p.model, p.series || p.trim, p.displacementL ? p.displacementL + "L" : ""].filter(Boolean).join(" ");
+}
+function oemMotorRule(i){
+  const miles = posOrNull(i.IntervalMile), km = posOrNull(i.IntervalKilometer), months = posOrNull(i.IntervalMonth), hours = posOrNull(i.IntervalOperatingHours);
+  const code = String(i.FrequencyCode || "").toUpperCase();
+  let type;
+  if (code === "N") type = "unspecified";
+  else if (code === "I") type = "indicator";
+  else if (code === "E") type = miles != null && months != null ? "whichever-first" : miles != null ? "mileage" : months != null ? "time" : hours != null ? "hours" : "unknown";
+  else type = "unknown";   /* a MOTOR frequency code this program has not been taught: shown, never calculated */
+  return {type, miles, km, months, hours, initialMiles:null, initialMonths:null, indicator:i.Indicator || "",
+    frequencyCode:code, frequencyText:i.FrequencyDescription || ""};
+}
+function normalizeMotorMaintenance(body, vehicle, ids){
+  const env = motorEnv();
+  const apps = (body && body.Body && body.Body.MaintenanceSchedules) || [];
+  const operations = [];
+  apps.filter(a => a && a.IsActive !== false).forEach(a => {
+    const tax = a.Taxonomy || {};
+    const name = tax.LiteralName || a.DisplayName || "MOTOR operation " + a.ApplicationID;
+    (a.Items || []).filter(i => i && i.IsActive !== false).forEach(i => {
+      const rule = oemMotorRule(i);
+      operations.push({key:"motor_daas:" + a.ApplicationID + ":" + (i.MaintenanceScheduleID || ""), providerId:"motor_daas",
+        operationId:String(a.ApplicationID), scheduleId:String(i.MaintenanceScheduleID || ""), name,
+        oemWording:[name, i.FrequencyDescription, i.Indicator, rule.miles != null ? rule.miles + " mi" : "", rule.km != null ? rule.km + " km" : "",
+          rule.months != null ? rule.months + " months" : "", rule.hours != null ? rule.hours + " operating hours" : ""].filter(Boolean).join(" · "),
+        action:oemAction(tax.Action || name), condition:/^y/i.test(String(i.SevereServiceDescription || "")) ? "severe" : "normal",
+        notes:(i.Notes || []).map(n => n.Text || n.Description || "").filter(Boolean), qualifiers:(a.Qualifiers || []).map(q => q.Description).filter(Boolean),
+        warranty:i.WarrantyDescription || "", rule});
+    });
+  });
+  const hdr = (body && body.Header) || {};
+  return {providerId:"motor_daas", label:OEM_LABEL.motor_daas, environment:env, production:env === "production", sandbox:env !== "production",
+    vin:(vehicle && vehicle.vin) || "", resolvedVehicle:oemResolvedVehicle(vehicle), providerVehicleId:String(ids.baseVehicleId || ""),
+    providerEngineId:String(ids.engineId || ""), retrievedAt:new Date().toISOString(), dataVersion:hdr.Date || "", operations};
+}
+async function adapterMotorMaintenanceSchedule(vehicle){
+  const ids = await motorVehicleIds(vehicle);
+  const body = await motorCall("/Information/Vehicles/Attributes/BaseVehicleID/" + encodeURIComponent(ids.baseVehicleId) + "/Content/Details/Of/MaintenanceSchedules",
+    {Severity:"All", EN:ids.engineId, SM:ids.subModelId});
+  return normalizeMotorMaintenance(body, vehicle, ids);
+}
+
+/* TecRMI's service proposal (ServiceProposalMiles in its REST Swagger): the
+   next service point for this vehicle from its mileage and first registration,
+   and the works it contains. TecRMI's work times are manufacturer work units,
+   not hours, and are not carried as hours. */
+function normalizeTecrmiServiceProposal(body, vehicle, typeId){
+  const b = body || {};
+  const works = []
+    .concat(Array.isArray(b.NextServiceAfterMilesMonth) ? b.NextServiceAfterMilesMonth : [])
+    .filter(w => w && !w.IsLocked);
+  const nextMiles = posOrNull(b.NextMiles), nextMonth = posOrNull(b.NextMonth);
+  const operations = works.map(w => ({key:"tecrmi:" + w.WorkId + ":" + (w.ItemMpId || "") + ":" + (w.KorId || ""), providerId:"tecrmi",
+    operationId:String(w.WorkId || ""), scheduleId:String(b.QualColId || ""),
+    name:[w.ItemMpText, w.KorText].filter(Boolean).join(" — ") || "TecRMI work " + w.WorkId,
+    oemWording:[w.ItemMpText, w.KorText, w.QualColText || b.QualColText].filter(Boolean).join(" · "),
+    action:oemAction(w.KorText), condition:"normal", notes:[], qualifiers:[w.QualColText || b.QualColText].filter(Boolean),
+    rule:{type:"service-point", miles:null, km:null, months:null, hours:null, atMiles:nextMiles, atMonth:nextMonth,
+      initialMiles:null, initialMonths:null, indicator:"", frequencyCode:"", frequencyText:"TecRMI service proposal"}}));
+  return {providerId:"tecrmi", label:OEM_LABEL.tecrmi, environment:"production", production:true, sandbox:false,
+    vin:(vehicle && vehicle.vin) || "", resolvedVehicle:oemResolvedVehicle(vehicle), providerVehicleId:String(typeId || ""),
+    retrievedAt:new Date().toISOString(), dataVersion:"", operations};
+}
+async function adapterTecrmiMaintenanceSchedule(vehicle){
+  const typeId = vehicle && vehicle.externalIds && vehicle.externalIds.tecrmiTypeId;
+  if (!typeId) throw new Error("TecRMI identifies vehicles by its own type ID. Enter it under Vehicle → external identifiers.");
+  throw new Error("TecRMI service proposals need the vehicle's maintenance body and COO group from a licensed TecRMI account; that sequence has not been run against a real account, so nothing is fetched or guessed. READY FOR LICENSE / CREDENTIALS.");
+}
+async function adapterDataoneMaintenanceSchedule(){
+  throw new Error("DataOne's OEM Service Schedules data is described to licensees only; its response has not been mapped, so nothing is fetched or guessed. READY FOR CREDENTIALS / LICENSE.");
+}
+async function adapterAutodataMaintenanceSchedule(vehicle){
+  const r = await adapterAutodataMaintenance(vehicle);
+  /* Autodata's public samples list service schedules but not their intervals:
+     each is shown by name with NO VERIFIED INTERVAL until the licensed detail
+     is mapped. */
+  return {providerId:"autodata", label:OEM_LABEL.autodata, environment:"production", production:true, sandbox:false,
+    vin:(vehicle && vehicle.vin) || "", resolvedVehicle:oemResolvedVehicle(vehicle),
+    providerVehicleId:String((vehicle.externalIds || {}).autodataMid || ""), retrievedAt:new Date().toISOString(), dataVersion:"",
+    operations:(r.results || []).map(x => ({key:"autodata:" + x.applicationId, providerId:"autodata", operationId:x.applicationId, scheduleId:x.applicationId,
+      name:x.title, oemWording:x.title, action:oemAction(x.title), condition:"normal", notes:[], qualifiers:[],
+      rule:{type:"unknown", miles:null, km:null, months:null, hours:null, initialMiles:null, initialMonths:null, indicator:"",
+        frequencyCode:"", frequencyText:"Interval detail not mapped"}}))};
+}
+const OEM_ADAPTERS = {motor_daas:adapterMotorMaintenanceSchedule, dataone:adapterDataoneMaintenanceSchedule,
+  tecrmi:adapterTecrmiMaintenanceSchedule, autodata:adapterAutodataMaintenanceSchedule};
+
+/* What each source can do for maintenance right now, in words. */
+async function oemProviderReadiness(){
+  const out = [];
+  for (const id of OEM_PROVIDER_ORDER){
+    const p = PROVIDER_BY_ID[id];
+    const u = await providerUsable(id);
+    let text = u.readiness, usable = !!u.usable;
+    if (id === "motor_daas"){
+      if (u.usable && u.sandbox){ text = "SANDBOX CONNECTED — DTO TEST ONLY, NEVER A RECOMMENDATION · PRODUCTION NOT LICENSED"; usable = false; }
+      else if (!u.usable) text = providerConfig(id).environment === "production" ? u.readiness : "PRODUCTION NOT LICENSED";
+    }
+    if (id === "dataone") { text = u.usable ? "CONNECTED FOR VIN DECODE — OEM SERVICE SCHEDULES READY FOR LICENSE" : "READY FOR CREDENTIALS / LICENSE"; usable = false; }
+    if (id === "tecrmi" && !u.usable) text = "READY FOR LICENSE / CREDENTIALS";
+    if (id === "tecrmi" && u.usable){ text = "CONNECTED — SERVICE PROPOSAL NOT YET RUN AGAINST A LICENSED ACCOUNT"; usable = false; }
+    if (id === "autodata" && !u.usable) text = "READY FOR LICENSE / API KEY";
+    out.push({id, name:p.name, readiness:text, usable, label:OEM_LABEL[id]});
+  }
+  return out;
+}
+
+/* The schedule this vehicle's recommendations come from, best source first.
+   A kept or session schedule from a better source wins over a worse one;
+   a person's verified items are used only when no provider schedule exists. */
+function oemScheduleFor(vehicleId){
+  const kept = oemData().schedules[vehicleId];
+  const sess = oemSessionSchedules.get(vehicleId);
+  const cands = [kept, sess].filter(s => s && !s.sandbox && s.production !== false);
+  cands.sort((a, b) => OEM_PROVIDER_ORDER.indexOf(a.providerId) - OEM_PROVIDER_ORDER.indexOf(b.providerId));
+  if (cands[0]) return cands[0];
+  const manual = (oemData().manual[vehicleId] || []).filter(Boolean);
+  if (manual.length){
+    const v = db.vehicles[vehicleId] || {};
+    return {providerId:"manual_oem", label:OEM_LABEL.manual_oem, environment:"manual", production:true, sandbox:false,
+      vin:v.vin || "", resolvedVehicle:oemResolvedVehicle(v), providerVehicleId:"", retrievedAt:"", dataVersion:"", operations:manual};
+  }
+  return null;
+}
+async function oemFetchSchedule(vehicleId){
+  const v = db.vehicles[vehicleId];
+  if (!v) throw new Error("No such vehicle.");
+  const tried = [];
+  if (!v.vin){
+    oemLastTried[vehicleId] = [{id:"vin", readiness:"This vehicle has no VIN on record — an OEM schedule is looked up by VIN."}];
+    return {schedule:null, tried:oemLastTried[vehicleId]};
+  }
+  for (const r of await oemProviderReadiness()){
+    if (!r.usable){ tried.push(r); continue; }
+    try {
+      const s = await OEM_ADAPTERS[r.id](v);
+      if (!s || s.sandbox || !s.operations.length){ tried.push(Object.assign({}, r, {readiness:s && s.sandbox ? "SANDBOX — NOT USED" : "NO SCHEDULE RETURNED FOR THIS VEHICLE"})); continue; }
+      const keep = cachePolicyOf(PROVIDER_BY_ID[r.id]) === CACHE.LICENSE_CONTROLLED_CACHE && providerConfig(r.id).cacheAllowedByContract;
+      s.kept = keep;
+      if (keep){ oemData().schedules[vehicleId] = s; save(); }
+      else { oemSessionSchedules.set(vehicleId, s); }
+      tried.push(Object.assign({}, r, {readiness:"USED"}));
+      oemLastTried[vehicleId] = tried;
+      return {schedule:s, tried};
+    } catch(e){ tried.push(Object.assign({}, r, {readiness:"ERROR — " + e.message})); }
+  }
+  oemLastTried[vehicleId] = tried;
+  return {schedule:null, tried};
+}
+
+/* MOTOR's sandbox, to prove the field mapping on a real answer. The result is
+   shown as a DTO test and is never stored, never calculated against this
+   vehicle, and never offered as work. */
+async function oemSandboxDtoTest(vehicleId){
+  const v = db.vehicles[vehicleId];
+  const u = await providerUsable("motor_daas");
+  if (!u.usable || !u.sandbox) throw new Error("MOTOR sandbox keys are not connected (Settings → Data Providers).");
+  const s = await adapterMotorMaintenanceSchedule(v);
+  const codes = {};
+  s.operations.forEach(o => { codes[o.rule.type] = (codes[o.rule.type] || 0) + 1; });
+  return {operations:s.operations.length, byRule:codes, severe:s.operations.filter(o => o.condition === "severe").length,
+    sample:s.operations.slice(0, 6).map(o => ({name:o.name, rule:oemRuleText(o.rule), condition:o.condition})), providerVehicleId:s.providerVehicleId};
+}
+
+/* ---------- which operations apply to this vehicle's use ---------- */
+function oemApplicable(schedule, profile){
+  if (!schedule) return [];
+  const sev = oemProfileSeverity(profile);
+  const groups = {};
+  schedule.operations.forEach(o => { (groups[o.providerId + ":" + o.operationId] = groups[o.providerId + ":" + o.operationId] || []).push(o); });
+  const out = [];
+  Object.keys(groups).forEach(k => {
+    const g = groups[k];
+    const normal = g.filter(o => o.condition !== "severe"), severe = g.filter(o => o.condition === "severe");
+    if (sev === "normal") normal.forEach(o => out.push(Object.assign({}, o, {profileDependent:false})));
+    else if (sev === "severe") (severe.length ? severe : normal).forEach(o => out.push(Object.assign({}, o, {profileDependent:false})));
+    else g.forEach(o => out.push(Object.assign({}, o, {profileDependent:severe.length > 0})));
+  });
+  return out;
+}
+/* How much choosing severe use changes this schedule, so a person can see
+   why the profile matters. */
+function oemProfileDifference(schedule){
+  if (!schedule) return {changed:0, names:[]};
+  const sig = list => new Set(list.map(o => o.key));
+  const n = sig(oemApplicable(schedule, "NORMAL")), s = sig(oemApplicable(schedule, "SEVERE"));
+  const names = new Set();
+  schedule.operations.forEach(o => { if (n.has(o.key) !== s.has(o.key)) names.add(o.name); });
+  return {changed:names.size, names:Array.from(names)};
+}
+
+/* ---------- history: never assumed ---------- */
+function oemHistoryFor(vehicleId, op){
+  const out = [];
+  const nameKey = String(op.name || "").toLowerCase();
+  (oemData().history || []).filter(h => h.vehicleId === vehicleId &&
+      ((h.operationId && h.providerId === op.providerId && h.operationId === op.operationId) || (h.name && String(h.name).toLowerCase() === nameKey)))
+    .forEach(h => out.push({date:h.date || "", mileage:h.mileage || "", source:h.source, detail:h.detail || "", id:h.id, by:h.by || ""}));
+  /* work this shop finished from an OEM maintenance line */
+  vals(db.orders).filter(o => o.vehicleId === vehicleId && !isDead(o)).forEach(o => (o.labor || []).forEach(l => {
+    if (!l.maint || l.maint.providerId !== op.providerId || l.maint.operationId !== op.operationId) return;
+    const done = JOB_DONE.indexOf(jobState(l)) >= 0 || jobState(l) === "QC Required" || isFinal(o);
+    if (done) out.push({date:dayOf(l.completedAt) || o.date || "", mileage:o.mileageOut || o.mileageIn || "", source:"Shop history", detail:ticketNo(o), orderId:o.id});
+  }));
+  return out.sort((a, b) => (numOrNull(b.mileage) || 0) - (numOrNull(a.mileage) || 0) || String(b.date).localeCompare(String(a.date)));
+}
+function oemMarkCompleted(vehicleId, op, entry){
+  const mileage = String(entry.mileage == null ? "" : entry.mileage).trim(), date = String(entry.date || "").trim();
+  if (OEM_HISTORY_SOURCES.indexOf(entry.source) < 0) throw new Error("Choose where this record comes from.");
+  if (!mileage && !date) throw new Error("Enter the mileage, the date, or both — a record with neither cannot be used.");
+  if (mileage && !/^\d{1,7}(\.\d+)?$/.test(mileage.replace(/,/g, ""))) throw new Error("The mileage must be a number.");
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("The date must be YYYY-MM-DD.");
+  const rec = {id:uid("oh"), vehicleId, providerId:op.providerId, operationId:op.operationId, name:op.name, mileage, date,
+    source:entry.source, detail:String(entry.detail || "").trim(), at:new Date().toISOString(), by:entry.by || db.settings.lastTech || ""};
+  oemData().history.push(rec);
+  save();
+  return rec;
+}
+
+/* ---------- when it is due ---------- */
+function oemRuleText(r){
+  r = r || {};
+  const mi = n => Number(n).toLocaleString() + " mi", mo = n => n + (n === 1 ? " month" : " months");
+  switch (r.type){
+    case "mileage": return "Every " + mi(r.miles);
+    case "time": return "Every " + mo(r.months);
+    case "whichever-first": return "Every " + mi(r.miles) + " or " + mo(r.months) + ", whichever comes first";
+    case "initial-then-repeat": return "First at " + [r.initialMiles != null ? mi(r.initialMiles) : "", r.initialMonths != null ? mo(r.initialMonths) : ""].filter(Boolean).join(" / ") +
+      (r.miles != null || r.months != null ? ", then every " + [r.miles != null ? mi(r.miles) : "", r.months != null ? mo(r.months) : ""].filter(Boolean).join(" / ") : ", once");
+    case "indicator": return "By maintenance minder" + (r.indicator ? " (" + r.indicator + ")" : "") + (r.months != null ? " or every " + mo(r.months) : "") + (r.miles != null ? " or every " + mi(r.miles) : "");
+    case "condition": return "Condition-based — inspect and service as needed";
+    case "unspecified": return "Manufacturer does not specify an interval";
+    case "hours": return "Every " + r.hours + " operating hours";
+    case "service-point": return "Next service at " + [r.atMiles != null ? mi(r.atMiles) : "", r.atMonth != null ? "month " + r.atMonth : ""].filter(Boolean).join(" or ");
+    default: return (r.frequencyText || "Interval") + (r.frequencyCode ? " (" + r.frequencyCode + ")" : "") + " — not calculated";
+  }
+}
+function oemLegStatus(left, soon){
+  if (left <= -soon) return "OVERDUE";
+  if (left <= 0) return "DUE NOW";
+  if (left <= soon) return "DUE SOON";
+  return "NOT YET DUE";
+}
+function oemDue(vehicleId, op, opts){
+  opts = opts || {};
+  const r = op.rule || {};
+  const hist = opts.history || oemHistoryFor(vehicleId, op);
+  const last = hist[0] || null;
+  const mileage = opts.mileage != null ? numOrNull(opts.mileage) : vehicleMileage(vehicleId);
+  const today = opts.today ? new Date(String(opts.today).slice(0, 10) + "T12:00:00") : new Date();
+  const soonMi = Number(db.settings.dueSoonMiles) || 1000, soonDays = Number(db.settings.dueSoonDays) || 30;
+  const res = {op, rule:oemRuleText(r), status:"UNKNOWN", detail:"", dueMileage:null, dueDate:null, milesLeft:null, daysLeft:null,
+    last, history:hist, historyKnown:!!last, byScheduleHistoryUnknown:false};
+  if (r.type === "unspecified"){ res.status = "NO VERIFIED SCHEDULE"; res.detail = "NO VERIFIED INTERVAL — DO NOT GUESS"; return res; }
+  if (r.type === "hours"){ res.detail = "The interval is in operating hours, which are not recorded here — NO VERIFIED MILEAGE OR TIME INTERVAL"; return res; }
+  if (r.type === "unknown"){ res.status = "NO VERIFIED SCHEDULE"; res.detail = "NO VERIFIED INTERVAL — DO NOT GUESS"; return res; }
+  if (r.type === "condition"){ res.detail = "CONDITION-BASED — inspect; service when the manufacturer's condition is met"; return res; }
+  if (r.type === "service-point"){
+    const legs = [];
+    if (r.atMiles != null && mileage != null){ res.dueMileage = r.atMiles; res.milesLeft = r.atMiles - mileage; legs.push(oemLegStatus(res.milesLeft, soonMi)); }
+    if (!legs.length){ res.detail = "Current mileage not recorded"; return res; }
+    res.status = legs.sort((a, b) => OEM_STATUS_ORDER[a] - OEM_STATUS_ORDER[b])[0];
+    res.detail = "Next service point from the provider's proposal";
+    return res;
+  }
+  const indicatorOnly = r.type === "indicator";
+  const repeatMiles = r.miles, repeatMonths = r.months;
+  const oneTime = r.type === "initial-then-repeat" && repeatMiles == null && repeatMonths == null;
+  if (oneTime && last){ res.status = "COMPLETED"; res.detail = "Done once, as the manufacturer specifies"; return res; }
+  const legs = [];
+  let incomplete = false, pastFirstPoint = false;
+  /* distance */
+  if (repeatMiles != null || r.initialMiles != null){
+    const lastMi = last ? numOrNull(last.mileage) : null;
+    if (last && lastMi != null && repeatMiles != null) res.dueMileage = lastMi + repeatMiles;
+    else if (!last && mileage != null){
+      const first = r.initialMiles != null ? r.initialMiles : repeatMiles;
+      if (mileage < first) res.dueMileage = first;              /* the first service point is still ahead */
+      else {
+        pastFirstPoint = true;
+        res.scheduledAt = r.initialMiles != null
+          ? r.initialMiles + (repeatMiles ? Math.floor((mileage - r.initialMiles) / repeatMiles) * repeatMiles : 0)
+          : Math.floor(mileage / repeatMiles) * repeatMiles;
+      }
+    }
+    if (res.dueMileage != null && mileage != null){ res.milesLeft = res.dueMileage - mileage; legs.push(oemLegStatus(res.milesLeft, soonMi)); }
+    else if (!pastFirstPoint) incomplete = true;
+  }
+  /* time: only from a recorded date - the vehicle's age is not a service record */
+  if (repeatMonths != null || r.initialMonths != null){
+    if (last && last.date && repeatMonths != null){
+      const due = addMonthsIso(last.date, repeatMonths);
+      if (due){ res.dueDate = dayOf(due.toISOString()); res.daysLeft = Math.round((due - today) / 86400000); legs.push(oemLegStatus(res.daysLeft, soonDays)); }
+      else incomplete = true;
+    } else if (!indicatorOnly) incomplete = true;
+  }
+  const minder = indicatorOnly ? "MAINTENANCE MINDER — due when the vehicle shows " + (r.indicator || "its service message") : "";
+  if (pastFirstPoint){
+    res.byScheduleHistoryUnknown = true;
+    res.detail = "DUE BY SCHEDULE + LAST SERVICE UNKNOWN — SERVICE HISTORY REQUIRED (scheduled at " + res.scheduledAt.toLocaleString() + " mi)";
+    return res;
+  }
+  if (!legs.length){
+    res.detail = [minder, last ? "the last record has no " + (repeatMiles != null ? "mileage" : "date") : "LAST SERVICE UNKNOWN — SERVICE HISTORY REQUIRED",
+      mileage == null && (repeatMiles != null || r.initialMiles != null) ? "current mileage not recorded" : ""].filter(Boolean).join(" · ");
+    return res;
+  }
+  const worst = legs.sort((a, b) => OEM_STATUS_ORDER[a] - OEM_STATUS_ORDER[b])[0];
+  const when = [res.dueMileage != null ? "due at " + res.dueMileage.toLocaleString() + " mi" : "", res.dueDate ? "due " + res.dueDate : ""].filter(Boolean).join(" · ");
+  if (incomplete && worst === "NOT YET DUE"){
+    /* one measure says not yet; the other cannot be checked, so it is not "not due" */
+    res.status = "UNKNOWN";
+    res.detail = when + " by " + (res.dueMileage != null ? "mileage" : "time") + " · " + (res.dueMileage != null ? "time" : "mileage") + " since last service unknown — SERVICE HISTORY REQUIRED";
+    return res;
+  }
+  res.status = worst;
+  res.detail = [when, !last ? "first scheduled service" : "", incomplete ? "other measure unknown" : "", indicatorOnly ? "or sooner if the vehicle shows " + (r.indicator || "its service message") : ""].filter(Boolean).join(" · ");
+  return res;
+}
+function oemTimeline(vehicleId, opts){
+  opts = opts || {};
+  const schedule = opts.schedule || oemScheduleFor(vehicleId);
+  if (!schedule) return {schedule:null, rows:[], profile:oemProfile(vehicleId)};
+  const profile = opts.profile || oemProfile(vehicleId);
+  const rows = oemApplicable(schedule, profile).map(op => oemDue(vehicleId, op, opts));
+  rows.sort((a, b) => OEM_STATUS_ORDER[a.status] - OEM_STATUS_ORDER[b.status] || String(a.op.name).localeCompare(String(b.op.name)));
+  return {schedule, rows, profile, difference:oemProfileDifference(schedule)};
+}
+/* For the inspection: what is due, without touching a single inspection item. */
+function oemDueForInspection(vehicleId, mileage){
+  const t = oemTimeline(vehicleId, {mileage});
+  if (!t.schedule) return [];
+  return t.rows.filter(r => r.status === "OVERDUE" || r.status === "DUE NOW" || r.status === "DUE SOON");
+}
+
+/* ---------- a person's verified OEM item ---------- */
+function oemAddManual(vehicleId, f){
+  const name = String(f.name || "").trim(), doc = String(f.document || "").trim(), by = String(f.verifiedBy || "").trim();
+  if (!name) throw new Error("Enter the operation as the manufacturer words it.");
+  if (!doc) throw new Error("Enter the manufacturer document it was verified against (owner's manual page, OEM portal document number…).");
+  if (!by) throw new Error("Enter who verified it.");
+  const rule = {type:f.type, miles:posOrNull(f.miles), km:null, months:posOrNull(f.months), hours:null,
+    initialMiles:posOrNull(f.initialMiles), initialMonths:posOrNull(f.initialMonths), indicator:String(f.indicator || "").trim(), frequencyCode:"", frequencyText:"Verified by hand"};
+  const need = {"mileage":["miles"], "time":["months"], "whichever-first":["miles", "months"], "initial-then-repeat":[], "indicator":[], "condition":[]};
+  if (!need[rule.type]) throw new Error("Choose how the interval is expressed.");
+  if (need[rule.type].some(k => rule[k] == null)) throw new Error("Enter the " + need[rule.type].join(" and ") + " exactly as the manufacturer states them.");
+  if (rule.type === "initial-then-repeat" && rule.initialMiles == null && rule.initialMonths == null) throw new Error("Enter the first service point.");
+  if (rule.type === "indicator" && !rule.indicator) throw new Error("Enter the maintenance minder code or message.");
+  const id = uid("oem");
+  const op = {key:"manual_oem:" + id, providerId:"manual_oem", operationId:id, scheduleId:"", name, oemWording:String(f.wording || name).trim(),
+    action:f.action || oemAction(name), condition:f.condition === "severe" ? "severe" : "normal", notes:[], qualifiers:[],
+    rule, verified:{document:doc, by, at:new Date().toISOString()}};
+  const d = oemData();
+  (d.manual[vehicleId] = d.manual[vehicleId] || []).push(op);
+  save();
+  return op;
+}
+
+/* ---------- onto a ticket, not authorized ---------- */
+function oemAddToEstimate(vehicleId, opKey){
+  const t = oemTimeline(vehicleId);
+  const row = t.rows.find(r => r.op.key === opKey);
+  if (!row) throw new Error("That operation is not on this vehicle's schedule.");
+  if (t.schedule.sandbox) throw new Error("SANDBOX DATA CANNOT BE USED ON A CUSTOMER DOCUMENT.");
+  const v = db.vehicles[vehicleId];
+  const line = {id:uid("ln"), type:"manual-labor", desc:row.op.name, hours:"", rate:shopRate(), bill:"H", rateSource:"shop", source:SRC_MANUAL,
+    finding:row.op.action + " — " + row.status + (row.detail ? " — " + row.detail : ""),
+    maint:{operationKey:row.op.key, providerId:row.op.providerId, operationId:row.op.operationId, scheduleId:row.op.scheduleId || "",
+      label:t.schedule.label, environment:t.schedule.environment, oemWording:row.op.oemWording, condition:row.op.condition,
+      rule:row.rule, reason:row.status + (row.detail ? " — " + row.detail : ""), dueMileage:row.dueMileage, dueDate:row.dueDate,
+      lastService:row.last ? {mileage:row.last.mileage, date:row.last.date, source:row.last.source} : null,
+      retrievedAt:t.schedule.retrievedAt || "", verified:row.op.verified || null, profile:t.profile,
+      addedAt:new Date().toISOString(), addedBy:db.settings.lastTech || "",
+      note:"The operation comes from " + t.schedule.label + ". The labor time is not from that source and has not been set."}};
+  let o = vals(db.orders).filter(x => x.vehicleId === vehicleId && !isFinal(x) && !isDead(x)).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+  if (o && cur && cur.id === o.id && $("#woOverlay").classList.contains("on")){
+    cur.labor.push(line); renderLines(); updateTotals(); return {orderId:o.id, line, open:true};
+  }
+  if (!o){
+    o = shapeOrder({id:uid("o"), invoiceNo:null, customerId:v.customerId || "", vehicleId, date:todayStr(), status:"Estimate", complaint:"",
+      mileageIn:v.mileage || "", mileageOut:"", labor:[], parts:[], extras:[], payments:[], history:[], notes:"", recommendation:"", custNotes:"", internalNotes:""});
+    ensureNumber(o, "estimate");
+    db.orders[o.id] = o;
+  }
+  o.labor.push(line);
+  save();
+  return {orderId:o.id, line, open:false};
+}
+
+/* ---------- the screen ---------- */
+function oemStatusClass(s){ return s === "OVERDUE" || s === "DUE NOW" ? "ps-wait" : s === "DUE SOON" ? "ps-part" : s === "NOT YET DUE" || s === "COMPLETED" ? "ps-ok" : "ps-none"; }
+let oemReadinessCache = null;
+function oemMaintenancePanel(vehicleId){
+  const v = db.vehicles[vehicleId] || {};
+  const t = oemTimeline(vehicleId);
+  const profile = t.profile;
+  const mi = vehicleMileage(vehicleId);
+  const tried = oemLastTried[vehicleId];
+  const readiness = tried || oemReadinessCache;
+  if (!oemReadinessCache) oemProviderReadiness().then(r => { oemReadinessCache = r; const el = $("#oemReady"); if (el && !oemLastTried[vehicleId]) el.innerHTML = oemReadinessHtml(r); }).catch(() => {});
+  const head = `<div class="toolbar" style="flex-wrap:wrap"><h2 style="margin:0">MAINTENANCE — OEM schedule</h2>
+      ${t.schedule ? `<span class="badge b-vehicle" data-oemlabel>${esc(t.schedule.label)}</span>` : `<span class="badge b-verify" data-oemlabel>NO VERIFIED OEM SCHEDULE</span>`}
+      <span class="muted">mileage ${mi == null ? "not recorded" : mi.toLocaleString()}</span><div class="grow"></div>
+      <label style="margin:0;display:flex;align-items:center;gap:6px">Usage profile <select id="oemProfile" style="width:auto" onchange="oemSetProfile('${vehicleId}', this.value)">
+        ${USAGE_PROFILES.map(p => `<option value="${p[0]}" ${p[0] === profile ? "selected" : ""}>${esc(p[1])}</option>`).join("")}</select></label>
+      <button class="sm primary" onclick="oemFetchClick('${vehicleId}')">GET OEM SCHEDULE</button>
+      <button class="sm" onclick="oemManualForm('${vehicleId}')">ADD MANUALLY VERIFIED OEM ITEM…</button>
+      <button class="sm" onclick="oemSandboxClick('${vehicleId}')">MOTOR SANDBOX DTO TEST</button></div>`;
+  const diff = t.schedule ? t.difference : {changed:0};
+  const profileNote = !t.schedule ? "" : profile === "UNKNOWN"
+    ? `<div class="verifynote" id="oemProfileNote"><b>USAGE PROFILE UNKNOWN.</b> ${diff.changed ? `Severe use changes ${diff.changed} operation(s) on this schedule (${esc(diff.names.slice(0, 4).join(", "))}${diff.names.length > 4 ? "…" : ""}); both are shown, marked NORMAL and SEVERE. Ask how the vehicle is used and set the profile.` : "This schedule is the same for normal and severe use."}</div>`
+    : diff.changed ? `<div class="muted" id="oemProfileNote" style="font-size:12px">Profile <b>${esc(oemProfileName(profile))}</b> — ${oemProfileSeverity(profile) === "severe" ? "SEVERE" : "NORMAL"} schedule shown. Changing the profile changes ${diff.changed} operation(s).</div>` : "";
+  if (!t.schedule){
+    return `<div class="card" id="oemMaint">${head}
+      <div class="verifynote" style="border-color:#c0392b"><b>OEM MAINTENANCE SCHEDULE UNAVAILABLE</b><br><b>NO VERIFIED INTERVAL — DO NOT GUESS.</b>
+        No licensed source has supplied this vehicle's schedule and nothing has been verified by hand. The shop's own intervals below are SHOP RECOMMENDATIONS, not the manufacturer's.</div>
+      <div id="oemReady" class="muted" style="font-size:12.5px">${readiness ? oemReadinessHtml(readiness) : "Checking sources…"}</div>
+      <div id="oemSandbox"></div></div>`;
+  }
+  const s = t.schedule;
+  const prov = `<div class="muted" style="font-size:12px;margin:4px 0 8px">${esc(s.label)} · ${esc(s.environment.toUpperCase())}${s.providerId !== "manual_oem" ? (s.kept ? " · kept (contract allows)" : " · this session only (contract does not allow keeping)") : ""}
+    · VIN ${esc(s.vin || "—")} · ${esc(s.resolvedVehicle || "")}${s.providerVehicleId ? " · provider vehicle " + esc(s.providerVehicleId) : ""}${s.retrievedAt ? " · retrieved " + esc(String(s.retrievedAt).slice(0, 16).replace("T", " ")) : ""}${s.dataVersion ? " · data " + esc(s.dataVersion) : ""}</div>`;
+  return `<div class="card" id="oemMaint">${head}${prov}${profileNote}
+    <table><thead><tr><th>Operation (OEM wording)</th><th>Interval</th><th>Last service</th><th>Status</th><th></th></tr></thead><tbody>
+    ${t.rows.map(r => `<tr data-oemop="${esc(r.op.key)}">
+      <td><b>${esc(r.op.name)}</b> <span class="badge ${r.op.action === "INSPECT" ? "b-manual" : "b-override"}">${esc(r.op.action)}</span>
+        ${r.op.profileDependent || r.op.condition === "severe" ? `<span class="badge ${r.op.condition === "severe" ? "b-verify" : "b-vehicle"}">${r.op.condition === "severe" ? "SEVERE" : "NORMAL"}</span>` : ""}
+        ${r.op.oemWording && r.op.oemWording !== r.op.name ? `<div class="muted" style="font-size:11.5px">${esc(r.op.oemWording)}</div>` : ""}
+        ${(r.op.notes || []).length ? `<div class="muted" style="font-size:11.5px">${r.op.notes.map(esc).join(" · ")}</div>` : ""}
+        ${r.op.verified ? `<div class="muted" style="font-size:11.5px">Verified by ${esc(r.op.verified.by)} against ${esc(r.op.verified.document)}</div>` : ""}</td>
+      <td>${esc(r.rule)}</td>
+      <td>${r.last ? esc([r.last.mileage ? Number(numOrNull(r.last.mileage)).toLocaleString() + " mi" : "", r.last.date].filter(Boolean).join(" · ")) + `<div class="muted" style="font-size:11.5px">${esc(r.last.source)}${r.last.detail ? " · " + esc(r.last.detail) : ""}</div>` : `<span class="muted">LAST SERVICE UNKNOWN</span>`}</td>
+      <td><span class="psb ${oemStatusClass(r.status)}" data-oemstatus>${esc(r.status)}</span><div class="muted" style="font-size:11.5px">${esc(r.detail)}</div></td>
+      <td class="right" style="white-space:nowrap">${r.status !== "NO VERIFIED SCHEDULE" ? `<button class="sm" onclick="oemCompletedForm('${vehicleId}','${oemAttr(r.op.key)}')">MARK PREVIOUSLY COMPLETED…</button>
+        <button class="sm primary" onclick="oemAddClick('${vehicleId}','${oemAttr(r.op.key)}')">ADD TO ESTIMATE</button>` : ""}</td></tr>`).join("")}
+    </tbody></table>
+    <p class="muted" style="font-size:12px;margin-bottom:0">A status needs this vehicle's own service history: nothing is assumed done. ADD TO ESTIMATE puts the operation on a ticket for the customer to approve; it does not authorize it, and its labor time is set separately.</p>
+    <div id="oemSandbox"></div></div>`;
+}
+function oemReadinessHtml(list){
+  return `<b>Sources checked for this vehicle:</b><br>${list.map(r => `${esc(r.name || r.id)} — <b>${esc(r.readiness)}</b>`).join("<br>")}<br>
+    Manually verified OEM — <b>${Object.keys(oemData().manual).length ? "none for this vehicle" : "none recorded"}</b>`;
+}
+function oemSetProfile(vehicleId, profile){
+  const before = oemProfile(vehicleId);
+  if (before === profile) return;
+  oemData().profiles[vehicleId] = {profile, at:new Date().toISOString(), by:db.settings.lastTech || "", previous:before};
+  save(); render();
+}
+async function oemFetchClick(vehicleId){
+  const el = $("#oemReady"); if (el) el.textContent = "Asking sources in order…";
+  try { await oemFetchSchedule(vehicleId); } catch(e){ alert(String(e.message || e)); }
+  render();
+}
+async function oemSandboxClick(vehicleId){
+  const box = $("#oemSandbox"); if (!box) return;
+  box.innerHTML = `<div class="muted">Calling the MOTOR sandbox…</div>`;
+  try {
+    const r = await oemSandboxDtoTest(vehicleId);
+    box.innerHTML = `<div class="verifynote"><b>MOTOR SANDBOX — DTO TEST ONLY — NOT A RECOMMENDATION FOR THIS VEHICLE.</b> ${r.operations} schedule items normalized (${esc(Object.keys(r.byRule).map(k => k + " " + r.byRule[k]).join(", "))}; ${r.severe} severe-service). Nothing was stored or calculated.
+      <div class="muted" style="font-size:11.5px;margin-top:4px">${r.sample.map(x => esc(x.name + " — " + x.rule + " — " + x.condition.toUpperCase())).join("<br>")}</div></div>`;
+  } catch(e){ box.innerHTML = `<div class="verifynote">${esc(e.message || String(e))}</div>`; }
+}
+function oemAddClick(vehicleId, key){
+  key = decodeURIComponent(key);
+  try {
+    const r = oemAddToEstimate(vehicleId, key);
+    if (!r.open) { if (confirm("Added to " + ticketNo(db.orders[r.orderId]) + " — not authorized; the customer still approves it. Open the ticket now?")) editOrder(r.orderId); else render(); }
+  } catch(e){ alert(e.message); }
+}
+function oemCompletedForm(vehicleId, key){
+  key = decodeURIComponent(key);
+  const row = oemTimeline(vehicleId).rows.find(r => r.op.key === key); if (!row) return;
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>MARK PREVIOUSLY COMPLETED — ${esc(row.op.name)}</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <p class="muted" style="margin-top:0">Record a service that was actually done, with where the record comes from. It is never assumed.</p>
+    <div class="row"><div><label>Mileage</label><input id="oh_mi" inputmode="numeric"></div><div><label>Date (YYYY-MM-DD)</label><input id="oh_date" placeholder="2025-04-18"></div></div>
+    <div class="row"><div><label>Source</label><select id="oh_src"><option value="">Choose…</option>${OEM_HISTORY_SOURCES.map(s => `<option>${esc(s)}</option>`).join("")}</select></div>
+      <div><label>Detail (shop, invoice #, sticker…)</label><input id="oh_detail"></div></div>
+    <div class="toolbar" style="margin-top:12px"><button class="green" id="oh_save">Record</button></div>`;
+  $("#recOverlay").classList.add("on");
+  $("#oh_save").onclick = () => {
+    try {
+      oemMarkCompleted(vehicleId, row.op, {mileage:$("#oh_mi").value, date:$("#oh_date").value, source:$("#oh_src").value, detail:$("#oh_detail").value});
+      closeRec(); render();
+    } catch(e){ alert(e.message); }
+  };
+}
+function oemManualForm(vehicleId){
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>MANUALLY VERIFIED OEM ITEM</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <p class="muted" style="margin-top:0">Only what the manufacturer's own document states for this vehicle. Anything the shop simply prefers belongs in Maintenance — SHOP RECOMMENDATION.</p>
+    <div class="row"><div><label>Operation (as the manufacturer words it)</label><input id="om_name"></div>
+      <div><label>Action</label><select id="om_action"><option>REPLACE</option><option>INSPECT</option><option>ROTATE</option><option>SERVICE</option></select></div>
+      <div><label>Operating condition</label><select id="om_cond"><option value="normal">Normal</option><option value="severe">Severe</option></select></div></div>
+    <div class="row"><div><label>Interval type</label><select id="om_type"><option value="mileage">Mileage only</option><option value="time">Time only</option><option value="whichever-first">Mileage or time, whichever first</option>
+      <option value="initial-then-repeat">First at…, then every…</option><option value="indicator">Maintenance minder code</option><option value="condition">Condition-based</option></select></div>
+      <div><label>Every (miles)</label><input id="om_mi" inputmode="numeric"></div><div><label>Every (months)</label><input id="om_mo" inputmode="numeric"></div></div>
+    <div class="row"><div><label>First at (miles)</label><input id="om_imi" inputmode="numeric"></div><div><label>First at (months)</label><input id="om_imo" inputmode="numeric"></div><div><label>Minder code / message</label><input id="om_ind"></div></div>
+    <div class="row"><div><label>Verified against (document)</label><input id="om_doc" placeholder="Owner's manual p. 412 / OEM portal doc #"></div><div><label>Verified by</label><input id="om_by" value="${esc(db.settings.lastTech || "")}"></div></div>
+    <div class="toolbar" style="margin-top:12px"><button class="green" id="om_save">Add verified item</button></div>`;
+  $("#recOverlay").classList.add("on");
+  $("#om_save").onclick = () => {
+    try {
+      oemAddManual(vehicleId, {name:$("#om_name").value, action:$("#om_action").value, condition:$("#om_cond").value, type:$("#om_type").value,
+        miles:$("#om_mi").value, months:$("#om_mo").value, initialMiles:$("#om_imi").value, initialMonths:$("#om_imo").value, indicator:$("#om_ind").value,
+        document:$("#om_doc").value, verifiedBy:$("#om_by").value});
+      closeRec(); render();
+    } catch(e){ alert(e.message); }
+  };
+}
+/* On the inspection: a quiet line, and nothing on the checklist changes. */
+function oemMpiIndicatorHtml(insp){
+  const due = oemDueForInspection(insp.vehicleId, insp.mileage);
+  if (!due.length) return "";
+  return `<span class="oemdue" id="oemMpiDue" title="${esc(due.map(r => r.op.name + " — " + r.status).join("\n"))}" onclick="oemMpiShow('${insp.vehicleId}','${esc(String(insp.mileage || ""))}')">OEM MAINTENANCE DUE: ${due.length}</span>`;
+}
+function oemMpiShow(vehicleId, mileage){
+  const due = oemDueForInspection(vehicleId, mileage);
+  const s = oemScheduleFor(vehicleId);
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>OEM MAINTENANCE DUE</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <p class="muted" style="margin-top:0">${esc(s ? s.label : "")}. For the service writer — this does not change any inspection result.</p>
+    <table><tbody>${due.map(r => `<tr><td><b>${esc(r.op.name)}</b></td><td><span class="psb ${oemStatusClass(r.status)}">${esc(r.status)}</span></td><td class="muted">${esc(r.detail)}</td></tr>`).join("")}</tbody></table>`;
+  $("#recOverlay").classList.add("on");
+}
+
 /* ---------- workload and production ----------
    Definitions, so the numbers mean the same thing to everybody:
    SOLD hours are the labor hours on the ticket. CLOCK hours are the time
@@ -4509,6 +5094,7 @@ let vehHistQ = "";
 function vehicleTechPanels(vehicleId){
   const rep = repeatedConcerns(vehicleId);
   return `${rep.length ? `<div class="card" style="padding:0;border:none;background:none">${repeatedConcernBox(rep)}</div>` : ""}
+  ${oemMaintenancePanel(vehicleId)}
   ${maintenancePanel(vehicleId)}
   ${installedPartsPanel(vehicleId)}
   <div class="card"><div class="toolbar"><h2 style="margin:0">Technical timeline</h2><div class="grow"></div>
@@ -4541,7 +5127,7 @@ function maintenancePanel(vehicleId){
   const mi = vehicleMileage(vehicleId);
   const order = {"DUE NOW":0, "DUE SOON":1, "UNKNOWN":2, "NOT DUE":3, "NO INTERVAL SET":4};
   const cls = s => s === "DUE NOW" ? "ps-wait" : s === "DUE SOON" ? "ps-part" : s === "NOT DUE" ? "ps-ok" : "ps-none";
-  return `<div class="card"><div class="toolbar"><h2 style="margin:0">Maintenance</h2><span class="muted">current mileage ${mi == null ? "not recorded" : mi.toLocaleString()}</span></div>
+  return `<div class="card"><div class="toolbar"><h2 style="margin:0">Maintenance — SHOP RECOMMENDATION</h2><span class="badge b-manual">SHOP RECOMMENDATION</span><span class="muted">current mileage ${mi == null ? "not recorded" : mi.toLocaleString()}</span></div>
     <table><thead><tr><th>Service</th><th>Interval</th><th>Last recorded</th><th>Status</th><th></th></tr></thead><tbody>
     ${list.sort((a, b) => order[a.state] - order[b.state]).map(s => `<tr>
       <td><b>${esc(s.item.name)}</b></td>
@@ -4551,7 +5137,7 @@ function maintenancePanel(vehicleId){
         <div class="muted" style="font-size:11.5px">${esc(s.state === "UNKNOWN" ? s.note : s.state === "NO INTERVAL SET" ? "" : [s.dueMileage != null ? "due at " + s.dueMileage.toLocaleString() + " mi" : "", s.dueDate ? "due " + s.dueDate : ""].filter(Boolean).join(" · "))}</div></td>
       <td class="right"><button class="sm" onclick="setVehInterval('${vehicleId}','${s.item.id}')">Interval…</button><button class="sm" onclick="recordPastService('${vehicleId}','${s.item.id}')">Record service…</button></td></tr>`).join("")}
     </tbody></table>
-    <p class="muted" style="font-size:12px;margin-bottom:0">Intervals are the shop's own, set in Settings or per vehicle — not a manufacturer schedule. Only work recorded here or entered by hand with its source counts; with no record the status is UNKNOWN.</p></div>`;
+    <p class="muted" style="font-size:12px;margin-bottom:0">SHOP RECOMMENDATION: intervals are the shop's own, set in Settings or per vehicle — not a manufacturer schedule, and never shown as one. Only work recorded here or entered by hand with its source counts; with no record the status is UNKNOWN.</p></div>`;
 }
 function setVehInterval(vehicleId, itemId){
   const item = (db.settings.maintItems || []).find(m => m.id === itemId); if (!item) return;
