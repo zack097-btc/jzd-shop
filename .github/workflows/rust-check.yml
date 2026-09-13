@@ -103,6 +103,10 @@ jobs:
         run: |
           npm install --no-save playwright
           npx playwright install chromium
+          foreach ($t in 'testsave','testvin','testflow','testshop','testphoto','testfront','testparts','testfloor') {
+            node "$t.cjs" 2>&1 | Out-File -FilePath "$t.log"
+            if ($LASTEXITCODE -ne 0) { Get-Content "$t.log" | Where-Object { $_ -match 'FAIL' } | Select-Object -First 8 | ForEach-Object { Write-Output ("::error title=$t::" + ($_.Trim() -replace '::', ': :')) }; exit $LASTEXITCODE }
+          }
           node testdata.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node testmpi.cjs
@@ -110,7 +114,7 @@ jobs:
           $env:SHOPHUB_SIM = "$PWD/desktop/shophub/target/debug/shophub-sim.exe"
           node testsync.cjs 2>&1 | Tee-Object -FilePath sync-page.log
           $code = $LASTEXITCODE
-          Get-Content sync-page.log | Where-Object { $_ -match 'FAIL|measured|ALL SHOP' } | ForEach-Object { Write-Output ("::notice title=Shop Sync page::" + ($_.Trim() -replace '::', ': :')) }
+          Get-Content sync-page.log | Where-Object { $_ -match 'FAIL|measured|ALL SHOP|stopped|Error' } | Select-Object -First 20 | ForEach-Object { Write-Output ("::notice title=Shop Sync page::" + ($_.Trim() -replace '::', ': :')) }
           if ($code -ne 0) { exit $code }
           if (Test-Path testmaint.cjs) { node testmaint.cjs; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
           node testmotorlive.cjs 2>&1 | Tee-Object -FilePath motorlive.log

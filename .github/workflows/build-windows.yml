@@ -76,8 +76,10 @@ jobs:
           npx playwright install chromium
           $env:SHOPHUB_SIM = "$PWD/desktop/shophub/target/debug/shophub-sim.exe"
           foreach ($t in 'testsave','testvin','testflow','testshop','testphoto','testfront','testparts','testfloor','testdata','testmpi','testmaint','testsync') {
-            node "$t.cjs"
-            if ($LASTEXITCODE -ne 0) { Write-Output "::error title=$t::$t.cjs failed"; exit $LASTEXITCODE }
+            node "$t.cjs" 2>&1 | Tee-Object -FilePath "$t.log"
+            $code = $LASTEXITCODE
+            Get-Content "$t.log" | Where-Object { $_ -match 'measured|FAIL|stopped|Error' } | Select-Object -First 12 | ForEach-Object { Write-Output ("::notice title=$t::" + ($_.Trim() -replace '::', ': :')) }
+            if ($code -ne 0) { Write-Output "::error title=$t::$t.cjs failed"; exit $code }
           }
 
       # The one release check that leaves the machine: a real request to MOTOR's
