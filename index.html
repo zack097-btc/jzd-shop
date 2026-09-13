@@ -290,6 +290,14 @@
   .captable td,.captable th{padding:4px 6px;border-bottom:1px solid #e5e7eb}
   .captable td.cm{text-align:center;font-weight:700}
   .captable td.cm-y{color:#15803d}.captable td.cm-w{color:#b45309}.captable td.cm-n{color:#9ca3af}
+  .presence{font-size:12px;font-weight:700;color:#b45309}
+  .synced-flash{animation:syncflash .9s ease-out}
+  @keyframes syncflash{from{background:#fff7d6}to{background:transparent}}
+  .tag.sync{position:absolute;bottom:2px;left:2px;font-size:8px;padding:1px 3px;border-radius:3px;background:rgba(0,0,0,.55);color:#fff}
+  .tag.sync:empty{display:none}
+  .tag.sync.up{background:#b45309}.tag.sync.ok{background:#15803d}
+  .pairbox{margin-top:10px;padding:12px;border:2px dashed #2563eb;border-radius:10px;text-align:center}
+  .paircode{font-size:40px;font-weight:800;letter-spacing:6px;font-family:Consolas,monospace}
   .iprogress{flex-wrap:wrap;row-gap:6px}
   .iprog{display:flex;flex-direction:column;margin-right:10px;font-size:13px}
   .iunins{color:#b45309;font-weight:700}
@@ -781,7 +789,15 @@ async function loadDb(){
     let r;
     try{ r = await invoke("db_load"); }
     catch(e){ storageLocked = "Could not reach the data file: " + e; return JSON.parse(JSON.stringify(DEFAULT)); }
+    window.__syncLoad = r;
     storeHint = r.path;
+    if(r.sync && r.sync !== "local" && !r.error && !String(r.text || "").trim()){
+      /* joined a Shop Hub, shop not received yet: show nothing as if it were
+         the shop, and write nothing */
+      syncWaitingForShop = true;
+      storageLocked = "Waiting for the shop from the Shop Hub.";
+      return JSON.parse(JSON.stringify(DEFAULT));
+    }
     if(r.error){ storageLocked = "The data file exists but could not be read: " + r.error; return JSON.parse(JSON.stringify(DEFAULT)); }
     if(!r.existed || !r.text.trim()) return JSON.parse(JSON.stringify(DEFAULT));
     try{ return shapeDb(JSON.parse(r.text)); }
@@ -828,6 +844,7 @@ async function persist(){
     if(DESKTOP){
       const r = await invoke("db_save", { text });
       storeHint = r.path;
+      if(r.sync && syncStatus && syncStatus.client) syncStatus.client.pending = r.sync.pending;
     } else {
       localStorage.setItem(LS_KEY, text);
       /* Read it back. localStorage can silently refuse when the quota is gone,
@@ -843,6 +860,7 @@ async function persist(){
   }finally{
     saving = false;
     if(dirty) setTimeout(persist, 50);
+    else if(typeof syncNeedPull !== "undefined" && syncNeedPull) setTimeout(syncPull, 20);
   }
 }
 /* Synchronous best effort for the moment the window is closing. */
@@ -857,6 +875,7 @@ function persistNow(){
 function markSaveState(state, detail){
   const el = document.getElementById("saveState");
   if(!el) return;
+  if(typeof syncOn === "function" && syncOn() && (state === "saved" || state === "saving")){ syncIndicator(); return; }
   const M = {
     saving: ["Saving…", "#6b7684"],
     saved:  ["All changes saved", "#187a4b"],
@@ -1410,6 +1429,10 @@ function orderTotals(o){
 function nextNumber(kind){
   const key = kind === "estimate" ? "nextEstimate" : kind === "ro" ? "nextRO"
             : kind === "inspection" ? "nextInspection" : kind === "po" ? "nextPO" : "nextInvoice";
+  /* with a Shop Hub, numbers come from a block the hub gave this computer, so
+     two computers can never issue the same one */
+  const fromHub = typeof syncTakeNumber === "function" ? syncTakeNumber(key) : null;
+  if (fromHub != null) return fromHub;
   const n = parseInt(db.settings[key], 10) || 1;
   db.settings[key] = n + 1;
   return n;
@@ -2064,6 +2087,7 @@ function renderInspection(){
     <button onclick="backToOrder('${insp.orderId}')">← Work order</button>
     <h2 style="margin:0">Multipoint Inspection</h2>
     <span class="pill st-${done?"Completed":"InProgress"}">${esc(insp.state)}</span>
+    ${syncPresenceHtml("inspection:"+insp.id)}
     <div class="grow"></div>
     <button onclick="printInspection('${insp.id}')">Print customer report</button>
     ${done?"":`<button class="green" onclick="signOffInspection()">Complete inspection…</button>`}
@@ -2093,6 +2117,7 @@ function renderInspection(){
     ${done?`<span class="muted">Completed by ${esc(insp.tech||"—")} on ${esc(String(insp.completedAt).slice(0,16).replace("T"," "))}${insp.uninspectedAtCompletion?` · completed with ${insp.uninspectedAtCompletion} item(s) not inspected`:""}</span>`
           :`<button class="green" onclick="signOffInspection()">Complete inspection…</button>`}</div></div>`;
   const te = $("#i_tech"); if(te) te.onchange = () => { insp.tech = te.value; save(); };
+  syncPresence("inspection:" + insp.id);
   window.scrollTo(0, y);
   if (focusKey){ const el = document.querySelector('[data-f="' + CSS.escape(focusKey) + '"]'); if (el) el.focus({preventScroll:true}); }
 }
@@ -2236,17 +2261,18 @@ function matrixHtml(insp,g,done){
     return `<div style="margin-bottom:10px">
       <div style="font-weight:600;margin-bottom:3px">${esc(item.name)}</div>${tools}
       <div style="overflow-x:auto"><table class="imatrix"><thead><tr><th></th>${meas.map(m=>`<th>${esc(m.label)} <span class="muted">${esc(m.unit)}</span></th>`).join("")}<th>Condition</th><th>Observations</th><th></th></tr></thead><tbody>
-      ${g.positions.map(pos=>{
-        const key=inspItemKey(g,item,pos);
-        if(!inspVisible(insp,key,g)) return "";
-        return `<tr data-rowkey="${key}"><td class="pos">${esc(pos)}</td>
-          ${meas.map(m=>`<td>${measControl(insp,key,item,m,done,false)}</td>`).join("")}
-          <td>${stateBtns(insp,key,item,g,done)}</td>
-          <td>${obsMultiHtml(insp,key,item,done)}</td>
-          <td>${flagsAndNote(insp,key,item,done)}</td></tr>`;
-      }).join("")}
+      ${g.positions.map(pos=>inspVisible(insp,inspItemKey(g,item,pos),g)?inspMatrixRowHtml(insp,g,item,pos,done):"").join("")}
       </tbody></table></div></div>`;
   }).join("");
+}
+function inspMatrixRowHtml(insp,g,item,pos,done){
+  const key=inspItemKey(g,item,pos);
+  const meas=item.meas||[];
+  return `<tr data-rowkey="${key}"><td class="pos">${esc(pos)}</td>
+    ${meas.map(m=>`<td>${measControl(insp,key,item,m,done,false)}</td>`).join("")}
+    <td>${stateBtns(insp,key,item,g,done)}</td>
+    <td>${obsMultiHtml(insp,key,item,done)}</td>
+    <td>${flagsAndNote(insp,key,item,done)}</td></tr>`;
 }
 function itemRowHtml(insp,g,item,pos,done){
   const key=inspItemKey(g,item,pos);
@@ -6329,6 +6355,491 @@ async function openPortalButton(id){
   try { await openProviderPortal(id); } catch(e){ alert(e.message || String(e)); }
 }
 
+/* ---------- Shop Sync ----------
+   With a Shop Hub, the book on this screen is this computer's replica of the
+   shop. Saving still goes through save()/persist(); the desktop shell turns
+   each save into field-level changes and sends them to the hub. Changes from
+   other computers arrive as patches: applied to the book field by field, and
+   drawn into the screen without redrawing what someone is typing into.
+
+   The words on screen mean exactly one thing each:
+     SAVING…                                 a change is on its way to the hub
+     SYNCED                                  the hub has acknowledged everything
+     OFFLINE — N CHANGES WAITING TO SYNC     kept on this computer, not yet sent
+     SHOP HUB OFFLINE                        cannot reach the hub
+     SYNC ERROR                              the hub refused something; see Shop Sync */
+let syncMode = "local", syncStatus = null, syncPatching = false, syncNeedPull = false, syncRenderPending = false;
+let syncNumbers = {}, syncAttState = {}, syncConflictOpen = false, syncDeferredOrder = null, syncPresenceKey = null;
+let syncLastEventN = 0, syncWaitingForShop = false;
+
+function syncOn(){ return DESKTOP && syncMode !== "local"; }
+function syncInvoke(cmd, args){ return invoke(cmd, args || {}); }
+
+async function syncInit(loadResult){
+  if (!DESKTOP) return;
+  syncMode = (loadResult && loadResult.sync) || "local";
+  try {
+    const ev = window.__TAURI__ && window.__TAURI__.event;
+    if (ev && ev.listen) ev.listen("shopsync", e => syncEvent(e.payload || {}));
+  } catch(e){}
+  await syncRefresh();
+  setInterval(syncRefresh, 3000);
+}
+
+async function syncRefresh(){
+  if (!DESKTOP) return;
+  try {
+    syncStatus = await syncInvoke("sync_status");
+    syncMode = syncStatus.mode || "local";
+    if (syncStatus.numbers) syncNumbers = syncStatus.numbers;
+    if (syncOn()){
+      syncAttState = await syncInvoke("sync_att_status");
+      const c = (syncStatus.client && syncStatus.client.conflicts) || [];
+      if (c.length && !syncConflictOpen) syncShowConflict(c[0]);
+      if (syncStatus.client && syncStatus.client.pending === 0 && !dirty && !saving) syncPull();
+    }
+  } catch(e){ /* the shell answers or it does not; the indicator says which */ }
+  syncIndicator();
+  if (view === "shopsync") drawShopSyncLive();
+}
+
+function syncEvent(p){
+  const kind = p.kind, data = p.data;
+  if (kind === "reload"){ location.reload(); return; }
+  if (kind === "status"){ if (syncStatus) syncStatus.client = data; syncIndicator(); if (view === "shopsync") drawShopSyncLive(); return; }
+  if (kind === "patches"){ syncPull(); return; }
+  if (kind === "conflicts"){ if (data && data.length && !syncConflictOpen) syncShowConflict(data[0]); return; }
+  if (kind === "numbers"){ syncNumbers = data || {}; return; }
+  if (kind === "presence"){ if (syncStatus && syncStatus.client) syncStatus.client.devices = data || []; syncPresenceDraw(); if (view === "shopsync") drawShopSyncLive(); return; }
+  if (kind === "photo"){ if (data && data.id){ syncAttState[data.id] = data.state; syncPhotoBadges(); } return; }
+}
+
+function syncIndicator(){
+  if (!syncOn()) return;
+  const el = document.getElementById("saveState"); if (!el) return;
+  const c = (syncStatus && syncStatus.client) || {};
+  let txt, col;
+  if (storageLocked){ txt = "NOT SAVING — read the warning above"; col = "#c0392b"; }
+  else if ((c.conflicts || []).length){ txt = "SYNC CONFLICT — choose a value"; col = "#e67e22"; }
+  else if (!c.online && c.pending > 0){ txt = "OFFLINE — " + c.pending + " CHANGE" + (c.pending === 1 ? "" : "S") + " WAITING TO SYNC"; col = "#e67e22"; }
+  else if (!c.online){ txt = "SHOP HUB OFFLINE"; col = "#e67e22"; }
+  else if (dirty || saving || c.pending > 0){ txt = "SAVING…"; col = "#cdd6e0"; }
+  else if (c.uploadError){ txt = "SYNC ERROR — photo"; col = "#c0392b"; }
+  else { txt = "SYNCED"; col = "#2ecc71"; }
+  el.textContent = txt;
+  el.style.color = col;
+  el.title = (c.lastError ? c.lastError + " · " : "") + (c.address ? "Shop Hub " + c.address : "");
+}
+
+/* ---------- other computers' changes ---------- */
+function syncPathTarget(path){
+  let o = db;
+  for (let i = 0; i < path.length - 1; i++){
+    const k = path[i];
+    if (o[k] == null || typeof o[k] !== "object") o[k] = {};
+    o = o[k];
+  }
+  return o;
+}
+function syncApplyPatch(p){
+  const t = syncPathTarget(p.path);
+  const last = p.path[p.path.length - 1];
+  /* removed and null are different things in a book */
+  if (p.del || p.value === undefined) delete t[last];
+  else t[last] = p.value;
+}
+/* A ticket open in the editor keeps its own copy; changing that copy under
+   someone's hands would lose what they are typing. Its patches wait. */
+function syncDefer(p){
+  return !!(cur && $("#woOverlay").classList.contains("on") && p.path[0] === "orders" && p.path[1] === cur.id);
+}
+async function syncPull(){
+  if (!syncOn()) return;
+  if (syncPatching || dirty || saving){ syncNeedPull = true; return; }
+  syncPatching = true; syncNeedPull = false;
+  try {
+    const patches = await syncInvoke("sync_take_patches");
+    if (!patches || !patches.length) return;
+    if (dirty || saving){ syncNeedPull = true; return; }   /* typed while we asked: save first */
+    const applied = [], deferred = [];
+    for (const p of patches){ if (syncDefer(p)) deferred.push(p); else { syncApplyPatch(p); applied.push(p); } }
+    if (applied.length) await syncInvoke("sync_confirm_patches", {ids:applied.map(p => p.id)});
+    if (deferred.length){ syncDeferredOrder = {id:cur.id, device:deferred[0].device}; syncWOBanner(); }
+    if (applied.length) syncRedraw(applied);
+  } catch(e){
+    /* nothing applied is confirmed, so nothing is lost: it is asked for again */
+  } finally {
+    syncPatching = false;
+    if (syncNeedPull) setTimeout(syncPull, 60);
+  }
+}
+function syncTyping(){
+  const a = document.activeElement;
+  return !!(a && a.closest && a.closest("#app") && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT"));
+}
+/* Draw only what changed. On the inspection, that is the rows of the items
+   that changed, with focus and caret kept where they were. */
+function syncRedraw(patches){
+  if (view === "insp" && inspId && patches.every(p => p.path[0] === "inspections" && p.path[1] === inspId && p.path[2] === "items" && p.path.length >= 4)){
+    const keys = Array.from(new Set(patches.map(p => p.path[3])));
+    keys.forEach(k => inspPatchRow(k));
+    inspPatchCounters();
+    return;
+  }
+  if (view === "insp" && inspId && patches.every(p => p.path[0] !== "inspections" || p.path[1] !== inspId)){
+    inspPatchCounters();
+    return;
+  }
+  if (syncTyping()){ syncRenderPending = true; return; }
+  render();
+}
+document.addEventListener("focusout", () => {
+  setTimeout(() => { if (syncRenderPending && !syncTyping()){ syncRenderPending = false; render(); } }, 30);
+});
+function inspPatchRow(key){
+  const insp = db.inspections[inspId]; if (!insp) return;
+  const done = insp.state === "Completed";
+  let group = null, item = null, pos = null;
+  (insp.template.groups || []).forEach(g => (g.items || []).forEach(i => (g.perWheel ? g.positions : [null]).forEach(p => {
+    if (inspItemKey(g, i, p) === key){ group = g; item = i; pos = p; }
+  })));
+  if (!group) return;
+  const el = document.querySelector('[data-rowkey="' + CSS.escape(key) + '"]');
+  if (!el){ return; }
+  const active = document.activeElement;
+  const focusF = active && el.contains(active) && active.dataset ? active.dataset.f : null;
+  const caret = focusF && active.selectionStart != null ? [active.selectionStart, active.selectionEnd] : null;
+  const html = group.perWheel ? inspMatrixRowHtml(insp, group, item, pos, done) : itemRowHtml(insp, group, item, null, done);
+  const tmp = document.createElement(group.perWheel ? "tbody" : "div");
+  tmp.innerHTML = html.trim();
+  const fresh = tmp.firstElementChild;
+  if (!fresh){ el.remove(); return; }
+  fresh.classList.add("synced-flash");
+  el.replaceWith(fresh);
+  if (focusF){
+    const f = fresh.querySelector('[data-f="' + CSS.escape(focusF) + '"]');
+    if (f){ f.focus({preventScroll:true}); if (caret && f.setSelectionRange) try { f.setSelectionRange(caret[0], caret[1]); } catch(e){} }
+  }
+  setTimeout(() => fresh.classList.remove("synced-flash"), 900);
+}
+function inspPatchCounters(){
+  const insp = db.inspections[inspId]; if (!insp) return;
+  const pr = inspProgress(insp);
+  const pe = $("#inspProgress"), ue = $("#inspUninspected");
+  if (pe) pe.textContent = pr.done + " / " + pr.total + " completed";
+  if (ue){ ue.textContent = "UNINSPECTED: " + pr.uninspected; ue.className = pr.uninspected ? "iunins" : "muted"; }
+}
+
+/* ---------- conflicts ---------- */
+function syncFieldLabel(path){
+  if (path[0] === "inspections"){
+    const insp = db.inspections[path[1]];
+    const key = path[3] || "";
+    let name = key;
+    if (insp && key){
+      (insp.template.groups || []).forEach(g => (g.items || []).forEach(i => (g.perWheel ? g.positions : [null]).forEach(p => {
+        if (inspItemKey(g, i, p) === key){
+          name = (p ? p + " " : "") + i.name;
+          if (path[4] === "meas"){ const m = (i.meas || []).find(x => x.k === path[5]); if (m) name += " — " + m.label; }
+        }
+      })));
+    }
+    const field = path[4] === "state" ? "status" : path[4] === "obs" ? (path[5] || "") : path[4] === "meas" ? "" : (path[4] || "");
+    return (name + (field ? " — " + field : "")).toUpperCase();
+  }
+  if (path[0] === "orders"){ const o = db.orders[path[1]]; return ((o ? ticketNo(o) : "Ticket") + " — " + path.slice(2).filter(x => !/^[@#]/.test(x)).join(" ")).toUpperCase(); }
+  return path.filter(x => !/^[@#]/.test(x)).slice(-3).join(" ").toUpperCase();
+}
+function syncValueText(path, v){
+  if (v === undefined) return "(removed)";
+  if (v === null || (v && typeof v === "object" && v["~null"] === true && Object.keys(v).length === 1)) return "(blank)";
+  if (path[0] === "inspections" && path[4] === "meas"){
+    const insp = db.inspections[path[1]];
+    let unit = "";
+    if (insp) (insp.template.groups || []).forEach(g => (g.items || []).forEach(i => { if (String(path[3]).indexOf(g.id + "." + i.id) === 0){ const m = (i.meas || []).find(x => x.k === path[5]); if (m) unit = m.unit; } }));
+    return measValueText(v, unit);
+  }
+  return typeof v === "string" ? v : JSON.stringify(v);
+}
+function syncDeviceName(id){
+  const d = ((syncStatus && syncStatus.client && syncStatus.client.devices) || []).find(x => x.id === id);
+  return d ? d.name : (id || "another computer");
+}
+function syncShowConflict(c){
+  const path = c.path || [];
+  /* a number counter both computers moved is settled without asking: the higher one wins */
+  if (path[0] === "settings" && /^next/.test(path[1] || "")){
+    syncInvoke("sync_resolve", {opId:c.op_id, keepMine:Number(c.mine) > Number(c.theirs)}).then(syncRefresh);
+    return;
+  }
+  /* the time a record was last touched is bookkeeping, not something to ask
+     about: the later time is the true one. The field that was actually
+     changed asks on its own. */
+  if (/^(at|updatedAt|lastEdit)$/.test(path[path.length - 1] || "") && typeof c.mine === "string" && typeof c.theirs === "string" && /^\d{4}-\d\d-\d\dT/.test(c.mine) && /^\d{4}-\d\d-\d\dT/.test(c.theirs)){
+    syncInvoke("sync_resolve", {opId:c.op_id, keepMine:c.mine > c.theirs}).then(() => { if (!(c.mine > c.theirs)) setTimeout(syncPull, 50); syncRefresh(); });
+    return;
+  }
+  syncConflictOpen = true;
+  const me = (syncStatus && syncStatus.client && syncStatus.client.deviceName) || "This computer";
+  const them = syncDeviceName(c.their_device);
+  const mine = syncValueText(path, c.mine), theirs = syncValueText(path, c.theirs);
+  let d = document.getElementById("syncConflict");
+  if (!d){ d = document.createElement("div"); d.id = "syncConflict"; d.className = "overlay on"; document.body.appendChild(d); }
+  d.className = "overlay on";
+  d.innerHTML = `<div class="sheet" style="max-width:520px">
+    <h2 style="margin:0 0 6px">${esc(syncFieldLabel(path))} CHANGED ON ANOTHER DEVICE</h2>
+    <p class="muted" style="margin:0 0 12px">Both computers changed this before either heard about the other. Nothing has been overwritten. Choose which value to keep.</p>
+    <table><tbody>
+      <tr><td><b>${esc(me)}</b> (this computer)</td><td><b>${esc(mine)}</b></td></tr>
+      <tr><td><b>${esc(them)}</b>${c.their_time ? ` <span class="muted">${esc(String(c.their_time).slice(11, 16))}</span>` : ""}</td><td><b>${esc(theirs)}</b></td></tr>
+    </tbody></table>
+    <div class="toolbar" style="margin-top:14px">
+      <button class="primary" id="syncKeepMine">USE ${esc(mine)}</button>
+      <button class="primary" id="syncKeepTheirs">USE ${esc(theirs)}</button></div></div>`;
+  const choose = async keepMine => {
+    try {
+      await syncInvoke("sync_resolve", {opId:c.op_id, keepMine});
+      db.audit.push({at:new Date().toISOString(), action:"sync-conflict", ref:syncFieldLabel(path),
+        from:keepMine ? theirs : mine, to:keepMine ? mine : theirs, who:db.settings.lastTech || me,
+        reason:"Same field changed on " + me + " and " + them + "; kept " + (keepMine ? me : them) + "'s value"});
+      save();
+    } catch(e){ alert("Could not settle that: " + e); }
+    d.className = "overlay"; syncConflictOpen = false;
+    if (!keepMine) setTimeout(syncPull, 100);
+    setTimeout(syncRefresh, 150);
+  };
+  $("#syncKeepMine").onclick = () => choose(true);
+  $("#syncKeepTheirs").onclick = () => choose(false);
+}
+
+/* ---------- presence ---------- */
+function syncPresence(key){
+  if (!syncOn() || key === syncPresenceKey) return;
+  syncPresenceKey = key;
+  syncInvoke("sync_presence", {open:key}).catch(() => {});
+}
+function syncOpenOn(key){
+  const c = (syncStatus && syncStatus.client) || {};
+  return (c.devices || []).filter(d => d.online && d.open === key && d.id !== c.deviceId).map(d => d.name);
+}
+function syncPresenceHtml(key){
+  if (!syncOn()) return "";
+  const names = syncOpenOn(key);
+  return `<span class="presence" data-presence="${esc(key)}">${names.length ? "OPEN ON: " + names.map(esc).join(", ") : ""}</span>`;
+}
+function syncPresenceDraw(){
+  document.querySelectorAll("[data-presence]").forEach(el => {
+    const names = syncOpenOn(el.dataset.presence);
+    el.textContent = names.length ? "OPEN ON: " + names.join(", ") : "";
+  });
+}
+function syncWOBanner(){
+  const s = $("#woSheet"); if (!s || !syncDeferredOrder || !cur || cur.id !== syncDeferredOrder.id) return;
+  if (s.querySelector(".syncbanner")) return;
+  const b = document.createElement("div");
+  b.className = "verifynote syncbanner";
+  b.innerHTML = `<b>This ticket was changed on ${esc(syncDeviceName(syncDeferredOrder.device))}.</b> Your screen is not changed while you have it open. Save or close it to see their change; a field you both changed will ask which to keep.`;
+  s.insertBefore(b, s.firstChild.nextSibling);
+}
+
+/* ---------- numbers ---------- */
+function syncTakeNumber(key){
+  if (!syncOn()) return null;
+  const list = syncNumbers[key];
+  if (!list || !list.length) return null;
+  const n = list.shift();
+  syncInvoke("sync_use_number", {key, n}).catch(() => {});
+  return n;
+}
+
+/* ---------- photographs ---------- */
+function syncPhotoBadge(id){
+  if (!syncOn()) return "";
+  const st = syncAttState[id];
+  if (st === "pending") return `<span class="tag sync up" data-photo="${esc(id)}">PHOTO UPLOADING</span>`;
+  if (st === "synced") return `<span class="tag sync ok" data-photo="${esc(id)}">PHOTO SYNCED</span>`;
+  return `<span class="tag sync" data-photo="${esc(id)}"></span>`;
+}
+function syncPhotoBadges(){
+  document.querySelectorAll("[data-photo]").forEach(el => {
+    const st = syncAttState[el.dataset.photo];
+    el.textContent = st === "pending" ? "PHOTO UPLOADING" : st === "synced" ? "PHOTO SYNCED" : "";
+    el.className = "tag sync " + (st === "pending" ? "up" : st === "synced" ? "ok" : "");
+  });
+}
+
+/* ---------- Settings → Shop Sync ---------- */
+function shopSyncCard(){
+  if (!DESKTOP) return "";
+  const m = syncMode;
+  const c = (syncStatus && syncStatus.client) || {};
+  const words = m === "host" ? "This computer hosts the Shop Hub" : m === "client" ? (c.online ? "Connected to the Shop Hub" : "SHOP HUB OFFLINE") : "Not set up — this computer keeps its own book";
+  return `<div class="card"><div class="toolbar" style="margin:0"><h3 style="margin:0">Shop Sync</h3><span class="muted">${esc(words)}</span><div class="grow"></div>
+    <button class="primary" onclick="go('shopsync')">Open Shop Sync</button></div>
+    <p class="muted" style="font-size:12.5px;margin:8px 0 0">One computer in the shop hosts the shop's data; the others connect to it over the shop's own network. No cloud, no subscription.</p></div>`;
+}
+let shopSyncMsg = "";
+function renderShopSync(){
+  $("#app").innerHTML = `<div class="toolbar"><button onclick="go('settings')">← Settings</button><h2 style="margin:0">Shop Sync</h2></div><div id="shopSyncBody"></div>`;
+  drawShopSyncLive();
+  syncRefresh();
+}
+function drawShopSyncLive(){
+  const box = $("#shopSyncBody"); if (!box) return;
+  if (syncTyping() && box.contains(document.activeElement)) return;
+  const s = syncStatus || {mode:"local"};
+  const c = s.client || {};
+  const h = s.hub || {};
+  const devices = (h.devices || c.devices || []);
+  const devRows = devices.map(d => `<tr><td><b>${esc(d.name)}</b>${d.host ? ` <span class="muted">host</span>` : ""}</td>
+    <td>${d.id === c.deviceId ? `<span class="badge b-vehicle">THIS DEVICE</span>` : d.revoked ? `<span class="badge b-verify">REVOKED</span>` : d.online ? `<span class="badge b-vehicle">ONLINE</span>` : `<span class="badge b-manual">OFFLINE</span>`}</td>
+    <td class="muted">${d.online || d.id === c.deviceId ? "Last seen: now" : d.lastSeen ? "Last seen: " + esc(String(d.lastSeen).slice(0, 16).replace("T", " ")) : "never connected"}</td>
+    <td class="muted">${d.open ? "Open: " + esc(d.open) : ""}</td>
+    <td class="right">${s.mode === "host" && !d.host && !d.revoked ? `<button class="sm danger" onclick="shopSyncRevoke('${esc(d.id)}','${esc(d.name)}')">REVOKE DEVICE</button>` : ""}</td></tr>`).join("");
+  const msg = shopSyncMsg ? `<div class="verifynote">${shopSyncMsg}</div>` : "";
+  /* a live redraw never throws away what someone typed */
+  const typed = {};
+  box.querySelectorAll("input[id]").forEach(i => { typed[i.id] = i.value; });
+  const keepTyped = () => Object.keys(typed).forEach(id => { const i = document.getElementById(id); if (i && i.type !== "checkbox") i.value = typed[id]; });
+  if (s.mode === "local"){
+    const j = s.join || {};
+    box.innerHTML = `${msg}
+      <div class="card"><h3 style="margin-top:0">THIS COMPUTER HOSTS THE SHOP</h3>
+        <p class="muted" style="font-size:12.5px">Choose this on the computer that stays in the office. Its current shop book becomes the Shop Hub. First an automatic backup is taken of the book and every photo; then the book is checked, loaded into the hub, and proved identical before anything switches over. This computer's original book file is kept.</p>
+        <div class="row"><div><label>Shop name</label><input id="ss_shop" value="${esc(db.settings.shopName || "")}"></div>
+          <div><label>This computer's name</label><input id="ss_hostname" value="Office Desktop"></div></div>
+        <button class="primary" onclick="shopSyncHost()">HOST THIS SHOP</button></div>
+      <div class="card"><h3 style="margin-top:0">CONNECT TO EXISTING SHOP HUB</h3>
+        <p class="muted" style="font-size:12.5px">Choose this on the laptop. On the host, open Shop Sync and press PAIR DEVICE to show a pairing code. This computer will then show the shop's data from the hub; its own book file is left untouched as a backup.</p>
+        <div class="toolbar" style="margin:0 0 8px"><button onclick="shopSyncDiscover()">Find the Shop Hub on this network</button><span id="ss_found" class="muted"></span></div>
+        <div class="row"><div><label>Shop Hub address</label><input id="ss_addr" placeholder="192.168.1.20" value="${esc(shopSyncFoundAddr || "")}"></div>
+          <div><label>Pairing code</label><input id="ss_code" inputmode="numeric" placeholder="482 193"></div>
+          <div><label>This computer's name</label><input id="ss_name" value="Shop Laptop"></div></div>
+        <button class="primary" onclick="shopSyncJoin()">CONNECT TO SHOP HUB</button>
+        ${j.state === "connecting" ? `<div class="verifynote">Connecting…</div>` : ""}
+        ${j.state === "verify" ? `<div class="verifynote" id="ss_verify"><b>Check the host screen shows ${esc(j.verify)}</b>, then approve this computer there. If the numbers differ, deny it on the host.</div>` : ""}
+        ${j.state === "approved" ? `<div class="verifynote">Approved. Receiving the shop from ${esc(j.shopName || "the Shop Hub")}…</div>` : ""}
+        ${j.state === "failed" ? `<div class="verifynote" style="border-color:#c0392b"><b>Not connected:</b> ${esc(j.error)}</div>` : ""}
+      </div>`;
+    keepTyped();
+    return;
+  }
+  const pairing = h.pairing;
+  const reqs = h.pairRequests || [];
+  box.innerHTML = `${msg}
+    <div class="card"><h3 style="margin-top:0">${s.mode === "host" ? "Shop Hub: " + (h.running ? "RUNNING" : "STOPPED") : c.online ? "Shop Hub: CONNECTED" : "SHOP HUB OFFLINE"}</h3>
+      <table><tbody>
+        ${s.mode === "host" ? `<tr><td>Computer</td><td><b>${esc(c.deviceName || "")}</b> — this computer hosts the shop</td></tr>
+          <tr><td>Network address</td><td><b>${esc((h.addresses || []).map(a => a + ":" + s.port).join(", ") || "no private network address found")}</b></td></tr>` :
+          `<tr><td>Shop Hub address</td><td><b>${esc(c.address || "")}</b></td></tr><tr><td>This computer</td><td><b>${esc(c.deviceName || "")}</b></td></tr>`}
+        <tr><td>Shop</td><td>${esc(c.shopName || h.shopName || "")} <span class="muted">${esc(c.shopId || h.shopId || "")}</span></td></tr>
+        ${s.mode === "host" ? `<tr><td>Database</td><td>schema ${esc(h.schema)} · ${Number(h.fields || 0).toLocaleString()} fields · revision ${esc(h.seq)}</td></tr>` : ""}
+        <tr><td>Pending operations</td><td><b>${c.pending || 0}</b>${(c.conflicts || []).length ? ` · <b>${c.conflicts.length} conflict(s) to choose</b>` : ""}</td></tr>
+        <tr><td>Last sync</td><td>${c.lastAckMs ? new Date(c.lastAckMs).toLocaleTimeString() : c.lastHeardMs ? "heard " + new Date(c.lastHeardMs).toLocaleTimeString() : "—"}${c.latencyMs ? ` · ${c.latencyMs} ms round trip` : ""}</td></tr>
+        ${s.mode === "host" ? `<tr><td>Last backup</td><td>${h.lastBackup ? esc(String(h.lastBackup.createdAt || "").replace("T", " ").slice(0, 16)) + " (" + esc(h.lastBackup.reason) + ")" : "none yet"}</td></tr>
+          <tr><td>Photos</td><td>${h.photosStored || 0} stored on the hub${c.photosWaiting ? ` · ${c.photosWaiting} waiting to upload from this computer` : ""}</td></tr>` :
+          `<tr><td>Photos</td><td>${c.photosWaiting ? c.photosWaiting + " waiting to upload" : "all uploaded"}${c.uploadError ? " · " + esc(c.uploadError) : ""}</td></tr>`}
+        ${c.lastError && !c.online ? `<tr><td>Last error</td><td>${esc(c.lastError)}</td></tr>` : ""}
+      </tbody></table>
+      <div class="toolbar" style="margin-top:10px">
+        <button onclick="shopSyncTest()">TEST CONNECTION</button>
+        ${s.mode === "host" ? `<button class="primary" onclick="shopSyncPair()">PAIR DEVICE</button>
+          <button onclick="shopSyncBackup()">BACK UP NOW</button>
+          <button onclick="shopSyncOpenBackups()">OPEN BACKUP LOCATION</button>` : ""}
+      </div>
+      ${pairing ? `<div class="pairbox"><div class="muted">PAIRING CODE — enter it on the new computer. Valid for 10 minutes, once.</div><div class="paircode" id="ss_paircode">${esc(pairing.code)}</div></div>` : ""}
+      ${reqs.map(r => `<div class="verifynote" data-pairreq="${esc(r.id)}"><b>${esc(r.name)}</b> (${esc(r.peer)}) wants to connect. It shows <b style="font-size:18px">${esc(r.verify)}</b>. Approve only if the new computer shows the same numbers.
+        <div class="toolbar" style="margin-top:6px"><button class="green" onclick="shopSyncDecide('${esc(r.id)}',true)">Approve</button><button class="danger" onclick="shopSyncDecide('${esc(r.id)}',false)">Deny</button></div></div>`).join("")}
+    </div>
+    <div class="card"><h3 style="margin-top:0">Connected devices</h3>
+      ${devRows ? `<table><tbody>${devRows}</tbody></table>` : `<div class="empty">No devices yet.</div>`}</div>
+    ${s.mode === "host" ? `<div class="card"><h3 style="margin-top:0">This computer as the host</h3>
+      <div id="ss_firewall" class="muted">Checking Windows Firewall…</div>
+      <div id="ss_autostart" class="muted" style="margin-top:8px"></div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">Closing this window keeps the Shop Hub running in the background (look for JZD Shop Manager by the clock). Choose Quit there to stop it. The laptop shows SHOP HUB OFFLINE while it is stopped and keeps its own work safe until it comes back.</p></div>` : ""}`;
+  if (s.mode === "host") shopSyncHostExtras();
+}
+let shopSyncFoundAddr = "";
+async function shopSyncDiscover(){
+  const el = $("#ss_found"); if (el) el.textContent = "Looking…";
+  try {
+    const list = await syncInvoke("sync_discover");
+    if (list.length){ shopSyncFoundAddr = list[0].address; const a = $("#ss_addr"); if (a) a.value = list[0].address; if (el) el.textContent = "Found " + list.map(x => x.name + " at " + x.address).join(", "); }
+    else if (el) el.textContent = "No Shop Hub answered. Type the host's address shown on its Shop Sync screen.";
+  } catch(e){ if (el) el.textContent = String(e); }
+}
+async function shopSyncHost(){
+  if (!confirm("Make this computer the Shop Hub?\n\nA backup of the book and every photo is taken first. The book is then loaded into the Shop Hub and checked field by field before anything switches over. The original book file is kept.")) return;
+  shopSyncMsg = "Setting up the Shop Hub… backing up, importing and verifying.";
+  drawShopSyncLive();
+  try {
+    await persistNowAsync();
+    const r = await syncInvoke("sync_host_enable", {shopName:($("#ss_shop") || {}).value || db.settings.shopName, deviceName:($("#ss_hostname") || {}).value || "Office Desktop"});
+    const rep = r.report || {};
+    shopSyncMsg = `<b>Shop Hub RUNNING.</b> Imported and verified ${Number(rep.leaves || 0).toLocaleString()} fields (${Object.keys(rep.counts || {}).length} sections) and ${rep.attachments || 0} photo(s). Backup before the move: ${esc(r.preBackup || "")}. Next: press PAIR DEVICE and connect the laptop.`;
+    location.reload();
+  } catch(e){
+    shopSyncMsg = "<b>The Shop Hub was not set up:</b> " + esc(String(e)) + " Nothing was switched over; this computer still uses its own book.";
+    drawShopSyncLive();
+  }
+}
+async function shopSyncJoin(){
+  const address = ($("#ss_addr") || {}).value || "", code = ($("#ss_code") || {}).value || "", deviceName = ($("#ss_name") || {}).value || "Shop Laptop";
+  if (!address.trim() || !code.trim()){ alert("Enter the Shop Hub's address and the pairing code showing on the host."); return; }
+  const books = Object.keys(db.orders || {}).length;
+  if (books && !confirm("This computer has its own book with " + books + " ticket(s). Connecting shows the shop's data from the Shop Hub instead. This computer's own book file is kept untouched as a backup and is not merged. Continue?")) return;
+  shopSyncMsg = "";
+  try { await syncInvoke("sync_join", {address:address.trim(), code:code.trim(), deviceName}); } catch(e){ alert(String(e)); }
+  const poll = setInterval(async () => {
+    await syncRefresh();
+    const j = (syncStatus && syncStatus.join) || {};
+    if (j.state === "failed" || syncMode !== "local") clearInterval(poll);
+  }, 500);
+}
+async function shopSyncPair(){ try { await syncInvoke("sync_pair_open"); await syncRefresh(); } catch(e){ alert(String(e)); } }
+async function shopSyncDecide(id, approve){ try { await syncInvoke("sync_pair_decide", {id, approve}); await syncRefresh(); } catch(e){ alert(String(e)); } }
+async function shopSyncRevoke(id, name){
+  if (!confirm("Revoke " + name + "? It is disconnected at once and cannot reconnect until it is paired again.")) return;
+  try { await syncInvoke("sync_revoke", {deviceId:id}); await syncRefresh(); } catch(e){ alert(String(e)); }
+}
+async function shopSyncBackup(){
+  shopSyncMsg = "Backing up…"; drawShopSyncLive();
+  try {
+    const r = await syncInvoke("sync_backup_now");
+    shopSyncMsg = `<b>Backed up and verified.</b> ${Number(r.verify.leaves).toLocaleString()} fields and ${r.verify.photos} photo(s) rebuilt from the backup and checked. ${esc(r.backup.path)}`;
+  } catch(e){ shopSyncMsg = "<b>Backup failed:</b> " + esc(String(e)); }
+  syncRefresh();
+}
+async function shopSyncOpenBackups(){ try { await syncInvoke("sync_open_backup_dir"); } catch(e){ alert(String(e)); } }
+async function shopSyncTest(){
+  const t = Date.now();
+  await syncRefresh();
+  const c = (syncStatus && syncStatus.client) || {};
+  shopSyncMsg = c.online ? `<b>Connected.</b> ${c.latencyMs ? c.latencyMs + " ms round trip to the Shop Hub" : "The Shop Hub is answering"} · ${c.pending || 0} pending · checked in ${Date.now() - t} ms.`
+                          : `<b>SHOP HUB OFFLINE.</b> ${esc(c.lastError || "")}`;
+  drawShopSyncLive();
+}
+async function shopSyncHostExtras(){
+  try {
+    const fw = await syncInvoke("sync_firewall_status");
+    const el = $("#ss_firewall");
+    if (el) el.innerHTML = fw.present ? `Windows Firewall: <b>ALLOWED</b> — JZD Shop Manager may accept connections on TCP ${esc(fw.port)} and UDP ${esc(fw.discoveryPort)} from private networks only.`
+      : `Windows Firewall: <b>NOT ALLOWED YET</b>. Other computers cannot reach this Shop Hub until it is. This adds two rules for this program only — TCP ${esc(fw.port)} (the Shop Hub) and UDP ${esc(fw.discoveryPort)} (so the laptop can find it), on Private networks. Windows will ask for permission. <button class="sm primary" onclick="shopSyncFirewall()">ALLOW ON PRIVATE NETWORKS</button>`;
+  } catch(e){ const el = $("#ss_firewall"); if (el) el.textContent = "Windows Firewall status is not available here."; }
+  try {
+    const au = await syncInvoke("sync_autostart_status");
+    const el = $("#ss_autostart");
+    if (el) el.innerHTML = `<label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" style="width:auto" ${au.enabled ? "checked" : ""} onchange="shopSyncAutostart(this.checked)"> Start JZD Shop Manager (and the Shop Hub) when Windows starts</label>`;
+  } catch(e){}
+}
+async function shopSyncFirewall(){ try { const r = await syncInvoke("sync_firewall_enable"); shopSyncMsg = r.present ? "<b>Windows Firewall rules added.</b>" : "Windows did not add the rules (permission may have been declined)."; } catch(e){ shopSyncMsg = esc(String(e)); } syncRefresh(); }
+async function shopSyncAutostart(on){ try { await syncInvoke("sync_autostart_set", {enabled:on}); } catch(e){ alert(String(e)); } }
+async function persistNowAsync(){
+  clearTimeout(saveTimer);
+  if (dirty && !saving) await persist();
+  let n = 0; while ((saving || dirty) && n++ < 100) await new Promise(r => setTimeout(r, 50));
+}
+
 /* ---------- Settings → Data Providers ---------- */
 let providersFilter = "all";
 function providerCard(){
@@ -7317,7 +7828,7 @@ async function attAdd(file, ctx, ctxId, extra){
   const stored = await attPut(ext, b64);
   const thumb = await attThumbnail(dataUrl, file.type);
   const meta = Object.assign({
-    id: stored.id, name: attSafeName(file.name), file: stored.file, mime: file.type || "",
+    id: stored.id, name: attSafeName(file.name), file: stored.file, mime: file.type || "", sha256: stored.sha256 || "",
     size: stored.bytes || file.size, at: new Date().toISOString(),
     caption: "", custVisible: false, ctx, ctxId,
     tech: db.settings.lastTech || "", orderId: "", vehicleId: "", thumb
@@ -7357,7 +7868,7 @@ function thumbHtml(a, readonly){
   const tag = a.custVisible ? `<span class="tag cust">CUSTOMER</span>` : `<span class="tag int">INTERNAL</span>`;
   return `<div class="thumb" title="${esc(a.caption || a.name)}" onclick="viewPhoto('${a.id}')">
     ${a.thumb ? `<img src="${a.thumb}" alt="${esc(a.caption || a.name)}">` : `<div style="padding:6px;font-size:9px">${esc(a.name).slice(0,24)}</div>`}
-    ${tag}</div>`;
+    ${tag}${syncPhotoBadge(a.id)}</div>`;
 }
 function pickPhotos(ctx, ctxId){
   attPending = {ctx, ctxId};
@@ -7404,6 +7915,14 @@ async function viewPhoto(id){
          : `<div style="background:#fff;padding:20px;border-radius:8px">${esc(a.name)} — ${Math.round((a.size||0)/1024)} KB
             <br><span class="muted">This kind of file opens outside the program.</span></div>`;
   } catch(err){
+    if (syncOn() && /OFFLINE|not on this computer yet|still receiving|did not arrive|does not have this photo yet/i.test(String(err))){
+      /* on its way, not lost: never record a photo as missing because the hub is away */
+      $("#viewerBody").innerHTML = `<div style="background:#fff;padding:22px;border-radius:8px;max-width:460px">
+        <b>PHOTO NOT ON THIS COMPUTER YET</b><p style="margin:8px 0 0">${esc(String(err))}</p>
+        <p class="muted" style="margin:6px 0 0;font-size:12px">It opens once the Shop Hub has it and this computer is connected.</p></div>
+        <div class="vbar"><button onclick="closeViewer()">Close</button></div>`;
+      return;
+    }
     /* The record stays. Losing the file is bad; losing the knowledge that
        there was one is worse. */
     a.missing = true; save();
@@ -9000,8 +9519,8 @@ function audit(action, ref, from, to, who, reason){
   if (db.audit.length > 2000) db.audit = db.audit.slice(-2000);
 }
 
-const NAV_PARENT={vehDetail:"vehicles",techdata:"vehicles",providers:"settings"};
-function go(v){view=v;document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v||NAV_PARENT[v]===b.dataset.view));render();}
+const NAV_PARENT={vehDetail:"vehicles",techdata:"vehicles",providers:"settings",shopsync:"settings"};
+function go(v){view=v;if(typeof syncPresence==="function"&&v!=="insp")syncPresence(null);document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v||NAV_PARENT[v]===b.dataset.view));render();}
 $("#newWO").onclick=()=>editOrder(null);
 $("#brandTop").onclick=()=>go("dash");
 
@@ -9021,6 +9540,7 @@ function render(){
   if(view==="vendor")return renderVendor();
   if(view==="board")return renderBoard();
   if(view==="providers")return renderProviders();
+  if(view==="shopsync")return renderShopSync();
   if(view==="techdata")return renderTechData();
   if(view==="techview")return renderTechView();
   if(view==="dash")renderDash();else if(view==="orders")renderOrders();else if(view==="customers")renderCustomers();else if(view==="vehicles")renderVehicles();else if(view==="vehDetail")renderVehicleDetail(detailVeh);else if(view==="services")renderServices();else if(view==="catalog")renderCatalog();else renderSettings();}
@@ -9275,6 +9795,7 @@ function renderSettings(){const s=db.settings;
   ${floorSettingsCard()}
   ${thresholdCard()}
   ${feeCard()}
+  ${shopSyncCard()}
   ${providerCard()}
   ${auditCard()}
   <div class="card"><h3>Backup</h3><p class="muted" style="margin-top:0">A backup is one file containing the whole book <b>and every photograph</b>, so it restores complete. Export one regularly, and to move to another computer.</p>
@@ -10004,7 +10525,8 @@ function saveOrder(){pullWO();if(!cur.customerId){alert("Select a customer.");re
   freezeIfFinal(cur);
   db.orders[cur.id]=JSON.parse(JSON.stringify(cur));save();closeWO();render();}
 function delOrder(id){if(!confirm("Delete this work order?"))return;delete db.orders[id];save();closeWO();render();}
-function closeWO(){$("#woOverlay").classList.remove("on");cur=null;}
+function closeWO(){$("#woOverlay").classList.remove("on");cur=null;
+  if(typeof syncPresence==="function"){ syncPresence(view==="insp"&&inspId?"inspection:"+inspId:null); if(syncDeferredOrder){ syncDeferredOrder=null; setTimeout(syncPull,50); } }}
 
 /* ---------- print invoice / estimate ---------- */
 function printDoc(kind){
@@ -10328,6 +10850,8 @@ $("#jobOverlay").addEventListener("mousedown",e=>{if(e.target===$("#jobOverlay")
    is exactly how an unreadable book came to look like a brand new one. */
 async function boot(){
   db = await loadDb();
+  await syncInit(window.__syncLoad);
+  if(syncWaitingForShop){ showWaitingForShop(); return; }
   render();
   /* dataset status is looked up in the background; nothing waits for it */
   loadDatasetMeta().then(() => { if(view==="providers"||view==="techdata") render(); }).catch(() => {});
@@ -10336,6 +10860,18 @@ async function boot(){
      owner glances at before closing the lid. */
   if(storageLocked){ markSaveState("blocked"); showStorageAlarm(); }
   else markSaveState("saved");
+}
+function showWaitingForShop(){
+  $("#app").innerHTML = `<div class="card" style="max-width:620px;margin:40px auto;text-align:center">
+    <h2>Receiving the shop from the Shop Hub…</h2>
+    <p>This computer is paired. The shop's data is on its way from the host; this page opens by itself when it arrives.</p>
+    <p class="muted" id="waitShopState"></p></div>`;
+  setInterval(async () => {
+    await syncRefresh();
+    const c = (syncStatus && syncStatus.client) || {};
+    const el = $("#waitShopState"); if (el) el.textContent = c.online ? "Connected — receiving…" : "SHOP HUB OFFLINE — " + (c.lastError || "waiting for the host");
+    try { const r = await invoke("db_load"); if (String(r.text || "").trim()) location.reload(); } catch(e){}
+  }, 1500);
 }
 boot();
 
