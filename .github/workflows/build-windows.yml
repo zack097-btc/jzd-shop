@@ -68,6 +68,7 @@ jobs:
           node testparts.cjs
           node testfloor.cjs
           node testdata.cjs
+          node testmpi.cjs
 
       # The one release check that leaves the machine: a real request to MOTOR's
       # public DaaS sandbox, through the desktop shell's own Rust signing code and

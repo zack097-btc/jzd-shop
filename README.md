@@ -81,8 +81,14 @@ subscription. Settings ▸ **Where is my data?** shows the folder.
   inner and outer per corner, rotor thickness against its minimum spec, brake
   fluid moisture percentage, coolant freeze point, battery volts and measured
   against rated CCA, oil life. Tyres and brakes are entered as a matrix, so four
-  wheels is four rows rather than four screens. **Mark remaining Good** handles
-  everything the technician was happy with in one tap.
+  wheels is four rows rather than four screens. Standard answers are picked,
+  not typed: tread and pad presets, fluid level and condition dropdowns, leak,
+  light, belt, hose, suspension and exhaust findings from lists, with
+  **Other / Custom** for anything a list cannot say. **Mark group Good** covers
+  condition items in one tap and never touches a measured item; the screen
+  always shows how many items are still **UNINSPECTED**, and completing with
+  items skipped asks first. G / M / A / U / X set a status from the keyboard
+  and move to the next item.
 - **Measurements that suggest, never decide** — set your own thresholds in
   Settings and a reading proposes a condition on an untouched item. The
   technician is standing at the car and can always overrule it.
@@ -261,6 +267,7 @@ node testfront.cjs     # customers, duplicates, appointments, arrival, search
 node testparts.cjs     # stock, vendors, purchase orders, receiving, cores
 node testfloor.cjs     # bays, job clock, efficiency, QC, diagnosis, comebacks, maintenance
 node testdata.cjs      # provider hub: NHTSA, datasets, routing, provenance, sandbox, secrets
+node testmpi.cjs       # fast inspection entry: dropdowns, presets, Mark Good, completion, a v2.8.1 book
 node testmotorlive.cjs # LIVE MOTOR sandbox through the page (needs MOTOR_SANDBOX_PUBLIC/PRIVATE)
 cd desktop/src-tauri && cargo test    # the storage layer and the provider hub's native side
 cargo test motor_sandbox_live -- --ignored --nocapture   # LIVE MOTOR sandbox through the shell
@@ -299,5 +306,5 @@ External data is supplemental. With the internet off, NHTSA down, or every
 provider disabled, customers, vehicles, inspections, repair orders, the SHOP SEED
 labor catalog, parts and the floor all keep working from this computer.
 
-Tag a version (`git tag v2.8.1 && git push origin v2.8.1`) and CI runs every
+Tag a version (`git tag v2.8.2 && git push origin v2.8.2`) and CI runs every
 suite and the live MOTOR sandbox check, then builds and publishes the installer.
