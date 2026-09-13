@@ -92,6 +92,8 @@ jobs:
           npx playwright install chromium
           node testdata.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node testmpi.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node testmotorlive.cjs 2>&1 | Tee-Object -FilePath motorlive.log
           $code = $LASTEXITCODE
           Get-Content motorlive.log | Where-Object { $_ -match 'PASS|FAIL|SKIPPED|MOTOR sandbox calls|Vehicle:' } | ForEach-Object {

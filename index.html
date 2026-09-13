@@ -290,6 +290,22 @@
   .captable td,.captable th{padding:4px 6px;border-bottom:1px solid #e5e7eb}
   .captable td.cm{text-align:center;font-weight:700}
   .captable td.cm-y{color:#15803d}.captable td.cm-w{color:#b45309}.captable td.cm-n{color:#9ca3af}
+  .iprogress{flex-wrap:wrap;row-gap:6px}
+  .iprog{display:flex;flex-direction:column;margin-right:10px;font-size:13px}
+  .iunins{color:#b45309;font-weight:700}
+  .ikeys{font-size:11.5px;margin:4px 2px 8px}
+  .isel{display:inline-flex;flex-direction:column;gap:1px;margin:0 6px 2px 0;font-size:11px;color:#555}
+  .isel select,.imp select,.iobs .iadd{height:auto;min-height:30px;padding:4px 6px;line-height:1.25;min-width:92px;font-size:13px}
+  .iline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:3px}
+  .iline .iobs{margin:0}
+  .imp{display:inline-flex;gap:4px;align-items:center}
+  .imeas{width:70px;height:30px}
+  .icustom{height:30px;min-width:170px;margin-top:2px}
+  .iobs{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:3px 0}
+  .iobs .iadd{max-width:210px}
+  .icopy{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 6px;font-size:12px}
+  .sbtn:focus{outline:3px solid #2563eb;outline-offset:1px}
+  .nc.on{background:#e5e7eb;font-weight:700}
   .dsstatus{font-size:12px;margin:6px 0;padding:6px 8px;border-radius:6px;background:#f3f4f6}
   .dsstatus .dsfail{color:#b91c1c}
   .provgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px}
@@ -715,7 +731,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.8.1";
+const JZD_VERSION = "2.8.2";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -1764,8 +1780,11 @@ function inspectionFor(o){
   return null;
 }
 function inspItem(insp, key){
-  if (!insp.items[key]) insp.items[key] = {state:"Not Inspected", meas:{}, flags:[], note:"", custNote:"", photos:[], at:null, tech:""};
-  return insp.items[key];
+  if (!insp.items[key]) insp.items[key] = {state:"Not Inspected", meas:{}, flags:[], note:"", custNote:"", photos:[], at:null, tech:"", obs:{}};
+  const it = insp.items[key];
+  if (!it.flags) it.flags = [];
+  if (!it.meas) it.meas = {};
+  return it;
 }
 function setInspState(insp, key, state){
   const it = inspItem(insp, key);
@@ -1822,7 +1841,8 @@ function inspFindings(insp){
                     it.state === "Dim" || it.state === "Damaged housing" || it.state === "Moisture present";
         if (!bad) return;
         out.push({key, group:g.name, name:(pos ? pos + " " : "") + item.name, state:it.state,
-                  meas:it.meas, flags:it.flags, note:it.note, custNote:it.custNote, photos:it.photos});
+                  meas:it.meas, flags:it.flags, note:it.note, custNote:it.custNote, photos:it.photos,
+                  obs:obsText(it, key, item)});
       });
     });
   });
@@ -1843,14 +1863,14 @@ function completeInspection(insp, tech){
    The damage record exists for one reason: so that a month later nobody has to
    argue about whether the shop put that scratch in the door. It is written
    before anyone touches the car, and it is never quietly edited afterwards. */
-const DAMAGE_AREAS = ["Front bumper","Hood","Windshield","Roof","Trunk / tailgate","Rear bumper",
-  "LF fender","RF fender","LF door","RF door","LR door","RR door",
-  "LF quarter","RF quarter","LF rocker","RF rocker",
-  "LF wheel","RF wheel","LR wheel","RR wheel",
-  "Mirrors","Headlights","Taillights","Interior","Other"];
-const DAMAGE_TYPES = ["Dent","Ding","Scratch","Scuff","Paint chip","Crack","Broken","Curb rash",
-  "Rust / corrosion","Stain / tear","Missing / damaged trim","Other"];
-const DAMAGE_SEVERITY = ["Light","Moderate","Heavy"];
+const DAMAGE_AREAS = ["Front Bumper","Hood","Windshield","Roof","Trunk/Tailgate","Rear Bumper",
+  "LF Fender","RF Fender","LF Door","RF Door","LR Door","RR Door",
+  "LF Quarter","RF Quarter","LF Rocker","RF Rocker",
+  "LF Wheel","RF Wheel","LR Wheel","RR Wheel",
+  "Driver Mirror","Passenger Mirror","Headlight","Taillight","Interior","Other"];
+const DAMAGE_TYPES = ["Dent","Ding","Scratch","Scuff","Paint Chip","Crack","Broken","Curb Rash",
+  "Rust/Corrosion","Stain/Tear","Missing/Damaged Trim","Other"];
+const DAMAGE_SEVERITY = ["Minor","Moderate","Major"];
 const FUEL_LEVELS = ["Empty","1/8","1/4","3/8","1/2","5/8","3/4","7/8","Full"];
 
 function shapeCheckin(o){
@@ -1861,19 +1881,153 @@ function shapeCheckin(o){
   return o.checkin;
 }
 function addDamage(o, area, type, severity, note, by){
-  const d = {id:uid("dmg"), area, type, severity:severity || "Light", note:note || "",
+  const d = {id:uid("dmg"), area, type, severity:severity || "Minor", note:note || "",
              by:by || db.settings.lastTech || "", at:new Date().toISOString(), photos:[]};
   shapeCheckin(o).damage.push(d);
   return d;
 }
 
 
+/* ---------- fast entry ----------
+   How each item is answered. This is screen behaviour, not stored data: the
+   inspection record keeps the same shape it has always had (state, meas,
+   flags, notes), plus an `obs` map for the named dropdowns. A value that is not
+   one of today's choices - including anything typed before these lists
+   existed - is kept exactly as written and shown as Other / Custom. */
+const OTHER = "Other / Custom…";
+const OL = {
+  TIRE:["Good","Normal Wear","Low Tread","Uneven Wear","Inside Edge Wear","Outside Edge Wear","Center Wear","Cupping","Feathering",
+    "Dry Rot / Cracking","Puncture","Nail / Foreign Object","Sidewall Damage","Bulge","Exposed Cord","Incorrect Size","Mismatched Tire","Age Concern","Not Inspected","N/A"],
+  WHEEL:["Good","Curb Rash","Bent","Cracked","Corrosion","Damaged Finish","Missing Lug","Damaged Lug/Stud","Wheel Lock Missing","Not Inspected","N/A"],
+  PAD:["Good","Uneven Wear","Contaminated","Delaminating","Glazed","Not Inspected","N/A"],
+  ROTOR:["Good","Normal Wear","Grooved","Scored","Heat Spotted","Rusted","Cracked","Lip / Wear Ridge","Below Specification",
+    "Near Minimum Specification","Pulsation Concern","Measurement Required","Not Measured","N/A"],
+  BRAKE_HW:["Good","Caliper Sticking","Slide Sticking","Torn Boot","Brake Hose Damaged","Brake Line Corrosion","Brake Line Leak","Caliper Leak",
+    "Hardware Missing/Damaged","Parking Brake Concern","EPB Concern","Not Inspected","N/A"],
+  BF_LEVEL:["Full / Good","Slightly Low","Low","Very Low","Not Checked","N/A"],
+  BF_COND:["Clean / Good","Dark","Contaminated","Cloudy","Debris Present","Service Recommended","Not Checked"],
+  OIL_LEVEL:["Full / Good","Slightly Low","Low","Very Low","Overfilled","Not Checked"],
+  OIL_COND:["Clean / Normal","Dark / Used","Very Dirty","Sludge Concern","Fuel Contamination Suspected","Coolant Contamination Suspected","Metal/Debris Concern","Not Checked"],
+  OIL_LEAK:["None Observed","Seep","Minor Leak","Active Leak","Severe Leak","Source Undetermined","Not Inspected"],
+  COOL_LEVEL:["Full / Good","Slightly Low","Low","Empty / Critically Low","Not Checked"],
+  COOL_COND:["Clean / Good","Normal","Dirty","Discolored","Rust/Corrosion","Contaminated","Oil Present","Mixed/Unknown Coolant","Not Checked"],
+  FLUID_LEVEL:["Full / Good","Slightly Low","Low","Very Low","Overfilled","Not Serviceable / Sealed","Not Checked","N/A"],
+  FLUID_COND:["Good / Normal","Dirty","Dark","Burnt","Contaminated","Metal/Debris Present","Water/Moisture Concern","Leak Observed","Service Recommended","Not Checked","N/A"],
+  LIGHT:["Good","Inoperative","Intermittent","Dim","Flickering","Damaged Housing","Lens Cracked","Moisture Present","Wrong Color/Bulb","Not Inspected","N/A"],
+  WIPER:["Good","Streaking","Chattering","Torn","Missing","Weak","Inoperative","Washer Nozzle Concern","Washer Pump Concern","Not Inspected","N/A"],
+  GLASS:["Good","Chip","Crack","Multiple Chips","Scratched","Delaminating","Pitted","Broken","Not Inspected"],
+  BATT_VIS:["Good","Corrosion","Loose Terminal","Damaged Terminal","Case Damaged","Case Swollen","Hold-Down Loose/Missing","Leakage","Age Concern","Not Inspected"],
+  BELT:["Good","Minor Wear","Cracked","Frayed","Glazed","Contaminated","Loose","Noisy","Replacement Recommended","Not Inspected","N/A"],
+  HOSE:["Good","Soft","Hard/Brittle","Swollen","Cracked","Leaking","Seeping","Collapsing","Damaged","Not Inspected","N/A"],
+  FILTER:["Good","Lightly Dirty","Dirty","Very Dirty","Restricted","Damaged","Missing","Replacement Recommended","Not Inspected","N/A"],
+  SUSP:["Good / Tight","Minor Play","Excessive Play","Loose","Worn","Torn Boot","Leaking","Bushing Cracked","Bushing Torn","Binding","Noisy","Bent","Broken","Not Inspected","N/A"],
+  SHOCK:["Good","Light Seep","Leaking","Weak","Bouncy","Noisy","Damaged","Broken","Mount Concern","Not Inspected","N/A"],
+  CV:["Good","Boot Cracked","Boot Torn","Grease Leak","Joint Play","Clicking/Noise","Binding","Damaged","Not Inspected","N/A"],
+  BEARING:["Good","Minor Play","Excessive Play","Rough","Noisy","Binding","Replacement Recommended","Not Inspected","N/A"],
+  LEAK:["None","Seep","Minor Leak","Active Leak","Severe Leak","Residue / Old Leak","Source Undetermined","Not Inspected"],
+  EXHAUST:["Good","Minor Corrosion","Heavy Corrosion","Exhaust Leak","Broken Hanger","Loose Hanger","Damaged Pipe","Damaged Muffler","Damaged Flex Joint",
+    "Catalytic Converter Concern","Aftermarket / Modified","Not Inspected","N/A"],
+  DRIVELINE:["Good","Minor Play","Excessive Play","Torn Boot","Leaking Seal","Vibration Concern","Noise","Loose","Damaged","Not Inspected","N/A"],
+  RT_STEER:["Normal","Pulls Left","Pulls Right","Wanders","Steering Wheel Off Center","Vibration","Noise","Not Road Tested"],
+  RT_BRAKE:["Normal","Pull","Pulsation","Vibration","Noise","Soft Pedal","Hard Pedal","Not Road Tested"],
+  RT_RIDE:["Normal","Vibration","Shake","Noise","Harsh","Bouncy","Not Road Tested"],
+  RT_TRANS:["Normal","Harsh Shift","Delayed Engagement","Slip","Shudder","Noise","Not Road Tested","N/A"]
+};
+const seq = (a, b, f) => { const out = []; for (let i = a; i <= b; i++) out.push(f(i)); return out; };
+/* Measurement presets. `v` is what is stored - the same number a technician
+   typing it would have stored - so thresholds, reports and history read it as
+   before. Anything else is typed as Custom, with no ceiling (a mud tyre is not
+   16/32). */
+const MP = {
+  TREAD:{opts:seq(0, 16, i => ({v:String(i), l:i + "/32"})), not:"Not Measured"},
+  PAD:{opts:seq(0, 15, i => ({v:String(i), l:i + " mm"})), not:"Not Measured"},
+  MOIST:{opts:seq(0, 4, i => ({v:String(i), l:i + "%"})).concat([{v:"5%+", l:"5%+"}, {v:"Pass", l:"Pass"}, {v:"Fail", l:"Fail"}]), not:"Not Tested"},
+  FREEZE:{opts:["-10","-20","-25","-30","-34","-40","-50"].map(x => ({v:x, l:x + "°F"})), not:"Not Tested"}
+};
+const sel = (k, label, opts, store) => ({k, label, opts, store:store || "obs"});
+const FLUID_SELS = [sel("level", "Level", OL.FLUID_LEVEL), sel("condition", "Condition", OL.FLUID_COND)];
+const ENTRY = {
+  "tires.tire":{multi:OL.TIRE, meas:{tread:MP.TREAD}, psi:true},
+  "wheels.wheel":{multi:OL.WHEEL},
+  "brakes.pads":{multi:OL.PAD, meas:{inner:MP.PAD, outer:MP.PAD}},
+  "brakes.rotor":{multi:OL.ROTOR},
+  "brakes.hardware":{multi:OL.BRAKE_HW},
+  "brakesys.fluid":{selects:[sel("level", "Level", OL.BF_LEVEL, "meas"), sel("condition", "Condition", OL.BF_COND)], meas:{moisture:MP.MOIST}},
+  "oil.oil":{selects:[sel("level", "Level", OL.OIL_LEVEL), sel("condition", "Condition", OL.OIL_COND), sel("leaks", "Leaks", OL.OIL_LEAK)]},
+  "cooling.coolant":{selects:[sel("level", "Level", OL.COOL_LEVEL), sel("condition", "Condition", OL.COOL_COND)], meas:{freeze:MP.FREEZE}},
+  "cooling.hoses":{multi:OL.HOSE},
+  "fluids.trans":{selects:FLUID_SELS}, "fluids.ps":{selects:FLUID_SELS}, "fluids.frontdiff":{selects:FLUID_SELS},
+  "fluids.reardiff":{selects:FLUID_SELS}, "fluids.tcase":{selects:FLUID_SELS}, "fluids.washer":{selects:FLUID_SELS}, "fluids.def":{selects:FLUID_SELS},
+  "glass.wiperf":{multi:OL.WIPER}, "glass.wiperr":{multi:OL.WIPER}, "glass.washf":{multi:OL.WIPER}, "glass.washr":{multi:OL.WIPER},
+  "glass.windshield":{multi:OL.GLASS}, "glass.sideglass":{multi:OL.GLASS}, "glass.rearglass":{multi:OL.GLASS}, "glass.mirrors":{multi:OL.GLASS},
+  "battery.battery":{multi:OL.BATT_VIS},
+  "underhood.belt":{multi:OL.BELT}, "underhood.vacuum":{multi:OL.HOSE},
+  "underhood.airfilter":{multi:OL.FILTER}, "underhood.cabinfilter":{multi:OL.FILTER},
+  "steering.struts":{multi:OL.SHOCK}, "steering.bearings":{multi:OL.BEARING}, "steering.cv":{multi:OL.CV},
+  "steering.psleak":{selects:[sel("leak", "Leak", OL.LEAK)]}, "steering.axleseal":{selects:[sel("leak", "Leak", OL.LEAK)]},
+  "safety.roadtest":{selects:[sel("steering", "Steering", OL.RT_STEER), sel("braking", "Braking", OL.RT_BRAKE), sel("ride", "Ride", OL.RT_RIDE), sel("transmission", "Transmission", OL.RT_TRANS)]}
+};
+["innertie","outertie","rack","upperball","lowerball","controlarm","swaylink","swaybush","springs","column"].forEach(id => ENTRY["steering." + id] = {multi:OL.SUSP});
+["draglink","trackbar","pitman","idlerarm","stabilizer","radiusarm","leaf","shackle","ubolt"].forEach(id => ENTRY["trucksteer." + id] = {multi:OL.SUSP});
+["lowbeam","highbeam","drl","turnfront","turnrear","hazard","brake","chmsl","tail","reverse","plate","markfront","markrear","fog","dome","cluster","trailer"].forEach(id => ENTRY["lighting." + id] = {multi:OL.LIGHT});
+["oilleak","coolantleak","transleak","diffleak","tcaseleak","psleak2","brakeleak","fuelleak","exhleak"].forEach(id => ENTRY["underbody." + id] = {selects:[sel("leak", "Leak", OL.LEAK)]});
+["filterhousing","valvecover","oilpan","frontengine","rearengine","turbo","fuelvis"].forEach(id => ENTRY["enginebay." + id] = {selects:[sel("leak", "Leak", OL.LEAK)]});
+["manifold","pipes","flex","cat","muffler","hangers"].forEach(id => ENTRY["exhaust." + id] = {multi:OL.EXHAUST});
+["driveshaft","centersupport","guibo","ujoint","diffmount","transmount","outputseal"].forEach(id => ENTRY["driveline." + id] = {multi:OL.DRIVELINE});
+/* Warning lights keep their stored words; these are the extra answers a
+   service writer needs, and friendlier names for two of the old ones. */
+const WARN_EXTRA_STATES = ["Customer Reports Intermittent","Previously Illuminated","Not Checked"];
+const STATE_LABEL = {"Not present":"Off / Not Present","Illuminated now":"Illuminated"};
+
+function baseKey(key){ const p = key.split("."); return p[0] + "." + p[1]; }
+function entryFor(key, item){
+  const e = ENTRY[baseKey(key)] || {};
+  /* an item with no list of its own answers from the template's own findings */
+  return Object.assign({multi:e.multi || e.selects ? e.multi : (item && item.flags) || null}, e);
+}
+/* What a choice says about the item. It proposes a status only while the item
+   has none, or while the status was itself proposed - it never overrules one
+   the technician set. */
+const GOODISH = /^(Good|Good \/ Tight|Good \/ Normal|Full \/ Good|Clean \/ Good|Clean \/ Normal|Normal|None|None Observed|Off \/ Not Present)$/;
+const NOANSWER = /^(Not Inspected|Not Checked|Not Measured|Not Tested|Not Road Tested|Measurement Required)$/;
+const URGENTISH = /^(Bulge|Exposed Cord|Sidewall Damage|Severe Leak|Empty \/ Critically Low|Brake Line Leak|Broken|Case Swollen|Cracked|Below Specification|Very Low|Coolant Contamination Suspected|Fuel Contamination Suspected)$/;
+const MONITORISH = /^(Normal Wear|Minor Wear|Minor Play|Minor Corrosion|Slightly Low|Seep|Light Seep|Seeping|Residue \/ Old Leak|Lightly Dirty|Dark \/ Used|Dark|Age Concern|Near Minimum Specification|Streaking|Curb Rash|Damaged Finish|Scratched|Chip|Pitted|Intermittent|Dirty|Discolored|Normal|Service Recommended|Dim|Aftermarket \/ Modified|Glazed|Soft|Mismatched Tire)$/;
+function optBucket(opt){
+  const o = String(opt || "");
+  if (!o || NOANSWER.test(o)) return "";
+  if (GOODISH.test(o)) return "Good";
+  if (o === "N/A" || o === "Not Serviceable / Sealed") return "N/A";
+  if (URGENTISH.test(o)) return "Urgent";
+  if (MONITORISH.test(o)) return "Monitor";
+  return "Needs Attention";
+}
+const BUCKET_RANK = {"Not Inspected":0, "N/A":0, "Good":1, "Monitor":2, "Needs Attention":3, "Urgent":4};
+function proposeFromChoice(insp, key, opt, item, g){
+  const b = optBucket(opt); if (!b) return;
+  const it = inspItem(insp, key);
+  if (!(it.state === "Not Inspected" || it.auto)) return;
+  const states = statesFor(item, g);
+  const low = String(opt).toLowerCase();
+  let st = states.find(s => s.toLowerCase() === low);
+  if (!st){
+    if (b === "N/A") st = states.indexOf("N/A") >= 0 ? "N/A" : null;
+    else if (states === INSP_STATES || states.indexOf("Needs Attention") >= 0) st = b;
+    else if (b === "Good") st = states.indexOf("Good") >= 0 ? "Good" : states.indexOf("Not present") >= 0 ? "Not present" : null;
+  }
+  if (!st) return;
+  if (it.state !== "Not Inspected" && (BUCKET_RANK[summaryBucket(st)] || 0) <= (BUCKET_RANK[summaryBucket(it.state)] || 0)) return;
+  if (b === "N/A" && it.state !== "Not Inspected") return;
+  setInspState(insp, key, st);
+  it.auto = true;
+}
+
 /* ---------- the multipoint inspection screen ----------
-   Speed is the feature. A technician with the car on a lift will not walk back
-   to a desk to open a dialog per item, so everything is on one page: status is
-   one tap, a measurement is one number typed into a box already the right
-   shape, and a note only appears when somebody wants one. */
-let inspId = null, inspFilter = "";
+   Speed is the feature. Everything is on one page. Status is one tap or one
+   key; a standard observation is a choice from a list; a measurement is a
+   preset or a number; typing is for what no list can say. */
+let inspId = null, inspFilter = "", inspSessionId = null;
+let inspLastState = "";                 /* this inspection only, never the next car */
+const inspOpenCustom = {};              /* which Other / Custom boxes are open */
 function openInspection(orderId){
   const o = db.orders[orderId] || (cur && cur.id === orderId ? cur : null);
   if(!o) return;
@@ -1881,17 +2035,30 @@ function openInspection(orderId){
   const ord = db.orders[orderId];
   let insp = inspectionFor(ord);
   if(!insp){ insp = newInspection(orderId, ord.vehicleId); save(); }
-  inspId = insp.id; inspFilter = ""; go("insp");
+  inspId = insp.id; inspFilter = "";
+  if (inspSessionId !== insp.id){ inspSessionId = insp.id; inspLastState = ""; Object.keys(inspOpenCustom).forEach(k => delete inspOpenCustom[k]); }
+  go("insp");
+}
+/* Reading an item for the screen never adds it to the record, so opening a
+   completed inspection leaves it byte-for-byte as it was. */
+function peekItem(insp, key){
+  return insp.items[key] || {state:"Not Inspected", meas:{}, flags:[], note:"", custNote:"", photos:[], at:null, tech:"", obs:{}};
+}
+function inspProgress(insp){
+  const s = inspSummary(insp);
+  return {total:s.total, uninspected:s["Not Inspected"], done:s.total - s["Not Inspected"], sum:s};
 }
 function renderInspection(){
   const insp = db.inspections[inspId];
   if(!insp){ go("dash"); return; }
+  const focusKey = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.f : "";
+  const y = window.scrollY;
   const o = db.orders[insp.orderId] || {};
   const v = db.vehicles[insp.vehicleId] || {};
-  const c = db.customers[o.customerId] || {};
-  const sum = inspSummary(insp);
+  const pr = inspProgress(insp), sum = pr.sum;
   const done = insp.state === "Completed";
-  const counts = [["Good","is-good"],["Monitor","is-mon"],["Needs Attention","is-att"],["Urgent","is-urg"],["Not Inspected","is-non"],["N/A","is-na"]];
+  const filters = [["","All",sum.total],["uninspected","Uninspected",sum["Not Inspected"]],["Monitor","Monitor",sum.Monitor],
+    ["Needs Attention","Needs Attention",sum["Needs Attention"]],["Urgent","Urgent",sum.Urgent],["notes","With Notes",null],["photos","With Photos",null]];
   $("#app").innerHTML = `
   <div class="toolbar">
     <button onclick="backToOrder('${insp.orderId}')">← Work order</button>
@@ -1913,17 +2080,21 @@ function renderInspection(){
     </div>
     ${techDatalist()}
   </div>
-  <div class="ibar">
-    ${counts.map(([n,cl])=>`<div class="icount ${inspFilter===n?"on":""}" onclick="filterInsp('${n}')"><b class="${cl}" style="color:inherit">${sum[n]||0}</b>${esc(n)}</div>`).join("")}
-    <div class="icount ${inspFilter===""?"on":""}" onclick="filterInsp('')">All ${sum.total}</div>
+  <div class="ibar iprogress">
+    <div class="iprog"><b id="inspProgress">${pr.done} / ${pr.total} completed</b>
+      <span class="${pr.uninspected?"iunins":"muted"}" id="inspUninspected">UNINSPECTED: ${pr.uninspected}</span></div>
+    ${filters.map(([k,label,n])=>`<div class="icount ${inspFilter===k?"on":""}" data-filter="${k}" onclick="filterInsp('${k}')">${n==null?"":`<b>${n}</b>`}${esc(label)}</div>`).join("")}
     <div class="grow"></div>
-    <button class="sm" onclick="markRestGood()" ${done?"disabled":""}>Mark remaining Good</button>
+    <button class="sm" onclick="markRestGood()" ${done?"disabled":""} title="Condition items only. Measured items stay as they are.">Mark remaining condition items Good</button>
   </div>
+  ${done?"":`<div class="muted ikeys">Keys on a status: <b>G</b> Good · <b>M</b> Monitor · <b>A</b> Needs Attention · <b>U</b> Urgent · <b>X</b> N/A · <b>1–9</b> nth choice · <b>0</b> clear · <b>.</b> repeat last${inspLastState?" ("+esc(inspLastState)+")":""} · <b>↑ ↓</b> item · <b>← →</b> choice · <b>Enter</b> in a box moves on</div>`}
   ${(insp.template.groups||[]).map(g=>inspGroupHtml(insp,g,done)).join("")}
   <div class="card"><div class="toolbar"><div class="grow"></div>
-    ${done?`<span class="muted">Completed by ${esc(insp.tech||"—")} on ${esc(String(insp.completedAt).slice(0,16).replace("T"," "))}</span>`
+    ${done?`<span class="muted">Completed by ${esc(insp.tech||"—")} on ${esc(String(insp.completedAt).slice(0,16).replace("T"," "))}${insp.uninspectedAtCompletion?` · completed with ${insp.uninspectedAtCompletion} item(s) not inspected`:""}</span>`
           :`<button class="green" onclick="signOffInspection()">Complete inspection…</button>`}</div></div>`;
   const te = $("#i_tech"); if(te) te.onchange = () => { insp.tech = te.value; save(); };
+  window.scrollTo(0, y);
+  if (focusKey){ const el = document.querySelector('[data-f="' + CSS.escape(focusKey) + '"]'); if (el) el.focus({preventScroll:true}); }
 }
 function backToOrder(orderId){ inspId=null; go("dash"); editOrder(orderId); }
 function filterInsp(f){ inspFilter = (inspFilter===f?"":f); renderInspection(); }
@@ -1931,102 +2102,210 @@ function techDatalist(){
   const list=(db.settings.techs||[]);
   return `<datalist id="techlist">${list.map(t=>`<option value="${esc(t)}">`).join("")}</datalist>`;
 }
-function inspVisible(insp,key){
+function inspVisible(insp,key,g){
   if(!inspFilter) return true;
-  const it=insp.items[key];
-  return (it?it.state:"Not Inspected")===inspFilter;
+  if(g && g.noSummary) return false;
+  const it=peekItem(insp,key);
+  if(inspFilter==="uninspected") return summaryBucket(it.state)==="Not Inspected";
+  if(inspFilter==="notes") return !!(it.note||it.custNote);
+  if(inspFilter==="photos") return attsFor("insp",insp.id+"|"+key).length>0;
+  return summaryBucket(it.state)===inspFilter;
+}
+/* Mark Good is for items judged by eye. Anything the template asks to be
+   measured, a test with its own result words, and the road test are left
+   alone: a pad cannot be "Good" without a number. */
+function goodEligible(g,item){
+  if(g.noSummary) return false;
+  if(item.meas&&item.meas.length) return false;
+  if(item.states) return false;
+  if(g.id==="safety"&&item.id==="roadtest") return false;
+  return true;
+}
+function groupGoodKeys(insp,g){
+  const keys=[];
+  (g.items||[]).forEach(item=>{
+    if(!goodEligible(g,item)) return;
+    (g.perWheel?g.positions:[null]).forEach(pos=>{
+      const key=inspItemKey(g,item,pos);
+      if(peekItem(insp,key).state==="Not Inspected") keys.push({key,item});
+    });
+  });
+  return keys;
+}
+function markGroupGood(gid){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const g=(insp.template.groups||[]).find(x=>x.id===gid); if(!g) return;
+  groupGoodKeys(insp,g).forEach(({key,item})=>{
+    const states=statesFor(item,g);
+    setInspState(insp,key,states.indexOf("Good")>=0?"Good":states[0]);
+    inspItem(insp,key).auto=false;
+  });
+  save(); renderInspection();
 }
 function inspGroupHtml(insp,g,done){
   const rows = g.perWheel ? matrixHtml(insp,g,done) : (g.items||[]).map(item=>itemRowHtml(insp,g,item,null,done)).join("");
   if(!rows.trim()) return "";
-  return `<div class="card igroup"><h3>${esc(g.name)}</h3>${rows}</div>`;
+  const eligible=done?[]:groupGoodKeys(insp,g);
+  return `<div class="card igroup" data-group="${g.id}"><div class="toolbar" style="margin:0 0 6px"><h3 style="margin:0">${esc(g.name)}</h3><div class="grow"></div>
+    ${eligible.length?`<button class="sm" data-f="gg|${g.id}" onclick="markGroupGood('${g.id}')" title="Sets only items still Not Inspected. Measured items are never included.">Mark group Good (${eligible.length})</button>`:""}</div>${rows}</div>`;
 }
-/* Tyres and brakes are the same three numbers four or five times over. A
-   matrix is the difference between a job that takes one minute and one that
-   takes five, so those groups get a table and everything else gets a row. */
+/* ---- controls ---- */
+const fk = s => esc(s);
+function optHtml(opts, value){
+  return opts.map(o=>`<option value="${esc(o)}" ${o===value?"selected":""}>${esc(o)}</option>`).join("");
+}
+/* A named dropdown (Level, Condition, Leak...). */
+function selectHtml(insp,key,s,done){
+  const it=peekItem(insp,key);
+  const bag=s.store==="meas"?(it.meas||{}):(it.obs||{});
+  const v=bag[s.k]==null?"":String(bag[s.k]);
+  const custom=(v!==""&&s.opts.indexOf(v)<0)||inspOpenCustom[key+"|sel|"+s.k];
+  return `<label class="isel"><span>${esc(s.label)}</span>
+    <select data-ik="${key}" data-sel="${s.k}" data-store="${s.store}" data-f="${fk("sel|"+key+"|"+s.k)}" ${done?"disabled":""}>
+      <option value="" ${v===""&&!custom?"selected":""}>—</option>${optHtml(s.opts,custom?null:v)}<option value="${OTHER}" ${custom?"selected":""}>${OTHER}</option></select>
+    ${custom?`<input class="icustom" placeholder="Other / Custom" data-ik="${key}" data-selc="${s.k}" data-store="${s.store}" data-f="${fk("selc|"+key+"|"+s.k)}" value="${esc(custom&&s.opts.indexOf(v)<0?v:"")}" ${done?"disabled":""}>`:""}</label>`;
+}
+/* A measurement with presets. The stored value is the plain number. */
+function measPresetHtml(insp,key,m,p,done){
+  const it=peekItem(insp,key);
+  const v=it.meas[m.k]==null?"":String(it.meas[m.k]);
+  const inPreset=p.opts.some(o=>o.v===v)||v===p.not;
+  const custom=(v!==""&&!inPreset)||inspOpenCustom[key+"|mp|"+m.k];
+  return `<span class="imp"><select data-ik="${key}" data-mp="${m.k}" data-f="${fk("mp|"+key+"|"+m.k)}" title="${esc(m.label)}" ${done?"disabled":""}>
+      <option value="" ${v===""&&!custom?"selected":""}>—</option>
+      ${p.opts.map(o=>`<option value="${esc(o.v)}" ${!custom&&o.v===v?"selected":""}>${esc(o.l)}</option>`).join("")}
+      <option value="__custom" ${custom?"selected":""}>Custom…</option><option value="${esc(p.not)}" ${v===p.not?"selected":""}>${esc(p.not)}</option></select>
+    ${custom?`<input class="imeas" inputmode="decimal" placeholder="${esc(m.unit||"")}" data-ik="${key}" data-m="${m.k}" data-f="${fk("m|"+key+"|"+m.k)}" value="${esc(inPreset?"":v)}" ${done?"disabled":""}>`:""}</span>`;
+}
+function measPlainHtml(insp,key,m,done,placeholder){
+  const it=peekItem(insp,key);
+  return `<input class="imeas" inputmode="decimal" placeholder="${esc(placeholder||"")}" data-ik="${key}" data-m="${m.k}" data-f="${fk("m|"+key+"|"+m.k)}" value="${esc(it.meas[m.k]==null?"":it.meas[m.k])}" ${done?"disabled":""}>`;
+}
+function measControl(insp,key,item,m,done,inRow){
+  const e=entryFor(key,item);
+  if(e.selects&&e.selects.some(s=>s.store==="meas"&&s.k===m.k)) return "";   /* drawn as its dropdown */
+  const p=e.meas&&e.meas[m.k];
+  if(p) return measPresetHtml(insp,key,m,p,done);
+  if(m.k==="psi"&&e.psi){
+    const it=peekItem(insp,key);
+    return `<span class="imp">${measPlainHtml(insp,key,m,done,"PSI")}${done?"":`<button class="sm nc ${it.meas.psi==="Not Checked"?"on":""}" tabindex="-1" onclick="setMeas('${key}','psi','Not Checked')">N/C</button>`}</span>`;
+  }
+  return measPlainHtml(insp,key,m,done,m.unit||"");
+}
+/* Observations that can be more than one at once: a chip per finding, and one
+   list to add the next. */
+function obsMultiHtml(insp,key,item,done){
+  const e=entryFor(key,item);
+  const opts=e.multi; const it=peekItem(insp,key);
+  if(!opts&&!(it.flags||[]).length) return "";
+  const list=opts||[];
+  const open=inspOpenCustom[key+"|multi"];
+  return `<div class="iobs">${(it.flags||[]).map((f,i)=>`<button class="flag on" data-f="${fk("chip|"+key+"|"+i)}" title="Remove" onclick="removeObs('${key}',${i})" ${done?"disabled":""}>${list.indexOf(f)>=0?esc(f):"Other / Custom: "+esc(f)}${done?"":" ×"}</button>`).join("")}
+    ${done||!opts?"":`<select class="iadd" data-ik="${key}" data-multi="1" data-f="${fk("multi|"+key)}"><option value="">+ Observation…</option>${list.filter(o=>(it.flags||[]).indexOf(o)<0).map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join("")}<option value="${OTHER}">${OTHER}</option></select>`}
+    ${open&&!done?`<input class="icustom" placeholder="Describe it, then Enter" data-ik="${key}" data-multic="1" data-f="${fk("multic|"+key)}">`:""}</div>`;
+}
+function statusStates(item,g){
+  const s=statesFor(item,g);
+  return g.id==="warnings"?s.concat(WARN_EXTRA_STATES.filter(x=>s.indexOf(x)<0)):s;
+}
+function stateBtns(insp,key,item,g,done){
+  const it=peekItem(insp,key);
+  const states=statusStates(item,g);
+  const onIdx=states.indexOf(it.state);
+  return `<div class="sbtns" data-row="${key}">${states.map((st,i)=>{
+    const b=summaryBucket(st);
+    const cl=INSP_CLASS[st]||(b==="Urgent"?"is-urg":b==="Needs Attention"?"is-att":b==="Monitor"?"is-mon":b==="Good"?"is-good":"is-na");
+    const label=states===INSP_STATES?INSP_SHORT[st]:(STATE_LABEL[st]||st);
+    return `<button class="sbtn ${cl} ${it.state===st?"on":""}" title="${esc(STATE_LABEL[st]||st)}" data-f="${fk("s|"+key+"|"+i)}" data-st="${esc(st)}"
+      tabindex="${(onIdx<0?i===0:i===onIdx)?0:-1}" onclick="tapState('${key}','${st.replace(/'/g,"")}')" ${done?"disabled":""}>${esc(label)}</button>`;
+  }).join("")}</div>`;
+}
+/* Tyres and brakes are the same numbers four or five times over, so those
+   groups are a table, with copy-across buttons that only ever act when pressed. */
 function matrixHtml(insp,g,done){
   return (g.items||[]).map(item=>{
-    const anyVisible=g.positions.some(pos=>inspVisible(insp,inspItemKey(g,item,pos)));
+    const anyVisible=g.positions.some(pos=>inspVisible(insp,inspItemKey(g,item,pos),g));
     if(!anyVisible) return "";
     const meas=item.meas||[];
+    const e=entryFor(inspItemKey(g,item,g.positions[0]),item);
+    const tools=done?"":g.id==="tires"&&item.id==="tire"?`<div class="icopy"><button class="sm" onclick="copyMeas('${g.id}','${item.id}',['psi'],'LF','RF')">Copy LF → RF pressure</button>
+        <button class="sm" onclick="copyMeas('${g.id}','${item.id}',['psi'],'FRONT','REAR')">Copy front → rear pressure</button>
+        <span>Set all pressures <input id="psiAll" class="imeas" inputmode="decimal" style="width:60px"> <button class="sm" onclick="setAllPsi()">Set all</button></span></div>`
+      :g.id==="brakes"&&item.id==="pads"?`<div class="icopy"><button class="sm" onclick="copyMeas('${g.id}','${item.id}',['inner','outer'],'LF','RF')">Copy LF → RF pads</button>
+        <button class="sm" onclick="copyMeas('${g.id}','${item.id}',['inner','outer'],'LR','RR')">Copy LR → RR pads</button></div>`:"";
     return `<div style="margin-bottom:10px">
-      <div style="font-weight:600;margin-bottom:3px">${esc(item.name)}</div>
-      <table class="imatrix"><thead><tr><th></th>${meas.map(m=>`<th>${esc(m.label)} <span class="muted">${esc(m.unit)}</span></th>`).join("")}<th>Condition</th><th></th></tr></thead><tbody>
+      <div style="font-weight:600;margin-bottom:3px">${esc(item.name)}</div>${tools}
+      <div style="overflow-x:auto"><table class="imatrix"><thead><tr><th></th>${meas.map(m=>`<th>${esc(m.label)} <span class="muted">${esc(m.unit)}</span></th>`).join("")}<th>Condition</th><th>Observations</th><th></th></tr></thead><tbody>
       ${g.positions.map(pos=>{
         const key=inspItemKey(g,item,pos);
-        if(!inspVisible(insp,key)) return "";
-        const it=inspItem(insp,key);
-        return `<tr><td class="pos">${esc(pos)}</td>
-          ${meas.map(m=>`<td><input inputmode="decimal" data-ik="${key}" data-m="${m.k}" value="${esc(it.meas[m.k]==null?"":it.meas[m.k])}" ${done?"disabled":""}></td>`).join("")}
+        if(!inspVisible(insp,key,g)) return "";
+        return `<tr data-rowkey="${key}"><td class="pos">${esc(pos)}</td>
+          ${meas.map(m=>`<td>${measControl(insp,key,item,m,done,false)}</td>`).join("")}
           <td>${stateBtns(insp,key,item,g,done)}</td>
+          <td>${obsMultiHtml(insp,key,item,done)}</td>
           <td>${flagsAndNote(insp,key,item,done)}</td></tr>`;
       }).join("")}
-      </tbody></table></div>`;
+      </tbody></table></div></div>`;
   }).join("");
 }
 function itemRowHtml(insp,g,item,pos,done){
   const key=inspItemKey(g,item,pos);
-  if(!inspVisible(insp,key)) return "";
-  const it=inspItem(insp,key);
+  if(!inspVisible(insp,key,g)) return "";
+  const it=peekItem(insp,key);
+  const e=entryFor(key,item);
   const meas=item.meas||[];
-  return `<div class="irow" id="row_${key.replace(/[^A-Za-z0-9]/g,'_')}">
+  const noteOpen=!!(it.note||it.custNote)||inspOpenCustom[key+"|note"];
+  return `<div class="irow" id="row_${key.replace(/[^A-Za-z0-9]/g,'_')}" data-rowkey="${key}">
     <div class="itop">
       <div class="iname">${esc(item.name)}</div>
-      ${meas.map(m=>`<div class="meas"><input inputmode="decimal" placeholder="${esc(m.label)}" data-ik="${key}" data-m="${m.k}" value="${esc(it.meas[m.k]==null?"":it.meas[m.k])}" ${done?"disabled":""}><span>${esc(m.unit)}</span></div>`).join("")}
+      ${(e.selects||[]).map(s=>selectHtml(insp,key,s,done)).join("")}
+      ${meas.map(m=>{ const c=measControl(insp,key,item,m,done,true); return c?`<label class="isel"><span>${esc(m.label)}${m.unit?" ("+esc(m.unit)+")":""}</span>${c}</label>`:""; }).join("")}
       ${stateBtns(insp,key,item,g,done)}
     </div>
-    ${flagChips(insp,key,item,done)}
-    ${noteRow(insp,key,done)}
+    <div class="iline">${obsMultiHtml(insp,key,item,done)}
+      ${noteOpen||done?"":`<button class="sm ghost" tabindex="-1" onclick="openNote('${key}')">+ Note</button>`}
+      ${done?"":`<button class="sm" tabindex="-1" onclick="pickPhotos('insp','${insp.id}|${key}')">+ Photo</button>`}</div>
+    ${noteOpen?noteRow(insp,key,done):""}
     ${attsFor("insp",insp.id+"|"+key).length?photoStrip("insp",insp.id+"|"+key,{readonly:done}):""}
-    ${done?"":`<button class="sm" style="margin-top:5px" onclick="pickPhotos('insp','${insp.id}|${key}')">+ Photo</button>`}
   </div>`;
 }
 function statesFor(item,g){ return item.states || g.itemStates || INSP_STATES; }
-function stateBtns(insp,key,item,g,done){
-  const it=inspItem(insp,key);
-  const states=statesFor(item,g);
-  return `<div class="sbtns">${states.map(st=>{
-    const cl=INSP_CLASS[st]||(st==="Inoperative"||st==="Replace Battery"||st==="Bad Cell"||st==="Contaminated"?"is-att":
-      st==="Dim"||st==="Moisture present"||st==="Damaged housing"||st==="Service Recommended"||st==="Recharge and Retest"||st==="Good / Recharge"?"is-mon":
-      st==="Good"||st==="Not present"?"is-good":"is-na");
-    const label=states===INSP_STATES?INSP_SHORT[st]:st;
-    return `<button class="sbtn ${cl} ${it.state===st?"on":""}" title="${esc(st)}" onclick="tapState('${key}','${st.replace(/'/g,"")}')" ${done?"disabled":""}>${esc(label)}</button>`;
-  }).join("")}</div>`;
-}
 function flagChips(insp,key,item,done){
   if(!item.flags) return "";
-  const it=inspItem(insp,key);
+  const it=peekItem(insp,key);
   return `<div class="flags">${item.flags.map(f=>
     `<button class="flag ${it.flags.indexOf(f)>=0?"on":""}" onclick="tapFlag('${key}','${f.replace(/'/g,"")}')" ${done?"disabled":""}>${esc(f)}</button>`).join("")}</div>`;
 }
-/* In the matrix the flags and note live behind one button so the table stays a
-   table; in a normal row they are already on screen. */
+/* In the matrix the note lives behind one button so the table stays a table. */
 function flagsAndNote(insp,key,item,done){
-  const it=inspItem(insp,key);
+  const it=peekItem(insp,key);
   const ph=attsFor("insp",insp.id+"|"+key).length;
-  const n=(it.flags||[]).length+((it.note||it.custNote)?1:0);
+  const n=(it.note||it.custNote)?1:0;
   return `<div style="display:flex;gap:4px;white-space:nowrap">
-    <button class="sm" onclick="openItemDetail('${key}')">Notes${n?" ("+n+")":""}</button>
-    ${done?"":`<button class="sm" title="Photograph this" onclick="pickPhotos('insp','${insp.id}|${key}')">📷${ph?" "+ph:""}</button>`}
+    <button class="sm" tabindex="-1" onclick="openItemDetail('${key}')">Note${n?" ✓":""}</button>
+    ${done?"":`<button class="sm" tabindex="-1" title="Photograph this" onclick="pickPhotos('insp','${insp.id}|${key}')">📷${ph?" "+ph:""}</button>`}
     ${(done&&ph)?`<button class="sm" onclick="openItemDetail('${key}')">📷 ${ph}</button>`:""}
   </div>`;
 }
 function noteRow(insp,key,done){
-  const it=inspItem(insp,key);
+  const it=peekItem(insp,key);
   return `<div class="inote">
-    <input placeholder="Technician note — internal" data-ik="${key}" data-n="note" value="${esc(it.note)}" ${done?"disabled":""}>
-    <input placeholder="Note for the customer — prints on their report" data-ik="${key}" data-n="custNote" value="${esc(it.custNote)}" ${done?"disabled":""}>
+    <input placeholder="Technician note — internal" data-ik="${key}" data-n="note" data-f="${fk("n|"+key+"|note")}" value="${esc(it.note)}" ${done?"disabled":""}>
+    <input placeholder="Note for the customer — prints on their report" data-ik="${key}" data-n="custNote" data-f="${fk("n|"+key+"|custNote")}" value="${esc(it.custNote)}" ${done?"disabled":""}>
   </div>`;
+}
+function openNote(key){
+  inspOpenCustom[key+"|note"]=true; renderInspection();
+  const el=document.querySelector('[data-f="'+CSS.escape("n|"+key+"|note")+'"]'); if(el) el.focus();
 }
 function openItemDetail(key){
   const insp=db.inspections[inspId]; if(!insp) return;
   window.__itemDetailKey=key;
-  const it=inspItem(insp,key);
+  const it=peekItem(insp,key);
   let item=null,gname="";
   (insp.template.groups||[]).forEach(g=>(g.items||[]).forEach(i=>{ if(key.indexOf(g.id+"."+i.id)===0){item=i;gname=g.name;} }));
   const done=insp.state==="Completed";
   $("#recSheet").innerHTML=`<div class="sheet-head"><h2>${esc(gname)} — ${esc(item?item.name:key)}</h2><div class="grow"></div><button onclick="closeRec();renderInspection()">Close</button></div>
-    ${item&&item.flags?`<label>What was found</label>${flagChips(insp,key,item,done)}`:""}
     <label style="margin-top:10px">Technician note — internal, never printed for the customer</label>
     <input id="d_note" value="${esc(it.note)}" ${done?"disabled":""}>
     <label>Note for the customer — prints on their report</label>
@@ -2034,20 +2313,29 @@ function openItemDetail(key){
     <label style="margin-top:10px">Photographs</label>
     ${photoStrip("insp",insp.id+"|"+key,{readonly:done})}
     <div class="muted" style="font-size:11.5px;margin-top:4px">A photograph only reaches the customer's report when it is marked <b>Show the customer</b>.</div>
-    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveItemDetail('${key}')">Done</button></div>`;
+    ${done?"":`<div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveItemDetail('${key}')">Done</button></div>`}`;
   $("#recOverlay").classList.add("on");
+  const n=$("#d_note"); if(n&&!done) n.focus();
 }
 function saveItemDetail(key){
-  const insp=db.inspections[inspId]; const it=inspItem(insp,key);
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const it=inspItem(insp,key);
   it.note=$("#d_note").value; it.custNote=$("#d_cust").value;
   it.photos=attsFor("insp",insp.id+"|"+key).map(a=>a.id);
   window.__itemDetailKey=null;
   save(); closeRec(); renderInspection();
 }
+function itemAndGroup(insp,key){
+  let item=null,group=null;
+  (insp.template.groups||[]).forEach(g=>(g.items||[]).forEach(i=>{ if(baseKey(key)===g.id+"."+i.id){item=i;group=g;} }));
+  return {item,g:group};
+}
 function tapState(key,state){
   const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
   const it=inspItem(insp,key);
   setInspState(insp,key,it.state===state?"Not Inspected":state);
+  it.auto=false;
+  if(it.state!=="Not Inspected") inspLastState=it.state;
   save(); renderInspection();
 }
 function tapFlag(key,flag){
@@ -2056,56 +2344,235 @@ function tapFlag(key,flag){
   const i=it.flags.indexOf(flag);
   if(i>=0) it.flags.splice(i,1); else it.flags.push(flag);
   if(it.state==="Not Inspected"&&it.flags.length) setInspState(insp,key,"Needs Attention");
-  save();
-  if($("#recOverlay").classList.contains("on")) openItemDetail(key); else renderInspection();
+  save(); renderInspection();
 }
-/* Everything the technician did not flag is, by definition, what they looked at
-   and were happy with. One button beats 120 taps. */
-function markRestGood(){
+function addObs(key,value){
   const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
-  if(!confirm("Mark every item still showing Not Inspected as Good? Anything you have already set is left alone.")) return;
-  (insp.template.groups||[]).forEach(g=>{
-    if(g.noSummary) return;
-    (g.items||[]).forEach(item=>{
-      (g.perWheel?g.positions:[null]).forEach(pos=>{
-        const key=inspItemKey(g,item,pos);
-        const it=inspItem(insp,key);
-        if(it.state==="Not Inspected"){
-          const states=statesFor(item,g);
-          setInspState(insp,key,states.indexOf("Good")>=0?"Good":states[0]);
-        }
-      });
-    });
+  const v=String(value||"").trim(); if(!v) return;
+  const it=inspItem(insp,key);
+  if(it.flags.indexOf(v)<0) it.flags.push(v);
+  const {item,g}=itemAndGroup(insp,key);
+  if(item) proposeFromChoice(insp,key,v,item,g);
+  it.at=new Date().toISOString();
+  if(insp.state==="Not Started"){ insp.state="In Progress"; insp.startedAt=it.at; }
+  save();
+}
+function removeObs(key,i){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const it=inspItem(insp,key);
+  it.flags.splice(i,1);
+  save(); renderInspection();
+  const nxt=document.querySelector('[data-f="'+CSS.escape("multi|"+key)+'"]'); if(nxt) nxt.focus();
+}
+function setSel(key,k,store,value){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const it=inspItem(insp,key);
+  if(store==="meas") it.meas[k]=value; else { it.obs=it.obs||{}; if(value==="") delete it.obs[k]; else it.obs[k]=value; }
+  const {item,g}=itemAndGroup(insp,key);
+  if(item&&value) proposeFromChoice(insp,key,value,item,g);
+  it.at=new Date().toISOString();
+  if(insp.state==="Not Started"){ insp.state="In Progress"; insp.startedAt=it.at; }
+  save();
+}
+function setMeas(key,k,value){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const it=inspItem(insp,key);
+  it.meas[k]=value;
+  const sug=suggestState(key,it.meas);
+  if(sug&&(it.state==="Not Inspected")){ setInspState(insp,key,sug); it.auto=true; }
+  it.at=new Date().toISOString();
+  if(insp.state==="Not Started"){ insp.state="In Progress"; insp.startedAt=it.at; }
+  save(); renderInspection();
+}
+/* Copying only ever happens on a press, and only fills in the numbers named. */
+function copyMeas(gid,iid,ks,from,to){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const pairs=from==="FRONT"?[["LF","LR"],["RF","RR"]]:[[from,to]];
+  pairs.forEach(([a,b])=>{
+    const src=peekItem(insp,gid+"."+iid+"."+a);
+    const dst=inspItem(insp,gid+"."+iid+"."+b);
+    ks.forEach(k=>{ if(src.meas[k]!==""&&src.meas[k]!=null) dst.meas[k]=src.meas[k]; });
+    dst.at=new Date().toISOString();
   });
   save(); renderInspection();
 }
-function signOffInspection(){
-  const insp=db.inspections[inspId]; if(!insp) return;
-  const sum=inspSummary(insp);
-  const tech=prompt("Technician completing this inspection:",insp.tech||db.settings.lastTech||"");
-  if(tech==null||!tech.trim()) return;
-  if(sum["Not Inspected"]>0&&!confirm(sum["Not Inspected"]+" item(s) are still Not Inspected. Complete the inspection anyway?")) return;
-  completeInspection(insp,tech.trim());
-  if(db.settings.techs.indexOf(tech.trim())<0) db.settings.techs.push(tech.trim());
+function setAllPsi(){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const v=($("#psiAll")||{}).value; if(v==null||String(v).trim()==="") return;
+  ["LF","RF","LR","RR"].forEach(p=>{ const it=inspItem(insp,"tires.tire."+p); it.meas.psi=String(v).trim(); it.at=new Date().toISOString(); });
   save(); renderInspection();
 }
-/* Measurements and notes are typed, so they are saved as they are typed rather
-   than on a button nobody remembers to press. */
+/* Every condition item still Not Inspected, across the sheet. Measured items,
+   tests and the road test are left for the technician. */
+function markRestGood(){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const n=(insp.template.groups||[]).reduce((s,g)=>s+groupGoodKeys(insp,g).length,0);
+  if(!n){ alert("Nothing left to mark: every condition item already has a status. Measured items are never marked automatically."); return; }
+  if(!confirm("Mark "+n+" condition item(s) still Not Inspected as Good? Measured items (tires, pads, rotors, fluid tests, battery) and the road test are left alone.")) return;
+  (insp.template.groups||[]).forEach(g=>groupGoodKeys(insp,g).forEach(({key,item})=>{
+    const states=statesFor(item,g);
+    setInspState(insp,key,states.indexOf("Good")>=0?"Good":states[0]);
+    inspItem(insp,key).auto=false;
+  }));
+  save(); renderInspection();
+}
+/* Completing: never invents a Good. If items were skipped the technician is
+   told how many, and chooses. */
+function signOffInspection(){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const pr=inspProgress(insp);
+  $("#recSheet").innerHTML=`<div class="sheet-head"><h2>Complete inspection</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <div><b>${pr.done} / ${pr.total}</b> items inspected.</div>
+    ${pr.uninspected?`<div class="verifynote" id="uninsWarn" style="margin-top:8px"><b>${pr.uninspected} ITEM${pr.uninspected===1?" HAS":"S HAVE"} NOT BEEN INSPECTED.</b> They will print as Not inspected. Nothing is marked Good for you.</div>`:""}
+    <label style="margin-top:10px">Technician completing this inspection</label>
+    <input id="so_tech" list="techlist" value="${esc(insp.tech||db.settings.lastTech||"")}">${techDatalist()}
+    <div class="toolbar" style="margin-top:14px">
+      ${pr.uninspected?`<button class="primary" id="so_return" onclick="returnToInspection()">RETURN TO INSPECTION</button>
+        <button id="so_complete" onclick="finishSignOff(true)">COMPLETE WITH UNINSPECTED ITEMS</button>`
+        :`<button class="green" id="so_complete" onclick="finishSignOff(false)">Complete inspection</button>`}</div>`;
+  $("#recOverlay").classList.add("on");
+  const b=$("#so_return")||$("#so_tech"); if(b) b.focus();
+}
+function returnToInspection(){
+  closeRec(); inspFilter="uninspected"; renderInspection();
+  const first=document.querySelector(".sbtns .sbtn[tabindex='0']"); if(first) first.focus();
+}
+function finishSignOff(withUninspected){
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const tech=(($("#so_tech")||{}).value||"").trim();
+  if(!tech){ alert("Enter the technician's name."); return; }
+  const pr=inspProgress(insp);
+  if(pr.uninspected&&!withUninspected) return;
+  insp.uninspectedAtCompletion=pr.uninspected||0;
+  completeInspection(insp,tech);
+  if(db.settings.techs.indexOf(tech)<0) db.settings.techs.push(tech);
+  save(); closeRec(); inspFilter=""; renderInspection();
+}
+/* ---- typing, choosing and the keyboard ---- */
 document.addEventListener("input",e=>{
   const t=e.target;
-  if(!t.dataset||!t.dataset.ik) return;
+  if(!t.dataset||!t.dataset.ik||t.tagName==="SELECT") return;
   const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
-  const it=inspItem(insp,t.dataset.ik);
+  const key=t.dataset.ik;
+  const it=inspItem(insp,key);
   if(t.dataset.m){
     it.meas[t.dataset.m]=t.value;
-    /* A measurement can propose a condition. It never imposes one: the
-       technician is at the car and this program is not. */
-    const sug=suggestState(t.dataset.ik,it.meas);
-    if(sug&&it.state==="Not Inspected"){ setInspState(insp,t.dataset.ik,sug); }
+    const sug=suggestState(key,it.meas);
+    if(sug&&it.state==="Not Inspected"){ setInspState(insp,key,sug); it.auto=true; }
   }
   else if(t.dataset.n){ it[t.dataset.n]=t.value; }
+  else if(t.dataset.selc){
+    if(t.dataset.store==="meas") it.meas[t.dataset.selc]=t.value;
+    else { it.obs=it.obs||{}; it.obs[t.dataset.selc]=t.value; }
+  }
+  else if(t.dataset.multic) return;   /* added on Enter */
   it.at=new Date().toISOString();
+  if(insp.state==="Not Started"){ insp.state="In Progress"; insp.startedAt=it.at; }
   save();
+  const pe=$("#inspProgress"), ue=$("#inspUninspected");
+  if(pe&&ue){ const pr=inspProgress(insp); pe.textContent=pr.done+" / "+pr.total+" completed"; ue.textContent="UNINSPECTED: "+pr.uninspected; }
+});
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.tagName!=="SELECT"||!t.dataset||!t.dataset.ik) return;
+  const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+  const key=t.dataset.ik;
+  if(t.dataset.multi){
+    if(t.value===OTHER){ inspOpenCustom[key+"|multi"]=true; renderInspection(); focusF("multic|"+key); return; }
+    if(t.value){ addObs(key,t.value); renderInspection(); focusF("multi|"+key); }
+    return;
+  }
+  if(t.dataset.sel){
+    const ck=key+"|sel|"+t.dataset.sel;
+    if(t.value===OTHER){ inspOpenCustom[ck]=true; setSel(key,t.dataset.sel,t.dataset.store,""); renderInspection(); focusF("selc|"+key+"|"+t.dataset.sel); return; }
+    delete inspOpenCustom[ck];
+    setSel(key,t.dataset.sel,t.dataset.store,t.value); renderInspection(); return;
+  }
+  if(t.dataset.mp){
+    const ck=key+"|mp|"+t.dataset.mp;
+    if(t.value==="__custom"){ inspOpenCustom[ck]=true; renderInspection(); focusF("m|"+key+"|"+t.dataset.mp); return; }
+    delete inspOpenCustom[ck];
+    setMeas(key,t.dataset.mp,t.value); return;
+  }
+});
+function focusF(f){ const el=document.querySelector('[data-f="'+CSS.escape(f)+'"]'); if(el){ el.focus(); if(el.select&&el.tagName==="INPUT") el.select(); } return !!el; }
+function inspFocusables(){
+  return Array.from(document.querySelectorAll("#app select:not([disabled]), #app input:not([disabled]), #app .sbtns .sbtn[tabindex='0']:not([disabled])"))
+    .filter(el=>el.offsetParent!==null&&el.id!=="i_tech"&&el.id!=="psiAll");
+}
+function focusNextAfter(el){
+  const list=inspFocusables(); const i=list.indexOf(el);
+  if(i>=0&&list[i+1]){ list[i+1].focus(); return true; }
+  return false;
+}
+function moveRow(fromBtn,dir,keepIndex){
+  const rows=Array.from(document.querySelectorAll("#app .sbtns")).filter(r=>!r.querySelector(".sbtn[disabled]"));
+  const row=fromBtn.closest(".sbtns"); const i=rows.indexOf(row);
+  const target=rows[i+dir]; if(!target) return;
+  const btns=target.querySelectorAll(".sbtn");
+  const idx=Array.from(row.querySelectorAll(".sbtn")).indexOf(fromBtn);
+  const on=target.querySelector(".sbtn.on");
+  (keepIndex&&btns[idx]?btns[idx]:on||btns[0]).focus();
+}
+document.addEventListener("keydown",e=>{
+  if(view!=="insp"||e.ctrlKey||e.metaKey||e.altKey) return;
+  const t=e.target;
+  if(t.classList&&t.classList.contains("sbtn")){
+    const row=t.closest(".sbtns"); const key=row.dataset.row;
+    const btns=Array.from(row.querySelectorAll(".sbtn"));
+    const idx=btns.indexOf(t);
+    if(e.key==="ArrowRight"||e.key==="ArrowLeft"){
+      const n=btns[(idx+(e.key==="ArrowRight"?1:btns.length-1))%btns.length];
+      btns.forEach(b=>b.tabIndex=-1); n.tabIndex=0; n.focus(); e.preventDefault(); return;
+    }
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){ moveRow(t,e.key==="ArrowDown"?1:-1,false); e.preventDefault(); return; }
+    const states=btns.map(b=>b.dataset.st);
+    const k=e.key.toLowerCase();
+    let st=null;
+    if(/^[1-9]$/.test(k)) st=states[Number(k)-1]||null;
+    else if(k==="g") st=states.find(s=>s==="Good"||s==="Not present")||null;
+    else if(k==="m") st=states.find(s=>s==="Monitor")||null;
+    else if(k==="a") st=states.find(s=>s==="Needs Attention")||null;
+    else if(k==="u") st=states.find(s=>s==="Urgent")||null;
+    else if(k==="x") st=states.find(s=>s==="N/A")||null;
+    else if(k===".") st=inspLastState&&states.indexOf(inspLastState)>=0?inspLastState:null;
+    if(k==="0"||e.key==="Delete"||e.key==="Backspace"){
+      const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+      const it=inspItem(insp,key); setInspState(insp,key,"Not Inspected"); it.auto=false; save(); renderInspection();
+      focusF("s|"+key+"|0"); e.preventDefault(); return;
+    }
+    if(st){
+      const insp=db.inspections[inspId]; if(!insp||insp.state==="Completed") return;
+      const rows=Array.from(document.querySelectorAll("#app .sbtns"));
+      const nextRow=rows[rows.indexOf(row)+1];
+      const nextKey=nextRow?nextRow.dataset.row:"";
+      const it=inspItem(insp,key);
+      setInspState(insp,key,st); it.auto=false; inspLastState=st;
+      save(); renderInspection();
+      /* on to the next item - which, under a filter, may be the one that
+         now sits where this one was */
+      const target=nextKey&&document.querySelector('.sbtns[data-row="'+CSS.escape(nextKey)+'"]');
+      if(target){ (target.querySelector(".sbtn.on")||target.querySelector(".sbtn")).focus(); }
+      e.preventDefault();
+    }
+    return;
+  }
+  if(e.key==="Enter"&&t.dataset&&t.dataset.ik){
+    if(t.dataset.multic){
+      const key=t.dataset.ik; const v=t.value.trim();
+      if(v){ addObs(key,v); delete inspOpenCustom[key+"|multi"]; renderInspection(); focusF("multi|"+key); }
+      e.preventDefault(); return;
+    }
+    /* a number in the tyre or brake table moves down the column: LF, RF, LR, RR */
+    if(t.dataset.m){
+      const tr=t.closest("tr[data-rowkey]");
+      if(tr){
+        let nx=tr.nextElementSibling;
+        while(nx){ const el=nx.querySelector('[data-m="'+t.dataset.m+'"], [data-mp="'+t.dataset.m+'"]'); if(el){ el.focus(); if(el.select) el.select(); e.preventDefault(); return; } nx=nx.nextElementSibling; }
+      }
+    }
+    if(focusNextAfter(t)) e.preventDefault();
+  }
 });
 
 
@@ -2183,6 +2650,7 @@ function recFromFinding(o,f){
 }
 function describeFinding(f){
   const bits=[];
+  if(f.obs) bits.push(f.obs);
   if(f.flags&&f.flags.length) bits.push(f.flags.join(", "));
   Object.keys(f.meas||{}).forEach(k=>{ if(f.meas[k]!=="" && f.meas[k]!=null) bits.push(k+" "+f.meas[k]); });
   if(f.note) bits.push(f.note);
@@ -2275,29 +2743,31 @@ function stampCheckin(){
 }
 function addDamageDialog(){
   pullWO(); pullCheckin();
+  const opt=(list,first)=>`<option value="">${first}</option>`+list.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join("");
   $("#recSheet").innerHTML=`<div class="sheet-head"><h2>Record pre-existing damage</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
-    <label>Where on the vehicle</label>
-    <div class="flags" id="dmgAreas">${DAMAGE_AREAS.map(a=>`<button class="flag" data-area="${esc(a)}" onclick="pickDamage('area',this)">${esc(a)}</button>`).join("")}</div>
-    <label style="margin-top:10px">What kind</label>
-    <div class="flags" id="dmgTypes">${DAMAGE_TYPES.map(t=>`<button class="flag" data-type="${esc(t)}" onclick="pickDamage('type',this)">${esc(t)}</button>`).join("")}</div>
-    <label style="margin-top:10px">Severity</label>
-    <div class="flags" id="dmgSev">${DAMAGE_SEVERITY.map((v,i)=>`<button class="flag ${i===0?"on":""}" data-sev="${esc(v)}" onclick="pickDamage('sev',this)">${esc(v)}</button>`).join("")}</div>
-    <label style="margin-top:10px">Note</label><input id="dmg_note" placeholder="e.g. 3 inch scratch below the handle">
-    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveDamage()">Record it</button></div>`;
+    <div class="row">
+      <div><label>Area</label><select id="dmg_area">${opt(DAMAGE_AREAS,"— area —")}</select></div>
+      <div><label>Damage type</label><select id="dmg_type">${opt(DAMAGE_TYPES,"— type —")}</select></div>
+      <div><label>Severity</label><select id="dmg_sev">${DAMAGE_SEVERITY.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("")}</select></div>
+    </div>
+    <label>Note <span class="muted">(optional)</span></label><input id="dmg_note" placeholder="e.g. 3 inch scratch below the handle">
+    <div id="dmg_added" class="muted" style="font-size:12px;margin-top:6px"></div>
+    <div class="toolbar" style="margin-top:14px"><button class="green" onclick="saveDamage(false)">Record it</button>
+      <button onclick="saveDamage(true)">Record and add another</button></div>`;
   $("#recOverlay").classList.add("on");
+  $("#dmg_area").focus();
 }
-function pickDamage(kind,btn){
-  const wrap=btn.parentElement;
-  if(kind!=="type") wrap.querySelectorAll(".flag").forEach(b=>b.classList.remove("on"));
-  btn.classList.toggle("on");
-}
-function saveDamage(){
-  const area=($("#dmgAreas").querySelector(".flag.on")||{}).dataset;
-  const types=Array.from($("#dmgTypes").querySelectorAll(".flag.on")).map(b=>b.dataset.type);
-  const sev=($("#dmgSev").querySelector(".flag.on")||{}).dataset;
-  if(!area||!types.length){ alert("Pick where on the vehicle, and at least one kind of damage."); return; }
-  types.forEach(t=>addDamage(cur,area.area,t,sev?sev.sev:"Light",$("#dmg_note").value,db.settings.lastTech));
-  save(); closeRec(); drawWO();
+function saveDamage(another){
+  const area=$("#dmg_area").value, type=$("#dmg_type").value, sev=$("#dmg_sev").value||"Minor";
+  if(!area||!type){ alert("Pick the area and the damage type."); return; }
+  const d=addDamage(cur,area,type,sev,$("#dmg_note").value,db.settings.lastTech);
+  save();
+  if(another){
+    $("#dmg_added").textContent="Recorded: "+d.area+" — "+d.type+" ("+d.severity+"). Pick the next one.";
+    $("#dmg_type").value=""; $("#dmg_note").value=""; $("#dmg_area").focus();
+    return;
+  }
+  closeRec(); drawWO();
 }
 function delDamage(i){
   if(!confirm("Remove this damage record? It is the shop's evidence of what the vehicle looked like on arrival.")) return;
@@ -6617,12 +7087,28 @@ function statusMark(st){
            "Damaged housing":"m","Moisture present":"m","Good / Recharge":"m","Recharge and Retest":"m"};
   return m[st]||"";
 }
+function measValueText(v,unit){
+  const s=String(v);
+  if(!/^-?\d+(\.\d+)?$/.test(s.trim())) return s;          /* Not Measured, 5%+, Pass */
+  if(unit==="/32") return s.trim()+"/32";
+  if(unit==="%"||unit==="°F"||unit==="°C") return s.trim()+unit;
+  return s.trim()+(unit?" "+unit:"");
+}
 function measText(it,item){
   if(!item||!item.meas) return "";
   return item.meas.map(m=>{
     const v=it.meas[m.k];
     if(v===""||v==null) return "";
-    return m.label+" "+v+(m.unit?" "+m.unit:"");
+    return m.label+(/^-?\d+(\.\d+)?$/.test(String(v).trim())?" ":": ")+measValueText(v,m.unit);
+  }).filter(Boolean).join(" · ");
+}
+/* The dropdown answers, named: "Condition: Dark · Leaks: Seep". A typed answer
+   prints as written. */
+function obsText(it,key,item){
+  const e=entryFor(key,item);
+  return (e.selects||[]).filter(sl=>sl.store!=="meas").map(sl=>{
+    const v=(it.obs||{})[sl.k];
+    return v?sl.label+": "+v:"";
   }).filter(Boolean).join(" · ");
 }
 function docInspection(insp){
@@ -6641,7 +7127,7 @@ function docInspection(insp){
                    meas:measText(it,item),
                    /* the customer sees the note written for them, never the
                       internal one, and never the shop's shorthand */
-                   note:it.custNote||"", flags:(it.flags||[]).join(", "), mark:statusMark(it.state)});
+                   note:it.custNote||"", flags:[obsText(it,key,item),(it.flags||[]).join(", ")].filter(Boolean).join(" · "), mark:statusMark(it.state)});
       });
     });
   });
@@ -6651,12 +7137,12 @@ function docInspection(insp){
   const good=rows.filter(r=>r.mark==="g"||r.mark==="");
   const recs=vals(db.recommendations).filter(r=>r.orderId===o.id);
   const tbl=(list,title)=>list.length?`<h4>${esc(title)}</h4>
-    <table><thead><tr><th>Item</th><th>Status</th><th>Measured</th><th>Note</th></tr></thead><tbody>
+    <table><thead><tr><th>Item</th><th>Status</th><th>Measured</th><th>Found</th></tr></thead><tbody>
     ${list.map(r=>`<tr class="lvl-${r.mark}"><td>${esc(r.name)} <span class="muted">${esc(r.g)}</span>
         ${photoRow(r.photos||[])}</td>
       <td><span class="st st-${r.mark}">${esc(r.st)}</span></td>
       <td>${esc(r.meas||"—")}</td>
-      <td>${esc(r.note||r.flags||"")}</td></tr>`).join("")}</tbody></table>`:"";
+      <td>${esc([r.flags,r.note].filter(Boolean).join(" — "))}</td></tr>`).join("")}</tbody></table>`:"";
   return `<div class="inv">
     ${docHead(o,"Inspection Report","INSP-"+insp.no)}
     <div class="sumgrid">
@@ -6683,7 +7169,7 @@ function docInspection(insp){
 function goodList(rows){
   if(!rows.length) return "";
   const byGroup={};
-  rows.forEach(r=>{ (byGroup[r.g]=byGroup[r.g]||[]).push(r.name+(r.meas?" ("+r.meas+")":"")); });
+  rows.forEach(r=>{ const d=[r.meas,r.flags].filter(Boolean).join("; "); (byGroup[r.g]=byGroup[r.g]||[]).push(r.name+(d?" ("+d+")":"")); });
   return `<h4>Checked and in good order — ${rows.length} items</h4>
     <table><tbody>${Object.keys(byGroup).map(g=>
       `<tr><td style="width:150px;vertical-align:top"><b>${esc(g)}</b></td><td>${esc(byGroup[g].join(", "))}</td></tr>`).join("")}</tbody></table>`;
