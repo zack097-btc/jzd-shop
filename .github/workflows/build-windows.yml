@@ -25,7 +25,9 @@ jobs:
       - name: Reuse the last build's compiled crates
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: desktop/src-tauri
+          workspaces: |
+            desktop/src-tauri
+            desktop/shophub
 
       # build.py stages index.html into desktop/dist and REFUSES to run if the
       # version on screen disagrees with the installer's, so the app can never
@@ -51,24 +53,32 @@ jobs:
         working-directory: desktop/src-tauri
         run: cargo test --verbose
 
+      # Shop Sync: the field-level engine, the hub, pairing and encryption, and
+      # three computers syncing over real sockets. The harness built here lets
+      # testsync.cjs run the real page on two separate "computers".
+      - name: Test Shop Sync (engine, hub, three computers)
+        working-directory: desktop/shophub
+        shell: pwsh
+        run: |
+          cargo test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build --bin shophub-sim
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # These suites drive the real page in a real browser. None touches the
       # network - NHTSA and the licensed providers are answered by fixtures - so
       # a release is never blocked by NHTSA being down, and a green run means the
       # page itself works, not just that it parsed.
-      - name: Test persistence, VIN, pricing, invoicing, the front office, parts, floor operations and data providers
+      - name: Test persistence, VIN, pricing, invoicing, the front office, parts, floor operations, data providers, maintenance and Shop Sync
+        shell: pwsh
         run: |
           npm install --no-save playwright
           npx playwright install chromium
-          node testsave.cjs
-          node testvin.cjs
-          node testflow.cjs
-          node testshop.cjs
-          node testphoto.cjs
-          node testfront.cjs
-          node testparts.cjs
-          node testfloor.cjs
-          node testdata.cjs
-          node testmpi.cjs
+          $env:SHOPHUB_SIM = "$PWD/desktop/shophub/target/debug/shophub-sim.exe"
+          foreach ($t in 'testsave','testvin','testflow','testshop','testphoto','testfront','testparts','testfloor','testdata','testmpi','testmaint','testsync') {
+            node "$t.cjs"
+            if ($LASTEXITCODE -ne 0) { Write-Output "::error title=$t::$t.cjs failed"; exit $LASTEXITCODE }
+          }
 
       # The one release check that leaves the machine: a real request to MOTOR's
       # public DaaS sandbox, through the desktop shell's own Rust signing code and

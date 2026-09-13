@@ -474,15 +474,15 @@ impl ShopSync {
         Value::Object(m)
     }
 
-    /// Stop the hub and the connection, and wait until every thread has let go
-    /// of the databases, so they can be opened again straight away.
-    /// Development harness only.
+    /// Development harness only: behave as if the network cable were pulled.
     pub fn debug_pause(&self, on: bool) {
         if let Some(c) = self.client() {
             c.set_paused(on);
         }
     }
 
+    /// Stop the hub and the connection, and wait until every thread has let go
+    /// of the databases, so they can be opened again straight away.
     pub fn shutdown(&self) {
         let hub = self.hub.lock().unwrap().take();
         let client = self.client.lock().unwrap().take();

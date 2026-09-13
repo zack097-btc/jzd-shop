@@ -20,7 +20,9 @@ jobs:
       - name: Reuse compiled crates
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: desktop/src-tauri
+          workspaces: |
+            desktop/src-tauri
+            desktop/shophub
       - name: Stage the page
         shell: pwsh
         run: python build.py
@@ -45,6 +47,17 @@ jobs:
           }
           Get-Content test.log | Where-Object { $_ -match '^test result:' } | ForEach-Object { Write-Output "::notice title=cargo test::$_" }
           cargo test a_secret_goes_in -- --nocapture 2>&1 | Where-Object { $_ -match '^CREDMAN:' } | ForEach-Object { Write-Output "::notice title=Credential Manager::$_" }
+
+      - name: Test Shop Sync (engine, hub, three computers)
+        shell: pwsh
+        working-directory: desktop/shophub
+        run: |
+          cargo test 2>&1 | Tee-Object -FilePath sync.log
+          $code = $LASTEXITCODE
+          Get-Content sync.log | Where-Object { $_ -match '^test |^test result:|panicked|MEASURED|^error' } | ForEach-Object { Write-Output ("::notice title=Shop Sync::" + ($_ -replace '::', ': :')) }
+          if ($code -ne 0) { exit $code }
+          cargo build --bin shophub-sim
+          exit $LASTEXITCODE
 
       # A real request to MOTOR's public DaaS sandbox, through the desktop app's
       # own signing and request code. The sandbox keys are the ones MOTOR
@@ -94,6 +107,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node testmpi.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:SHOPHUB_SIM = "$PWD/desktop/shophub/target/debug/shophub-sim.exe"
+          node testsync.cjs 2>&1 | Tee-Object -FilePath sync-page.log
+          $code = $LASTEXITCODE
+          Get-Content sync-page.log | Where-Object { $_ -match 'FAIL|measured|ALL SHOP' } | ForEach-Object { Write-Output ("::notice title=Shop Sync page::" + ($_.Trim() -replace '::', ': :')) }
+          if ($code -ne 0) { exit $code }
+          if (Test-Path testmaint.cjs) { node testmaint.cjs; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
           node testmotorlive.cjs 2>&1 | Tee-Object -FilePath motorlive.log
           $code = $LASTEXITCODE
           Get-Content motorlive.log | Where-Object { $_ -match 'PASS|FAIL|SKIPPED|MOTOR sandbox calls|Vehicle:' } | ForEach-Object {

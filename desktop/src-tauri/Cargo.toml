@@ -13,7 +13,9 @@ rust-version = "1.77"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
+# Shop Sync: the local Shop Hub and each computer's connection to it
+jzd-shophub = { path = "../shophub" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Request signing for licensed data providers. The RustCrypto crates, not our

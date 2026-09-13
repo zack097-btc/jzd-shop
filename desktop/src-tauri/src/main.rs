@@ -18,12 +18,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod hub;
+mod sync;
 
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use sync::SyncState;
 use tauri::Manager;
 
 /// How many previous copies of the book to keep. A shop that edits all day
@@ -68,6 +70,9 @@ struct Loaded {
     /// how a recoverable problem becomes a permanent loss.
     error: Option<String>,
     path: String,
+    /// "local" (this computer's own book), or "host" / "client" when the book
+    /// is this computer's copy of the shop from the Shop Hub.
+    sync: String,
 }
 
 #[derive(Serialize)]
@@ -76,6 +81,9 @@ struct Saved {
     path: String,
     /// The copy taken before this write, if there was anything to copy.
     backup: Option<String>,
+    /// With a Shop Hub: what was queued for the hub.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sync: Option<serde_json::Value>,
 }
 
 #[derive(Serialize)]
@@ -85,6 +93,10 @@ struct AttSaved {
     id: String,
     file: String,
     bytes: usize,
+    /// SHA-256 of the stored bytes, so a copy on another computer can be checked.
+    sha256: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sync_error: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -209,14 +221,26 @@ fn stamp() -> u64 {
 }
 
 #[tauri::command]
-fn db_load(app: tauri::AppHandle) -> Result<Loaded, String> {
+fn db_load(app: tauri::AppHandle, state: tauri::State<'_, SyncState>) -> Result<Loaded, String> {
+    let mode = state.mode(&data_dir(&app)?);
+    if mode != "local" {
+        // This computer belongs to a Shop Hub: its screen shows the shop from
+        // the hub, never its old book, even if sync cannot start.
+        let path = "Shop Hub".to_string();
+        return Ok(match state.shell().and_then(|s| s.sync.load_book()) {
+            Ok(Some(text)) => Loaded { existed: !text.is_empty(), text, error: None, path, sync: mode },
+            Ok(None) => Loaded { text: String::new(), existed: true, error: Some("Shop Sync changed mode while loading; restart the program".into()), path, sync: mode },
+            Err(e) => Loaded { text: String::new(), existed: true, error: Some(e), path, sync: mode },
+        });
+    }
     let p = book_path(&app)?;
     let path = p.display().to_string();
+    let sync = mode;
     if !p.exists() {
-        return Ok(Loaded { text: String::new(), existed: false, error: None, path });
+        return Ok(Loaded { text: String::new(), existed: false, error: None, path, sync });
     }
     match fs::read_to_string(&p) {
-        Ok(text) => Ok(Loaded { text, existed: true, error: None, path }),
+        Ok(text) => Ok(Loaded { text, existed: true, error: None, path, sync }),
         // A file that is there but unreadable is an emergency, not an empty
         // shop. Say so, and let the page put the brakes on.
         Err(e) => Ok(Loaded {
@@ -224,6 +248,7 @@ fn db_load(app: tauri::AppHandle) -> Result<Loaded, String> {
             existed: true,
             error: Some(format!("{e}")),
             path,
+            sync,
         }),
     }
 }
@@ -235,9 +260,15 @@ fn db_load(app: tauri::AppHandle) -> Result<Loaded, String> {
 ///   3. rename it over the real name, which is atomic on every OS we ship to;
 ///   4. read it back and check it matches what we meant to write.
 #[tauri::command]
-fn db_save(app: tauri::AppHandle, text: String) -> Result<Saved, String> {
+fn db_save(app: tauri::AppHandle, state: tauri::State<'_, SyncState>, text: String) -> Result<Saved, String> {
     if text.trim().is_empty() {
         return Err("refusing to write an empty book".into());
+    }
+    if state.mode(&data_dir(&app)?) != "local" {
+        // Kept by this computer's replica first (durable), then sent to the
+        // hub. The page says SYNCED only once the hub has acknowledged it.
+        let r = state.shell()?.sync.save_book(&text)?;
+        return Ok(Saved { bytes: text.len(), path: "Shop Hub".into(), backup: None, sync: Some(r) });
     }
     let p = book_path(&app)?;
     let path = p.display().to_string();
@@ -281,7 +312,7 @@ fn db_save(app: tauri::AppHandle, text: String) -> Result<Saved, String> {
         ));
     }
 
-    Ok(Saved { bytes: text.len(), path, backup })
+    Ok(Saved { bytes: text.len(), path, backup, sync: None })
 }
 
 fn prune_backups(dir: &Path) {
@@ -346,7 +377,7 @@ fn db_read_backup(app: tauri::AppHandle, name: String) -> Result<String, String>
 /// kind; it does not supply a name, a path, or an id, so there is nothing for
 /// it to get wrong and nothing for a malicious filename to reach.
 #[tauri::command]
-fn att_save(app: tauri::AppHandle, ext: String, data_b64: String) -> Result<AttSaved, String> {
+fn att_save(app: tauri::AppHandle, state: tauri::State<'_, SyncState>, ext: String, data_b64: String) -> Result<AttSaved, String> {
     let e = safe_ext(&ext).ok_or_else(|| format!("{ext} is not a kind of file this keeps"))?;
     let bytes = b64_decode(&data_b64)?;
     if bytes.is_empty() {
@@ -389,22 +420,48 @@ fn att_save(app: tauri::AppHandle, ext: String, data_b64: String) -> Result<AttS
         let _ = fs::remove_file(&p);
         return Err("the stored file does not match what was sent".into());
     }
-    Ok(AttSaved { id, file, bytes: bytes.len() })
+    let sha256 = {
+        use sha2::Digest;
+        sha2::Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect::<String>()
+    };
+    // With a Shop Hub the photo is queued to upload; the file is already safe
+    // here either way.
+    let sync_error = match state.shell.as_ref() {
+        Some(s) if s.sync.mode() != "local" => s.sync.att_saved(&id, &e).err(),
+        _ => None,
+    };
+    Ok(AttSaved { id, file, bytes: bytes.len(), sha256, sync_error })
+}
+
+/// With a Shop Hub, a photo taken on another computer is fetched from the hub
+/// the first time it is opened here, checked, and kept.
+fn att_bytes(app: &tauri::AppHandle, shell: Option<std::sync::Arc<shophub::shell::Shell>>, id: &str) -> Result<Vec<u8>, String> {
+    match att_path(app, id) {
+        Ok(p) => fs::read(&p).map_err(|e| format!("cannot read attachment: {e}")),
+        Err(missing) => match shell {
+            Some(s) if s.sync.mode() != "local" => s.sync.att_fetch(id),
+            _ => Err(missing),
+        },
+    }
 }
 
 #[tauri::command]
-fn att_read(app: tauri::AppHandle, id: String) -> Result<String, String> {
-    let p = att_path(&app, &id)?;
-    let bytes = fs::read(&p).map_err(|e| format!("cannot read attachment: {e}"))?;
+async fn att_read(app: tauri::AppHandle, state: tauri::State<'_, SyncState>, id: String) -> Result<String, String> {
+    if !safe_att_id(&id) {
+        return Err("bad attachment id".into());
+    }
+    let shell = state.shell.clone();
+    let bytes = tauri::async_runtime::spawn_blocking(move || att_bytes(&app, shell, &id)).await.map_err(|e| e.to_string())??;
     Ok(b64_encode(&bytes))
 }
 
 #[tauri::command]
-fn att_exists(app: tauri::AppHandle, id: String) -> Result<bool, String> {
+async fn att_exists(app: tauri::AppHandle, state: tauri::State<'_, SyncState>, id: String) -> Result<bool, String> {
     if !safe_att_id(&id) {
         return Err("bad attachment id".into());
     }
-    Ok(att_path(&app, &id).is_ok())
+    let shell = state.shell.clone();
+    tauri::async_runtime::spawn_blocking(move || att_bytes(&app, shell, &id).is_ok()).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -761,9 +818,28 @@ fn db_where(app: tauri::AppHandle) -> Result<String, String> {
     Ok(data_dir(&app)?.display().to_string())
 }
 
+pub(crate) fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
 fn main() {
-    tauri::Builder::default()
-        .setup(|app| {
+    // A second start while the first copy runs (for example in the
+    // notification area as the Shop Hub) shows the first copy's window.
+    if sync::another_copy_is_running() {
+        return;
+    }
+    let background = std::env::args().any(|a| a == "--background");
+    let app = tauri::Builder::default()
+        .setup(move |app| {
+            let handle = app.handle().clone();
+            let state = SyncState::open(&handle, data_dir(&handle)?, att_dir(&handle)?);
+            app.manage(state);
+            sync::listen_for_second_copy(handle.clone());
+
             let w = tauri::WebviewWindowBuilder::new(
                 app,
                 "main",
@@ -772,9 +848,52 @@ fn main() {
             .title("JZD Shop Manager")
             .inner_size(1280.0, 860.0)
             .min_inner_size(900.0, 600.0)
+            .visible(!background)
             .build()?;
-            let _ = w.set_focus();
+            if !background {
+                let _ = w.set_focus();
+            }
+
+            // In the notification area: open the window, or quit (which stops
+            // the Shop Hub on a host).
+            use tauri::menu::{Menu, MenuItem};
+            let open = MenuItem::with_id(app, "open", "Open JZD Shop Manager", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit (stops the Shop Hub on this computer)", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open, &quit])?;
+            let mut tray = tauri::tray::TrayIconBuilder::with_id("main")
+                .tooltip("JZD Shop Manager")
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "open" => show_main_window(app),
+                    "quit" => {
+                        if let Some(s) = app.state::<SyncState>().shell.clone() {
+                            s.sync.shutdown();
+                        }
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
+                        show_main_window(tray.app_handle());
+                    }
+                });
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            tray.build(app)?;
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // The host keeps the shop running for the other computers when its
+            // window is closed; Quit in the notification area stops it.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let host = window.app_handle().state::<SyncState>().shell.as_ref().map(|s| s.sync.mode() == "host").unwrap_or(false);
+                if host {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             db_load,
@@ -806,10 +925,42 @@ fn main() {
             secret_set,
             secret_has,
             secret_clear,
-            open_external
+            open_external,
+            sync::sync_status,
+            sync::sync_pair_open,
+            sync::sync_pair_close,
+            sync::sync_pair_decide,
+            sync::sync_discover,
+            sync::sync_join,
+            sync::sync_revoke,
+            sync::sync_take_patches,
+            sync::sync_confirm_patches,
+            sync::sync_resolve,
+            sync::sync_presence,
+            sync::sync_numbers,
+            sync::sync_use_number,
+            sync::sync_backup_now,
+            sync::sync_backups,
+            sync::sync_verify_backup,
+            sync::sync_restore_backup,
+            sync::sync_att_status,
+            sync::sync_host_enable,
+            sync::sync_open_backup_dir,
+            sync::sync_firewall_status,
+            sync::sync_firewall_enable,
+            sync::sync_autostart_status,
+            sync::sync_autostart_set
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("JZD Shop Manager could not start");
+    app.run(|handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            // let every sync thread finish writing and release the databases
+            if let Some(s) = handle.state::<SyncState>().shell.clone() {
+                s.sync.shutdown();
+            }
+        }
+    });
 }
 
 #[cfg(test)]
