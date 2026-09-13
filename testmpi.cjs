@@ -26,9 +26,14 @@ const F = f => '[data-f="' + f.replace(/"/g, '\\"') + '"]';
   const browser = await chromium.launch();
 
   /* ---- a book written by v2.8.1 itself ---- */
+  const showOld = () => execSync('git show v2.8.1:index.html', { maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }).toString('utf8');
   let oldHtml = null;
-  try { oldHtml = execSync('git show v2.8.1:index.html', { maxBuffer: 64 * 1024 * 1024 }).toString('utf8'); }
-  catch (e){ try { oldHtml = execSync('git show bbebd7e:index.html', { maxBuffer: 64 * 1024 * 1024 }).toString('utf8'); } catch (e2){ oldHtml = null; } }
+  try { oldHtml = showOld(); }
+  catch (e){
+    /* a shallow CI checkout has no tags: fetch just the one this test needs */
+    try { execSync('git fetch --no-tags --depth 1 origin refs/tags/v2.8.1:refs/tags/v2.8.1', { stdio: 'ignore' }); oldHtml = showOld(); } catch (e2){ oldHtml = null; }
+  }
+  if (!oldHtml){ console.log('FAIL: could not read index.html from the v2.8.1 tag; the old-book checks cannot run.'); process.exit(1); }
   let oldBook = null, oldInspJson = null, oldDoneJson = null;
   if (oldHtml){
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jzd281-'));
