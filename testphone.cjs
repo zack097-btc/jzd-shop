@@ -109,6 +109,8 @@ function shim(port){
 
     /* ================= 1. the phone opens the app from the hub ================= */
     const phoneCtx = await browser.newContext({ ...devices['iPhone 13'] });
+    await phoneCtx.route('https://vpic.nhtsa.dot.gov/**', r => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ Results: [{ ModelYear: '2003', Make: 'HONDA', Model: 'Accord', ErrorCode: '0' }] }) }));
     const phone = await phoneCtx.newPage();
     phone.errs = []; phone.on('pageerror', e => phone.errs.push(e.message)); phone.on('dialog', d => d.accept());
     const url = 'http://127.0.0.1:' + HUB + '/';
@@ -172,6 +174,27 @@ function shim(port){
     const sha = b => require('crypto').createHash('sha256').update(Buffer.from(b, 'base64')).digest('hex');
     check('3c. the laptop opens the full photo, byte for byte what the phone sent', !!lapBytes && sha(lapBytes) === shot.sha, lapBytes ? sha(lapBytes) + ' vs ' + shot.sha : 'none');
 
+    /* ================= 3d. the VIN scanner on the phone, its readers served by the hub ================= */
+    const GOOD = '1HGCM82633A004352';
+    const scanned = await phone.evaluate(async vin => {
+      const C39 = { '0': '000110100', '1': '100100001', '2': '001100001', '3': '101100000', '4': '000110001', '5': '100110000', '6': '001110000', '7': '000100101', '8': '100100100', '9': '001100100',
+        A: '100001001', C: '101001000', G: '000001101', H: '100001100', M: '101000010', '*': '010010100' };
+      const c = document.createElement('canvas'); c.width = 1400; c.height = 600;
+      const g = c.getContext('2d'); g.fillStyle = '#f4f1e8'; g.fillRect(0, 0, 1400, 600);
+      g.save(); g.translate(120, 200); g.rotate(-0.05); let x = 0;
+      for (const ch of '*' + vin + '*'){ const p = C39[ch]; for (let i = 0; i < 9; i++){ const wd = p[i] === '1' ? 10 : 4; if (i % 2 === 0){ g.fillStyle = '#000'; g.fillRect(x, 0, wd, 150); } x += wd; } x += 4; }
+      g.restore();
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+      const res = await vinScanImage(new File([blob], 'jamb.jpg', { type: 'image/jpeg' }));
+      return res.candidates[0] ? { vin: res.candidates[0].vin, source: res.candidates[0].source, ok: res.candidates[0].checkOk } : { none: true, notes: res.notes };
+    }, GOOD);
+    check('3d. the phone scans a door-jamb barcode with the readers the hub hands it', scanned.vin === GOOD && scanned.source === 'barcode' && scanned.ok, JSON.stringify(scanned));
+    await phone.evaluate(vin => { vinScanOpen({ purpose: 'vehicle', vehicleId: 'v1' }); vinShow({ candidates: vinRank(vinCandidatesFromText(vin, 'barcode')), notes: [] }); }, GOOD);
+    await phone.waitForTimeout(400);
+    await press(phone, '.vincand button');
+    const vinOnLaptop = await until(() => lap.evaluate(v => db.vehicles.v1.vin === v, GOOD), 5000);
+    check('3e. USE THIS VIN on the phone: the laptop has the new VIN within seconds', !!vinOnLaptop);
+
     /* ================= 4. the same note on the phone and the laptop ================= */
     await lap.evaluate(() => openItemDetail('tires.tire.RR'));
     await lap.fill('#d_note', 'from the laptop');
@@ -220,6 +243,15 @@ function shim(port){
     check('5f. the photo taken offline arrives, byte for byte', !!offBytes && sha(offBytes) === offlinePhoto.sha);
     const back = await until(async () => { const t = await phone.evaluate(() => document.getElementById('saveState').textContent); return t === 'SYNCED' ? t : null; }, 8000);
     check('5g. the phone says SYNCED again', !!back, await phone.evaluate(() => document.getElementById('saveState').textContent));
+
+    /* ================= 5h. the desktop shows how to connect a phone ================= */
+    await desk.evaluate(() => go('shopsync'));
+    const card = await until(async () => { const t = await desk.textContent('#shopSyncBody'); return /Connect a phone/.test(t) ? t : null; }, 5000);
+    const qrOk = await until(async () => {
+      const addrs = await desk.evaluate(() => (syncStatus.hub.addresses || []).length);
+      return addrs === 0 ? 'no-address' : ((await desk.$('#ss_phoneqr svg')) ? 'svg' : null);
+    }, 5000);
+    check('5h. the host\'s Shop Sync screen shows how to connect a phone, with the address as a QR code', !!card && /Add to Home Screen/.test(card) && !!qrOk, qrOk);
 
     /* ================= 6. revoked ================= */
     const phoneId = stored.device;

@@ -52,7 +52,15 @@ fn main() {
             // the harness serves the page straight from the working copy
             assets: arg("--page").map(|page| {
                 let page = PathBuf::from(page);
-                Arc::new(move |name: &str| if name == "index.html" { std::fs::read(&page).ok() } else { None }) as shophub::server::Assets
+                Arc::new(move |name: &str| {
+                    if name == "index.html" {
+                        std::fs::read(&page).ok()
+                    } else if let Some(v) = name.strip_prefix("vendor/") {
+                        page.parent().and_then(|d| std::fs::read(d.join("vendor").join(v)).ok())
+                    } else {
+                        None
+                    }
+                }) as shophub::server::Assets
             }),
         })
         .unwrap(),

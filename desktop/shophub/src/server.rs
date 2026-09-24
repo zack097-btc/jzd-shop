@@ -838,6 +838,20 @@ impl Hub {
             },
             "/phone-shell.js" => http_send(&mut stream, 200, "text/javascript; charset=utf-8", PHONE_SHELL_JS.as_bytes().to_vec()),
             "/noble.js" => http_send(&mut stream, 200, "text/javascript; charset=utf-8", NOBLE_JS.as_bytes().to_vec()),
+            p if p.starts_with("/vendor/") => {
+                // the scanner's libraries, by exact name only: one path segment,
+                // nothing that could climb out of the folder
+                let name = &p["/vendor/".len()..];
+                let safe = !name.is_empty() && name.len() < 80 && name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'.' || c == b'-' || c == b'_') && !name.contains("..");
+                let bytes = if safe { self.inner.assets.as_ref().and_then(|a| a(&format!("vendor/{name}"))) } else { None };
+                match bytes {
+                    Some(b) => {
+                        let ct = if name.ends_with(".js") { "text/javascript; charset=utf-8" } else if name.ends_with(".wasm") { "application/wasm" } else { "application/octet-stream" };
+                        http_send(&mut stream, 200, ct, b)
+                    }
+                    None => http_send(&mut stream, 404, "text/plain; charset=utf-8", b"Not here.".to_vec()),
+                }
+            }
             "/health" => http_send(
                 &mut stream,
                 200,

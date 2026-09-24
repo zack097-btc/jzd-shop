@@ -291,6 +291,46 @@
   .captable td.cm{text-align:center;font-weight:700}
   .captable td.cm-y{color:#15803d}.captable td.cm-w{color:#b45309}.captable td.cm-n{color:#9ca3af}
   .presence{font-size:12px;font-weight:700;color:#b45309}
+  /* ---- the shop phone ---- */
+  .positem{display:none}
+  body.phone{font-size:16px}
+  body.phone input,body.phone select,body.phone textarea{font-size:16px}   /* 16px or iOS zooms in on every tap */
+  body.phone header{padding:6px 8px;gap:6px;flex-wrap:nowrap}
+  body.phone header #nav,body.phone header #newWO{display:none}
+  body.phone header .logo{font-size:15px}
+  body.phone #saveState{margin-right:0 !important;font-size:11px !important}
+  body.phone .wrap{padding:10px 10px 90px;max-width:none}
+  body.phone .card{padding:12px}
+  body.phone .ikeys{display:none}
+  body.phone .iprogress{position:static !important}
+  body.phone .phonehome .search,body.phone .search{max-width:none;width:100%;box-sizing:border-box}
+  body.phone .overlay .sheet{width:100%;max-width:none !important;min-height:100%;margin:0;border-radius:0;box-sizing:border-box}
+  body.phone table.imatrix,body.phone table.imatrix tbody,body.phone table.imatrix tr,body.phone table.imatrix td{display:block;width:auto}
+  body.phone table.imatrix thead{display:none}
+  body.phone table.imatrix tr{border:1px solid var(--line);border-radius:12px;margin:0 0 10px;padding:8px 10px;background:#fff}
+  body.phone table.imatrix td{border:none;padding:4px 0;height:auto}
+  body.phone table.imatrix td.pos{font-size:19px;font-weight:800;padding-bottom:2px}
+  body.phone .positem{display:inline;font-size:14px;font-weight:600;color:var(--muted)}
+  body.phone table.imatrix td[data-label]::before{content:attr(data-label);display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+  body.phone table.imatrix select,body.phone table.imatrix input{width:100%;max-width:none;box-sizing:border-box}
+  body.phone .icopy{display:flex;flex-wrap:wrap;gap:6px}
+  body.phone button{min-height:40px}
+  .phonehome .search{width:100%;box-sizing:border-box;margin:10px 0}
+  .phonebig{display:block;width:100%;min-height:54px;font-size:17px;font-weight:800;margin:6px 0;border-radius:12px}
+  .phonecard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:0 0 12px}
+  .phonecard-head{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:17px}
+  .phonecard-concern{margin:6px 0;font-style:italic}
+  .phonebtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .phonebtns button{min-height:50px;font-size:15px;font-weight:700;border-radius:10px}
+  .phonecount{display:inline-block;background:rgba(0,0,0,.12);border-radius:10px;padding:0 7px;font-size:12px;margin-left:4px}
+  .vincand{border:2px solid var(--line);border-radius:12px;padding:12px;margin:10px 0;background:#fff}
+  .vincand.vin-high,.vincand.vin-good{border-color:#16a34a}
+  .vincand.vin-check,.vincand.vin-medium{border-color:#d97706}
+  .vincand.vin-low{border-color:#dc2626}
+  .vinbig{font-family:Consolas,Menlo,monospace;font-size:24px;font-weight:800;letter-spacing:2px;word-break:break-all}
+  .vinunsure{background:#fde68a;border-bottom:3px solid #d97706}
+  .vintrust{font-weight:700;font-size:13px;margin:4px 0}
+  .vindecode{margin:6px 0}
   .oemdue{font-size:11.5px;font-weight:700;color:#1d4ed8;border:1px solid #93c5fd;background:#eff6ff;border-radius:999px;padding:2px 9px;cursor:pointer}
   .synced-flash{animation:syncflash .9s ease-out}
   @keyframes syncflash{from{background:#fff7d6}to{background:transparent}}
@@ -373,6 +413,8 @@
 <div class="overlay" id="woOverlay"><div class="sheet" id="woSheet"></div></div>
 <!-- CUSTOMER / VEHICLE EDITOR -->
 <div class="overlay" id="recOverlay"><div class="sheet" id="recSheet" style="max-width:560px"></div></div>
+<!-- VIN SCANNER -->
+<div class="overlay" id="vinOverlay"><div class="sheet" id="vinSheet" style="max-width:560px"></div></div>
 <!-- ADD JOB FROM THE CATALOG -->
 <div class="overlay" id="jobOverlay"><div class="sheet" id="jobSheet"></div></div>
 <!-- PHOTO VIEWER -->
@@ -740,7 +782,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.8.4";
+const JZD_VERSION = "2.9.0";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -973,8 +1015,9 @@ function normalizeVin(raw){
    reject: it is not applied uniformly by every manufacturer or market, and a
    shop with the car in the bay should not be told its VIN is invalid by a rule
    the vehicle never followed. vPIC gets the final say. */
+const VIN_TRANSLIT = {A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,J:1,K:2,L:3,M:4,N:5,P:7,R:9,S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9};
 function vinCheckDigit(v){
-  const val = c => "0123456789".indexOf(c) >= 0 ? +c : ("ABCDEFGHJKLMNPRSTUVWXYZ".indexOf(c) % 9) + 1;
+  const val = c => "0123456789".indexOf(c) >= 0 ? +c : (VIN_TRANSLIT[c] || 0);
   const wt = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
   let sum = 0; for (let i = 0; i < 17; i++) sum += val(v[i]) * wt[i];
   const r = sum % 11, expected = r === 10 ? "X" : String(r);
@@ -2124,7 +2167,7 @@ function renderInspection(){
   window.scrollTo(0, y);
   if (focusKey){ const el = document.querySelector('[data-f="' + CSS.escape(focusKey) + '"]'); if (el) el.focus({preventScroll:true}); }
 }
-function backToOrder(orderId){ inspId=null; go("dash"); editOrder(orderId); }
+function backToOrder(orderId){ inspId=null; if(PHONE){ go("phone"); return; } go("dash"); editOrder(orderId); }
 function filterInsp(f){ inspFilter = (inspFilter===f?"":f); renderInspection(); }
 function techDatalist(){
   const list=(db.settings.techs||[]);
@@ -2271,10 +2314,10 @@ function matrixHtml(insp,g,done){
 function inspMatrixRowHtml(insp,g,item,pos,done){
   const key=inspItemKey(g,item,pos);
   const meas=item.meas||[];
-  return `<tr data-rowkey="${key}"><td class="pos">${esc(pos)}</td>
-    ${meas.map(m=>`<td>${measControl(insp,key,item,m,done,false)}</td>`).join("")}
-    <td>${stateBtns(insp,key,item,g,done)}</td>
-    <td>${obsMultiHtml(insp,key,item,done)}</td>
+  return `<tr data-rowkey="${key}"><td class="pos">${esc(pos)}<span class="positem"> ${esc(item.name)}</span></td>
+    ${meas.map(m=>`<td data-label="${esc(m.label)}${m.unit?" ("+esc(m.unit)+")":""}">${measControl(insp,key,item,m,done,false)}</td>`).join("")}
+    <td data-label="Condition">${stateBtns(insp,key,item,g,done)}</td>
+    <td data-label="Observations">${obsMultiHtml(insp,key,item,done)}</td>
     <td>${flagsAndNote(insp,key,item,done)}</td></tr>`;
 }
 function itemRowHtml(insp,g,item,pos,done){
@@ -7376,11 +7419,12 @@ function drawShopSyncLive(){
     </div>
     <div class="card"><h3 style="margin-top:0">Connected devices</h3>
       ${devRows ? `<table><tbody>${devRows}</tbody></table>` : `<div class="empty">No devices yet.</div>`}</div>
+    ${s.mode === "host" ? shopSyncPhoneCard(s) : ""}
     ${s.mode === "host" ? `<div class="card"><h3 style="margin-top:0">This computer as the host</h3>
       <div id="ss_firewall" class="muted">Checking Windows Firewall…</div>
       <div id="ss_autostart" class="muted" style="margin-top:8px"></div>
       <p class="muted" style="font-size:12px;margin:8px 0 0">Closing this window keeps the Shop Hub running in the background (look for JZD Shop Manager by the clock). Choose Quit there to stop it. The laptop shows SHOP HUB OFFLINE while it is stopped and keeps its own work safe until it comes back.</p></div>` : ""}`;
-  if (s.mode === "host") shopSyncHostExtras();
+  if (s.mode === "host"){ shopSyncHostExtras(); shopSyncPhoneQr(); }
 }
 let shopSyncFoundAddr = "";
 async function shopSyncDiscover(){
@@ -7442,6 +7486,36 @@ async function shopSyncTest(){
                           : `<b>SHOP HUB OFFLINE.</b> ${esc(c.lastError || "")}`;
   drawShopSyncLive();
 }
+/* A phone opens the app from this computer's address on the shop Wi-Fi. The QR
+   code is that address; the iPhone's own camera opens it. */
+function shopSyncPhoneUrls(s){
+  const h = (s && s.hub) || {};
+  return (h.addresses || []).map(a => "http://" + a + ":" + s.port + "/");
+}
+function shopSyncPhoneCard(s){
+  const urls = shopSyncPhoneUrls(s);
+  return `<div class="card"><h3 style="margin-top:0">Connect a phone</h3>
+    <ol style="margin:0 0 8px 18px;padding:0;font-size:13.5px">
+      <li>Put the phone on the <b>same Wi-Fi</b> as this computer.</li>
+      <li>Point the phone's camera at this code and tap the link (or type the address into Safari).</li>
+      <li>Press <b>PAIR DEVICE</b> above, type the code on the phone, and approve it here when the digits match.</li>
+      <li>In Safari, tap Share → <b>Add to Home Screen</b> so it opens like an app.</li></ol>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+      <div id="ss_phoneqr" style="width:168px;height:168px;background:#fff"></div>
+      <div>${urls.length ? urls.map(u => `<div style="font-family:Consolas,monospace;font-size:17px;font-weight:700">${esc(u)}</div>`).join("") : `<div class="muted">No private network address found — is this computer on the shop Wi-Fi?</div>`}
+        <div class="muted" style="font-size:12px;margin-top:4px">Only phones on this network can reach it, and only after they are paired here.</div></div></div></div>`;
+}
+let shopSyncQrReady = null;
+async function shopSyncPhoneQr(){
+  const box = $("#ss_phoneqr"); if (!box) return;
+  const url = shopSyncPhoneUrls(syncStatus)[0]; if (!url) return;
+  try {
+    if (!window.qrcode) shopSyncQrReady = shopSyncQrReady || vinLoadScript(new URL("vendor/qrcode.js", location.href).href + "?v=" + encodeURIComponent(JZD_VERSION));
+    await shopSyncQrReady;
+    const qr = qrcode(0, "M"); qr.addData(url); qr.make();
+    const b = $("#ss_phoneqr"); if (b) b.innerHTML = qr.createSvgTag({cellSize:4, margin:2, scalable:true});
+  } catch(e){ const b = $("#ss_phoneqr"); if (b) b.textContent = ""; }
+}
 async function shopSyncHostExtras(){
   try {
     const fw = await syncInvoke("sync_firewall_status");
@@ -7461,6 +7535,480 @@ async function persistNowAsync(){
   clearTimeout(saveTimer);
   if (dirty && !saving) await persist();
   let n = 0; while ((saving || dirty) && n++ < 100) await new Promise(r => setTimeout(r, 50));
+}
+
+/* ---------- The shop phone ----------
+   The same app, laid out for a phone held in one hand in a bay: a home screen
+   of the vehicles in the shop today with big buttons, the inspection with one
+   card per wheel instead of a spreadsheet, and the camera one tap away. The
+   phone works through its seat on the Shop Hub (see the phone shell), so
+   everything here reaches the laptop and the desktop within a second or two. */
+const PHONE = !!(window.JZD_PHONE || window.JZD_PHONE_PREVIEW);
+let phoneQ = "";
+
+function phoneInit(){
+  if (!PHONE) return;
+  document.body.classList.add("phone");
+  view = "phone";
+  /* one tap opens the camera */
+  const inp = $("#attInput");
+  if (inp){ inp.setAttribute("capture", "environment"); inp.setAttribute("accept", "image/*"); inp.removeAttribute("multiple"); }
+  /* the header: home, and what the connection is doing */
+  const hdr = document.querySelector("header");
+  if (hdr && !$("#phoneHome")){
+    const b = document.createElement("button");
+    b.id = "phoneHome"; b.className = "hbtn"; b.textContent = "⌂ Home";
+    b.onclick = () => { if (typeof closeRec === "function") closeRec(); if ($("#woOverlay").classList.contains("on")) closeWO(); inspId = null; go("phone"); };
+    hdr.insertBefore(b, hdr.firstChild);
+  }
+}
+
+/* the tickets a technician is working on today */
+function phoneOrders(){
+  const q = phoneQ.trim().toLowerCase();
+  return vals(db.orders).filter(o => !isFinal(o) && !isDead(o)).filter(o => {
+    if (!q) return true;
+    const v = db.vehicles[o.vehicleId] || {};
+    return [vehLabel(o.vehicleId), v.vin, v.plate, v.unit, custName(o.customerId), ticketNo(o), o.complaint].join(" ").toLowerCase().indexOf(q) >= 0;
+  }).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(ticketNo(b)).localeCompare(String(ticketNo(a))));
+}
+function renderPhoneHome(){
+  const list = phoneOrders();
+  $("#app").innerHTML = `<div class="phonehome">
+    <button class="phonebig primary" onclick="vinScanOpen({purpose:'new'})">📷 SCAN VIN — NEW VEHICLE</button>
+    <input class="search" id="phq" placeholder="Search vehicle, plate, VIN, customer, ticket" value="${esc(phoneQ)}">
+    ${list.length ? list.map(o => {
+      const v = db.vehicles[o.vehicleId] || {};
+      const insp = inspectionFor(o);
+      const pr = insp ? inspProgress(insp) : null;
+      const photos = vals(db.attachments).filter(a => a.orderId === o.id || (a.vehicleId === o.vehicleId && a.ctx === "vehicle")).length;
+      return `<div class="phonecard" data-order="${esc(o.id)}">
+        <div class="phonecard-head"><b>${esc(vehLabel(o.vehicleId))}</b><span class="pill">${esc(canonStatus(o.status))}</span></div>
+        <div class="muted">${esc([custName(o.customerId), ticketNo(o), v.plate].filter(Boolean).join(" · "))}</div>
+        ${o.complaint ? `<div class="phonecard-concern">${esc(o.complaint)}</div>` : ""}
+        <div class="muted" style="font-size:13px">VIN ${v.vin ? esc(v.vin) : `<b style="color:#b45309">not recorded</b>`}</div>
+        <div class="phonebtns">
+          <button class="primary" onclick="openInspection('${o.id}')">INSPECTION${pr ? ` <span class="phonecount">${pr.done}/${pr.total}</span>` : ""}</button>
+          <button onclick="phonePhotos('${o.id}')">📷 PHOTOS${photos ? ` <span class="phonecount">${photos}</span>` : ""}</button>
+          <button onclick="vinScanOpen({purpose:'vehicle', vehicleId:'${esc(o.vehicleId)}'})">${v.vin ? "CHECK VIN" : "SCAN VIN"}</button>
+          <button onclick="editOrder('${o.id}')">TICKET</button>
+        </div></div>`;
+    }).join("") : `<div class="empty">${phoneQ ? "Nothing matches." : "No open tickets. Check a vehicle in on the office computer, or scan a VIN above."}</div>`}
+  </div>`;
+  const s = $("#phq");
+  if (s) s.oninput = () => { phoneQ = s.value; const pos = s.selectionStart; renderPhoneHome(); const n = $("#phq"); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} };
+}
+/* a photo of the vehicle for this ticket; the camera opens at once */
+function phonePhotos(orderId){
+  const o = db.orders[orderId]; if (!o) return;
+  const list = vals(db.attachments).filter(a => a.orderId === o.id || (a.vehicleId === o.vehicleId && a.ctx === "vehicle"))
+    .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  $("#recSheet").innerHTML = `<div class="sheet-head"><h2>Photos — ${esc(vehLabel(o.vehicleId))}</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+    <button class="phonebig primary" onclick="pickPhotos('vehicle','${esc(o.vehicleId)}',{orderId:'${esc(o.id)}'})">📷 TAKE A PHOTO</button>
+    <button class="phonebig" onclick="pickPhotos('vehicle','${esc(o.vehicleId)}',{orderId:'${esc(o.id)}', library:true})">Choose from the phone's photos</button>
+    <div style="margin-top:10px">${list.length ? photoStrip("vehicle", o.vehicleId, {}) : `<div class="muted">No photos yet.</div>`}</div>`;
+  $("#recOverlay").classList.add("on");
+}
+
+/* ---------- VIN scanner ----------
+   A VIN read from a photo is only offered when it can be trusted, and it is
+   never filled in without a person looking at it.
+
+   1. The barcode first. Door-jamb labels (and some windshield plates and
+      registration cards) carry the VIN as a barcode - Code 39 mostly, Code 128,
+      Data Matrix, QR or PDF417 on others. A barcode read is exact.
+      (zxing-cpp, vendor/zxing-*)
+   2. Only if no barcode gives a VIN, the printed characters are read
+      (Tesseract, vendor/tesseract-*) on several cleaned-up versions of the
+      photo, limited to the characters a VIN can contain.
+   3. Every candidate is checked: 17 characters, no I/O/Q (a 1 or a 0 read as
+      a letter is corrected - those letters never appear in a VIN), a valid
+      model-year character, and the ninth-position check digit. A text read
+      that fails the check digit is never "fixed" by guessing - the check digit
+      says a read is wrong, not which character is. Only where several reads
+      disagree is the combination that checks offered, with the characters
+      they disagreed on marked for the person to compare with the sticker.
+   4. NHTSA decodes the VIN so the person sees the year, make and model it
+      belongs to before accepting it.
+
+   The check digit is reported, not a gate, for vehicles built outside North
+   America (see vinCheckDigit); a barcode read that does not calculate says so
+   plainly and still needs a person's yes. */
+const VIN_LETTERS = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
+const VIN_YEAR_CHARS = "ABCDEFGHJKLMNPRSTVWXY123456789";
+const VIN_VENDOR = () => new URL("vendor/", location.href).href;
+const VIN_V = () => "?v=" + encodeURIComponent(JZD_VERSION);
+
+/* ---------- reading candidates out of text ---------- */
+/* A barcode read is exact, so it only has to be a well-formed VIN (vehicles
+   built for Europe use position 9 and 10 freely). A text read is where a
+   scanner goes wrong, so it must also look like the VIN of a vehicle a shop
+   sees: a model-year character at position 10, a check-digit character at 9,
+   and the serial number ending in digits (positions 15-17 are numeric for
+   every manufacturer under 49 CFR 565). Label text that happens to be 17
+   characters long does not look like that. */
+function vinPlausible(v, source){
+  if (v.length !== 17 || !/^[A-HJ-NPR-Z0-9]{17}$/.test(v) || v[0] === "0") return false;
+  if (source === "barcode") return true;
+  return VIN_YEAR_CHARS.indexOf(v[9]) >= 0 && /[0-9X]/.test(v[8]) && /^\d{3}$/.test(v.slice(14)) && /\d/.test(v.slice(0, 3) + v.slice(3, 8));
+}
+/* 17-character stretches of a piece of text. "exact" ones are whole words, or
+   whole words a text reader split a VIN into - that is how a VIN is printed.
+   A stretch cut out of the middle of a longer word is only "loose". A
+   "VIN" glued to the front of it is taken off first. */
+function vinWindows(text){
+  const up = String(text || "").toUpperCase();
+  const toks = up.split(/[^A-Z0-9]+/).filter(Boolean).map(t => t.length > 17 && /^VIN(NO|NUMBER)?/.test(t) ? t.replace(/^VIN(NO|NUMBER)?/, "") : t).filter(t => !/^VIN(NO|NUMBER)?$/.test(t));
+  const out = new Map();
+  const add = (w, exact) => { if (!out.has(w) || exact) out.set(w, exact || out.get(w) || false); };
+  for (let i = 0; i < toks.length; i++){
+    let s = "", ends = new Set([0]);
+    for (let j = i; j < toks.length && s.length < 17 + 12; j++){
+      s += toks[j]; ends.add(s.length);
+      if (s.length === 17) add(s, true);
+      if (j === i) for (let k = 0; k + 17 <= s.length; k++) add(s.slice(k, k + 17), false);
+    }
+  }
+  return Array.from(out, ([w, exact]) => ({w, exact}));
+}
+/* I, O and Q never appear in a VIN, so reading one is a 1 or a 0 every time */
+function vinDeIOQ(w){
+  const fixed = [];
+  const v = w.replace(/[IOQ]/g, (c, i) => { const to = c === "I" ? "1" : "0"; fixed.push({pos:i + 1, from:c, to, certain:true}); return to; });
+  return {v, fixed};
+}
+function vinCandidatesFromText(text, source){
+  const out = [];
+  /* a text read only trusts whole words; a barcode is exact however it is framed */
+  for (const {w, exact} of vinWindows(text)){
+    if (source !== "barcode" && !exact) continue;
+    const {v, fixed} = vinDeIOQ(w);
+    if (!vinPlausible(v, source)) continue;
+    out.push({vin:v, source, checkOk:vinCheckDigit(v).matches, fixed, exact});
+  }
+  return out;
+}
+/* A check digit says a read is wrong, not which character is. So a text read
+   that does not check is never "corrected" by guessing. When several reads of
+   the same VIN disagree - different versions of the photo, a close-up of the
+   line - the characters they disagree on are tried against each other, and a
+   combination that checks is offered with those characters marked. One read
+   on its own that does not check is shown as not checking. */
+function vinVote(textReads){
+  const reads = Array.from(new Set(textReads.filter(c => c.source === "text").map(c => c.vin)));
+  const out = [];
+  const tried = new Set();
+  for (let i = 0; i < reads.length; i++){
+    const group = reads.filter(r => { let d = 0; for (let k = 0; k < 17; k++) if (r[k] !== reads[i][k]) d++; return d <= 3; });
+    if (group.length < 2) continue;
+    const opts = [];
+    for (let k = 0; k < 17; k++) opts.push(Array.from(new Set(group.map(r => r[k]))));
+    const varying = opts.map((o, k) => o.length > 1 ? k : -1).filter(k => k >= 0);
+    if (!varying.length || varying.length > 4) continue;
+    const combos = varying.reduce((acc, k) => acc.flatMap(pre => opts[k].map(ch => pre.concat([[k, ch]]))), [[]]);
+    for (const combo of combos){
+      const arr = reads[i].split("");
+      combo.forEach(([k, ch]) => arr[k] = ch);
+      const v = arr.join("");
+      if (tried.has(v)) continue;
+      tried.add(v);
+      if (!vinPlausible(v, "text") || !vinCheckDigit(v).matches) continue;
+      if (group.indexOf(v) >= 0) continue;   /* a read that checks by itself is already there */
+      out.push({vin:v, source:"text", checkOk:true, exact:true, voted:true,
+        fixed:varying.map(k => ({pos:k + 1, from:group.filter(r => r[k] !== v[k]).map(r => r[k]).join("/"), to:v[k], certain:false}))});
+    }
+  }
+  return out;
+}
+/* several reads (barcodes, text on several versions of the photo) into one
+   ranked list; the same VIN read more than once counts for more */
+function vinRank(reads){
+  const by = new Map();
+  for (const c of reads){
+    const k = c.vin;
+    const had = by.get(k);
+    if (!had) by.set(k, Object.assign({seen:1}, c));
+    else {
+      had.seen += 1;
+      if (c.source === "barcode" && had.source !== "barcode") Object.assign(had, c, {seen:had.seen});
+      if (!c.fixed.some(f => !f.certain) && had.fixed.some(f => !f.certain)) had.fixed = c.fixed;
+    }
+  }
+  const score = c => (c.source === "barcode" ? 60 : 0) + (c.checkOk ? 100 : 0) + (c.exact ? 20 : 0) + c.seen * 8 - c.fixed.filter(f => !f.certain).length * 30;
+  return Array.from(by.values()).sort((a, b) => score(b) - score(a));
+}
+function vinTrust(c){
+  const uncertain = c.fixed.filter(f => !f.certain);
+  if (c.source === "barcode" && c.checkOk) return {level:"high", text:"READ FROM THE BARCODE — CHECK DIGIT OK"};
+  if (c.source === "barcode") return {level:"medium", text:"READ FROM THE BARCODE — CHECK DIGIT DOES NOT CALCULATE (normal for some vehicles built outside North America)"};
+  if (c.checkOk && !uncertain.length) return {level:"good", text:"READ FROM THE PRINTED TEXT — CHECK DIGIT OK. Compare it with the sticker."};
+  if (c.checkOk) return {level:"check", text:"THE READS DISAGREED ON " + (uncertain.length === 1 ? "ONE CHARACTER" : uncertain.length + " CHARACTERS") + " (" + uncertain.map(f => "position " + f.pos + ": " + f.from + " or " + f.to).join("; ") + ") — this is the reading that checks. Compare the marked characters with the sticker."};
+  return {level:"low", text:"READ FROM THE PRINTED TEXT — CHECK DIGIT DOES NOT CALCULATE. Do not use it unless it matches the sticker exactly."};
+}
+
+/* ---------- the photo ---------- */
+async function vinLoadImage(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("That photo could not be opened.")); i.src = url; });
+    const MAX = 2600;
+    const s = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  } finally { URL.revokeObjectURL(url); }
+}
+/* versions of the photo a text reader copes with better: grey with the contrast
+   stretched, black-and-white at the best threshold, and the negative (a light
+   VIN on a dark windshield plate) */
+function vinVariants(canvas){
+  const w = canvas.width, h = canvas.height;
+  const src = canvas.getContext("2d").getImageData(0, 0, w, h).data;
+  const grey = new Uint8ClampedArray(w * h);
+  let lo = 255, hi = 0;
+  for (let i = 0, j = 0; i < src.length; i += 4, j++){ const g = (src[i] * 299 + src[i + 1] * 587 + src[i + 2] * 114) / 1000; grey[j] = g; if (g < lo) lo = g; if (g > hi) hi = g; }
+  const span = Math.max(1, hi - lo);
+  const hist = new Array(256).fill(0);
+  for (let j = 0; j < grey.length; j++){ grey[j] = (grey[j] - lo) * 255 / span; hist[grey[j]]++; }
+  /* Otsu */
+  let sum = 0; for (let t = 0; t < 256; t++) sum += t * hist[t];
+  let sumB = 0, wB = 0, best = 0, thr = 127;
+  for (let t = 0; t < 256; t++){ wB += hist[t]; if (!wB) continue; const wF = grey.length - wB; if (!wF) break; sumB += t * hist[t];
+    const mB = sumB / wB, mF = (sum - sumB) / wF, between = wB * wF * (mB - mF) * (mB - mF); if (between > best){ best = between; thr = t; } }
+  const make = f => { const c = document.createElement("canvas"); c.width = w; c.height = h; const ctx = c.getContext("2d"); const id = ctx.createImageData(w, h);
+    for (let j = 0, i = 0; j < grey.length; j++, i += 4){ const v = f(grey[j]); id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255; } ctx.putImageData(id, 0, 0); return c; };
+  return [make(g => g), make(g => g > thr ? 255 : 0), make(g => g > thr ? 0 : 255)];
+}
+function vinRotate(canvas, deg){
+  const c = document.createElement("canvas");
+  const r = deg % 180 !== 0;
+  c.width = r ? canvas.height : canvas.width; c.height = r ? canvas.width : canvas.height;
+  const ctx = c.getContext("2d"); ctx.translate(c.width / 2, c.height / 2); ctx.rotate(deg * Math.PI / 180); ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+  return c;
+}
+
+/* ---------- the two readers, each loaded the first time it is needed ---------- */
+let vinZxingReady = null, vinOcrWorker = null;
+function vinLoadScript(src){
+  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("Could not load " + src.split("/").pop().split("?")[0] + " — the scanner's files are missing.")); document.head.appendChild(s); });
+}
+function vinZxing(){
+  if (!vinZxingReady) vinZxingReady = (async () => {
+    if (!window.ZXingWASM) await vinLoadScript(VIN_VENDOR() + "zxing-reader.js" + VIN_V());
+    await ZXingWASM.prepareZXingModule({overrides:{locateFile:(path, prefix) => path.endsWith(".wasm") ? VIN_VENDOR() + "zxing_reader.wasm" + VIN_V() : prefix + path}, fireImmediately:true});
+    return ZXingWASM;
+  })().catch(e => { vinZxingReady = null; throw e; });
+  return vinZxingReady;
+}
+async function vinBarcodes(canvas){
+  const Z = await vinZxing();
+  const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+  const res = await Z.readBarcodes(data, {formats:["Code39", "Code128", "DataMatrix", "QRCode", "PDF417", "Code93"], tryHarder:true, tryRotate:true, tryInvert:true, tryDownscale:true, maxNumberOfSymbols:8});
+  return res.filter(r => r.isValid && r.text).map(r => ({text:r.text, format:r.format}));
+}
+async function vinOcr(){
+  if (!vinOcrWorker) vinOcrWorker = (async () => {
+    if (!window.Tesseract) await vinLoadScript(VIN_VENDOR() + "tesseract.min.js" + VIN_V());
+    const base = VIN_VENDOR();
+    const w = await Tesseract.createWorker("eng", 1, {workerPath:base + "tesseract-worker.min.js" + VIN_V(), corePath:base.replace(/\/$/, ""), langPath:base.replace(/\/$/, ""), gzip:true, logger:() => {}});
+    await w.setParameters({tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", tessedit_pageseg_mode:"11", preserve_interword_spaces:"0"});
+    return w;
+  })().catch(e => { vinOcrWorker = null; throw e; });
+  return vinOcrWorker;
+}
+
+/* ---------- the whole read ---------- */
+/* Tesseract's word table: each word with its line and its box */
+function vinTsvLines(tsv){
+  const lines = new Map();
+  String(tsv || "").split("\n").forEach(row => {
+    const f = row.split("\t");
+    if (f.length < 12 || f[0] !== "5") return;
+    const key = f[2] + "." + f[3] + "." + f[4];
+    const x = +f[6], y = +f[7], w = +f[8], h = +f[9];
+    const l = lines.get(key) || {x0:1e9, y0:1e9, x1:0, y1:0, words:[]};
+    l.x0 = Math.min(l.x0, x); l.y0 = Math.min(l.y0, y); l.x1 = Math.max(l.x1, x + w); l.y1 = Math.max(l.y1, y + h);
+    l.words.push(f.slice(11).join("\t"));
+    lines.set(key, l);
+  });
+  return Array.from(lines.values()).map(l => Object.assign(l, {text:l.words.join(" ")}));
+}
+function vinCrop(canvas, box, extra){
+  const padX = (box.x1 - box.x0) * 0.06 + 10, padY = (box.y1 - box.y0) * 0.5 + 6;
+  const x = Math.max(0, box.x0 - padX), y = Math.max(0, box.y0 - padY);
+  const w = Math.min(canvas.width - x, box.x1 - box.x0 + 2 * padX), h = Math.min(canvas.height - y, box.y1 - box.y0 + 2 * padY);
+  const scale = Math.max(0.5, Math.min(4, 60 / Math.max(1, box.y1 - box.y0) * (extra || 1)));
+  const c = document.createElement("canvas"); c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+  const ctx = c.getContext("2d"); ctx.imageSmoothingQuality = "high"; ctx.drawImage(canvas, x, y, w, h, 0, 0, c.width, c.height);
+  return c;
+}
+async function vinScanImage(file, progress){
+  progress = progress || (() => {});
+  const notes = [];
+  progress("Opening the photo…");
+  const canvas = await vinLoadImage(file);
+  let reads = [];
+  progress("Looking for the barcode…");
+  try {
+    for (const b of await vinBarcodes(canvas)) reads = reads.concat(vinCandidatesFromText(b.text, "barcode").map(c => Object.assign(c, {format:b.format})));
+  } catch(e){ notes.push("Barcode reader: " + (e.message || e)); }
+  if (reads.some(c => c.checkOk)) return {candidates:vinRank(reads), notes};
+  progress("No barcode VIN — reading the printed characters…");
+  try {
+    const w = await vinOcr();
+    const settled = () => vinRank(reads).some(c => c.source === "text" && c.checkOk && c.seen >= 2);
+    for (const turn of [0, 90, 270]){
+      const base = turn ? vinRotate(canvas, turn) : canvas;
+      const set = vinVariants(base);
+      const lines = [];
+      for (let i = 0; i < set.length; i++){
+        progress("Reading the printed characters (" + (i + 1) + " of " + set.length + (turn ? ", turned" : "") + ")…");
+        const r = await w.recognize(set[i], {}, {text:true, tsv:true});
+        reads = reads.concat(vinCandidatesFromText(r.data.text, "text"));
+        for (const l of vinTsvLines(r.data.tsv)){
+          if (vinWindows(l.text).some(x => x.exact && vinPlausible(vinDeIOQ(x.w).v, "text")) &&
+              !lines.some(o => Math.abs(o.box.y0 - l.y0) < (l.y1 - l.y0) / 2)) lines.push({box:l});
+        }
+      }
+      /* Close-ups of the line that holds something shaped like a VIN, each read
+         as one line: at two sizes, in each clean-up, so a character one version
+         gets wrong the others can outvote. Stops as soon as two reads agree on a
+         VIN that checks. */
+      if (lines.length && !settled()){
+        try {
+          for (const l of lines.slice(0, 2)){
+            for (const scale of [1, 1.7]){
+              const crop = vinCrop(base, l.box, scale);
+              for (const [k, v] of vinVariants(crop).entries()){
+                if (settled()) break;
+                progress("Reading the VIN up close (" + (k + 1) + ")…");
+                for (const psm of ["7", "13"]){
+                  await w.setParameters({tessedit_pageseg_mode:psm});
+                  const r = await w.recognize(v, {}, {text:true});
+                  reads = reads.concat(vinCandidatesFromText(r.data.text, "text"));
+                }
+              }
+            }
+          }
+        } finally { await w.setParameters({tessedit_pageseg_mode:"11"}); }
+      }
+      if (reads.length) break;   /* found the line the right way up */
+    }
+    reads = reads.concat(vinVote(reads));
+  } catch(e){ notes.push("Text reader: " + (e.message || e)); }
+  return {candidates:vinRank(reads), notes};
+}
+
+/* ---------- on screen ---------- */
+let vinScanCtx = null;
+function closeVin(){ $("#vinOverlay").classList.remove("on"); }
+function vinScanOpen(ctx){
+  vinScanCtx = ctx || {};
+  const v = vinScanCtx.vehicleId ? db.vehicles[vinScanCtx.vehicleId] : null;
+  $("#vinSheet").innerHTML = `<div class="sheet-head"><h2>Scan VIN${v ? " — " + esc(vehLabel(v.id)) : ""}</h2><div class="grow"></div><button onclick="closeVin()">Close</button></div>
+    <button class="phonebig primary" onclick="vinPick(true)">📷 TAKE A PHOTO OF THE VIN</button>
+    <button class="phonebig" onclick="vinPick(false)">Choose a photo</button>
+    <div class="muted" style="font-size:13px;margin:6px 0 10px">Best: the <b>barcode</b> on the driver's door-jamb sticker, filling the photo, no glare. The windshield plate works too; hold the phone flat to the glass.</div>
+    <div id="vinWork"></div>
+    <details style="margin-top:12px"><summary>Type it instead</summary>
+      <input id="vinType" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="20" placeholder="17 characters" style="font-family:Consolas,monospace;font-size:20px;letter-spacing:2px;margin-top:8px">
+      <div id="vinTypeState" class="muted" style="margin-top:4px"></div>
+      <button class="phonebig" id="vinTypeUse" style="margin-top:8px">CHECK THIS VIN</button></details>`;
+  $("#vinOverlay").classList.add("on");
+  const t = $("#vinType");
+  t.oninput = () => { const n = normalizeVin(vinDeIOQ(t.value.toUpperCase().replace(/[^A-Z0-9]/g, "")).v); $("#vinTypeState").textContent = n.ok ? (n.check.matches ? "17 characters — check digit OK" : "17 characters — check digit does not calculate") : n.reason; };
+  $("#vinTypeUse").onclick = () => { const raw = t.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); const {v:vin, fixed} = vinDeIOQ(raw); const n = normalizeVin(vin);
+    if (!n.ok){ $("#vinTypeState").textContent = n.reason; return; } vinShow({candidates:[{vin, source:"typed", checkOk:n.check.matches, fixed, seen:1}], notes:[]}); };
+}
+function vinPick(camera){
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*";
+  if (camera) inp.setAttribute("capture", "environment");
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    const box = $("#vinWork"); if (!box) return;
+    const say = m => { const b = $("#vinWork"); if (b) b.innerHTML = `<div class="verifynote">${esc(m)}</div>`; };
+    try { vinShow(await vinScanImage(f, say)); }
+    catch(e){ say("Could not read that photo: " + (e.message || e)); }
+  };
+  inp.click();
+}
+function vinGroups(v){ return esc(v.slice(0, 3)) + " " + esc(v.slice(3, 8)) + " <b>" + esc(v[8]) + "</b> " + esc(v[9]) + " " + esc(v.slice(10, 11)) + " " + esc(v.slice(11)); }
+function vinMarked(c){
+  const unsure = new Set(c.fixed.filter(f => !f.certain).map(f => f.pos - 1));
+  return Array.from(c.vin).map((ch, i) => unsure.has(i) ? `<span class="vinunsure">${esc(ch)}</span>` : esc(ch)).join("");
+}
+async function vinShow(res){
+  const box = $("#vinWork"); if (!box) return;
+  const list = (res.candidates || []).slice(0, 3);
+  if (!list.length){
+    box.innerHTML = `<div class="verifynote" style="border-color:#c0392b"><b>NO VIN FOUND IN THAT PHOTO.</b> Nothing was filled in.
+      <ul style="margin:6px 0 0 18px;padding:0"><li>Get closer, so the barcode or the VIN fills most of the photo.</li><li>Tilt the phone a little to lose the glare.</li><li>On a dirty sticker, wipe it first; or type it below.</li></ul>
+      ${res.notes.length ? `<div class="muted" style="font-size:12px;margin-top:6px">${res.notes.map(esc).join("<br>")}</div>` : ""}</div>`;
+    return;
+  }
+  box.innerHTML = list.map((c, i) => {
+    const tr = vinTrust(c);
+    return `<div class="vincand vin-${tr.level}" data-vin="${esc(c.vin)}">
+      <div class="vinbig">${vinMarked(c)}</div>
+      <div class="vintrust">${esc(tr.text)}</div>
+      ${c.fixed.some(f => f.certain) ? `<div class="muted" style="font-size:12px">${esc(c.fixed.filter(f => f.certain).map(f => "position " + f.pos + ": " + f.from + " is never used in a VIN, so it is " + f.to).join("; "))}</div>` : ""}
+      ${c.ambiguous && c.ambiguous.length ? `<div class="muted" style="font-size:12px">More than one character could be wrong; readings that would check: ${c.ambiguous.map(esc).join(", ")}</div>` : ""}
+      <div class="vindecode" id="vinDec${i}">Checking with NHTSA…</div>
+      <button class="phonebig ${tr.level === "high" || tr.level === "good" ? "primary" : ""}" onclick="vinUse('${esc(c.vin)}', ${i})">USE THIS VIN</button>
+    </div>`;
+  }).join("") + (res.notes.length ? `<div class="muted" style="font-size:12px">${res.notes.map(esc).join("<br>")}</div>` : "");
+  list.forEach(async (c, i) => {
+    const el = () => $("#vinDec" + i);
+    try {
+      const d = await decodeVin(c.vin);
+      if (el()) el().innerHTML = `<b>${esc([d.year, d.make, d.model, d.series || d.trim].filter(Boolean).join(" ") || "NHTSA has no year / make / model")}</b>` +
+        (d.warnings.length ? `<div class="muted" style="font-size:12px">${d.warnings.map(esc).join(" · ")}</div>` : "");
+    } catch(e){ if (el()) el().textContent = "NHTSA decode not available: " + (e.message || e); }
+  });
+}
+/* the person has looked and said yes */
+function vinUse(vin, idx){
+  const cand = document.querySelector(`.vincand[data-vin="${CSS.escape(vin)}"]`);
+  const trust = cand ? cand.className : "";
+  if (/vin-low|vin-medium|vin-check/.test(trust) && !confirm("Use " + vin + "?\n\nCompare it character by character with the sticker first.")) return;
+  const ctx = vinScanCtx || {};
+  if (ctx.onVin){ closeVin(); ctx.onVin(vin); return; }
+  const dec = db.vinCache[vin] || null;
+  if (ctx.purpose === "vehicle" && ctx.vehicleId){
+    const v = db.vehicles[ctx.vehicleId]; if (!v) return;
+    if (v.vin && v.vin !== vin && !confirm("This vehicle is on record with VIN " + v.vin + ".\nThe scan says " + vin + ".\n\nReplace the VIN on record?")) return;
+    const before = v.vin || "";
+    v.vin = vin;
+    if (dec){ if (!v.year) v.year = dec.year; if (!v.make) v.make = dec.make; if (!v.model) v.model = dec.model; }
+    db.audit.push({at:new Date().toISOString(), action:"vin-scanned", ref:vehLabel(v.id), from:before, to:vin, who:db.settings.lastTech || "", reason:"Scanned on " + (PHONE ? "the phone" : "this computer")});
+    save(); closeVin(); render();
+    return;
+  }
+  /* a vehicle the shop already knows is found, not duplicated */
+  const known = vals(db.vehicles).find(v => String(v.vin || "").toUpperCase() === vin);
+  if (known){
+    const open = vals(db.orders).filter(o => o.vehicleId === known.id && !isFinal(o) && !isDead(o))[0];
+    closeVin();
+    if (open){ alert("Already in the book: " + vehLabel(known.id) + " — " + ticketNo(open) + " is open."); if (PHONE) render(); else editOrder(open.id); }
+    else if (confirm("Already in the book: " + vehLabel(known.id) + " (" + custName(known.customerId) + ").\n\nStart a new estimate for it?")) vinNewTicket(known.id);
+    return;
+  }
+  const id = uid("v");
+  db.vehicles[id] = {id, customerId:"", vin, year:dec ? dec.year : "", make:dec ? dec.make : "", model:dec ? dec.model : "", mileage:"", plate:""};
+  db.audit.push({at:new Date().toISOString(), action:"vin-scanned", ref:vin, from:"", to:vin, who:db.settings.lastTech || "", reason:"New vehicle scanned on " + (PHONE ? "the phone" : "this computer")});
+  closeVin();
+  vinNewTicket(id);
+}
+function vinNewTicket(vehicleId){
+  const v = db.vehicles[vehicleId];
+  const o = shapeOrder({id:uid("o"), invoiceNo:null, customerId:v.customerId || "", vehicleId, date:todayStr(), status:"Estimate", complaint:"", mileageIn:v.mileage || "", mileageOut:"",
+    labor:[], parts:[], extras:[], payments:[], history:[], notes:"", recommendation:"", custNotes:"", internalNotes:v.customerId ? "" : "Checked in by VIN scan — customer to be added."});
+  ensureNumber(o, "estimate");
+  db.orders[o.id] = o;
+  save();
+  if (PHONE) render(); else editOrder(o.id);
 }
 
 /* ---------- Settings → Data Providers ---------- */
@@ -8493,17 +9041,18 @@ function thumbHtml(a, readonly){
     ${a.thumb ? `<img src="${a.thumb}" alt="${esc(a.caption || a.name)}">` : `<div style="padding:6px;font-size:9px">${esc(a.name).slice(0,24)}</div>`}
     ${tag}${syncPhotoBadge(a.id)}</div>`;
 }
-function pickPhotos(ctx, ctxId){
-  attPending = {ctx, ctxId};
+function pickPhotos(ctx, ctxId, extra){
+  attPending = Object.assign({ctx, ctxId}, extra || {});
   const inp = $("#attInput");
   inp.value = "";
+  if (PHONE){ if (extra && extra.library) inp.removeAttribute("capture"); else inp.setAttribute("capture", "environment"); }
   inp.click();
 }
 $("#attInput").addEventListener("change", async e => {
   const files = Array.from(e.target.files || []);
   if (!files.length || !attPending) return;
   const {ctx, ctxId} = attPending;
-  const o = cur || null;
+  const o = cur || (attPending.orderId ? db.orders[attPending.orderId] : null) || null;
   for (const f of files){
     try {
       await attAdd(f, ctx, ctxId, {
@@ -8517,6 +9066,7 @@ $("#attInput").addEventListener("change", async e => {
 });
 function refreshAfterPhotos(ctx){
   if (view === "insp") return renderInspection();
+  if (PHONE && $("#recOverlay").classList.contains("on") && !window.__itemDetailKey && attPending === null && ctx === "vehicle"){ render(); return; }
   if ($("#recOverlay").classList.contains("on") && window.__itemDetailKey) return openItemDetail(window.__itemDetailKey);
   if (cur) return drawWO();
   render();
@@ -10154,6 +10704,7 @@ function render(){
   dl.innerHTML=`<datalist id="techlist">${allTechs().map(t=>`<option value="${esc(t)}">`).join("")}</datalist>`;
   $("#brandTop").innerHTML=esc(db.settings.shopName).replace(/(Inc\.?)$/i,'<span> $1</span>')||"JZD<span> Inc.</span>";
   if(view==="insp")return renderInspection();
+  if(view==="phone")return renderPhoneHome();
   if(view==="schedule")return renderSchedule();
   if(view==="appt")return renderAppointment();
   if(view==="custProfile")return renderCustomerProfile();
@@ -10620,6 +11171,7 @@ function editVehicle(id,presetCustomer,then){
   <div class="vinbar">
     <input id="v_vin" style="flex:1;min-width:230px" value="${esc(v.vin)}" placeholder="17 characters — paste or scan" autocomplete="off" spellcheck="false">
     <button class="primary" id="v_decode">Decode VIN</button>
+    <button id="v_scan" onclick="vinScanOpen({onVin:vin=>{const f=$('#v_vin'); f.value=vin; $('#v_decode').click();}})">📷 Scan</button>
   </div>
   <div id="v_decoded"></div>
   <label style="margin-top:12px">Owner</label><select id="v_cust"><option value="">— select customer —</option>${custOpts}</select>
@@ -11472,6 +12024,7 @@ $("#jobOverlay").addEventListener("mousedown",e=>{if(e.target===$("#jobOverlay")
    old version rendered an empty shop first and filled it in afterwards, which
    is exactly how an unreadable book came to look like a brand new one. */
 async function boot(){
+  phoneInit();
   db = await loadDb();
   await syncInit(window.__syncLoad);
   if(syncWaitingForShop){ showWaitingForShop(); return; }

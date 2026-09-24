@@ -287,6 +287,56 @@ the shop's own network. No cloud, no subscription, no shared folder.
 - Provider credentials stay in each computer's Credential Manager; they are not
   in the hub.
 
+## The shop phone
+
+An iPhone (or any phone) on the shop Wi-Fi opens the app straight from the
+office desktop - no App Store, nothing to install, no cloud.
+
+- On the desktop, **Settings → Shop Sync** shows a **Connect a phone** card
+  with the address and a QR code. Point the phone's camera at it, press **PAIR
+  DEVICE**, type the code on the phone and approve it when the digits match.
+  Then Safari → Share → **Add to Home Screen**.
+- The phone opens on a list of the open tickets with big buttons: the
+  **inspection** (one card per wheel, one item at a time), **photos** (the
+  camera opens in one tap; the photo is shrunk on the phone so it sends
+  quickly), **scan VIN**, and the ticket.
+- Everything the phone does reaches the laptop and the desktop in about a
+  second, and the other way round. The laptop shows **OPEN ON: Shop iPhone** on
+  the inspection being worked. The same field changed on the phone and the
+  laptop asks which to keep.
+- Out of Wi-Fi range, the phone keeps working; its changes and photos go up
+  when it is back, without undoing anything done elsewhere meanwhile.
+- How it works: the hub keeps a "seat" for each paired phone - the same sync
+  engine a laptop runs - and the phone is its screen, over a paired, encrypted
+  connection (P-256, HMAC-SHA-256, ChaCha20-Poly1305 from the MIT-licensed
+  noble libraries, because Safari has no browser crypto on a plain-Wi-Fi
+  address). **REVOKE DEVICE** shuts a phone out at once.
+
+## Scanning a VIN
+
+**📷 Scan** next to the VIN on the vehicle form (and **SCAN VIN** on the phone)
+reads a VIN from a photo, and never fills one in without a person looking at
+it:
+
+1. **The barcode first** (zxing-cpp): the door-jamb label's Code 39, or Code
+   128, Data Matrix, QR or PDF417. A barcode read is exact.
+2. Only if there is no barcode, **the printed characters** (Tesseract, limited
+   to the characters a VIN can contain), on several cleaned-up versions of the
+   photo and then close-ups of the VIN's own line.
+3. Every read must be 17 characters, look like a VIN (model-year character,
+   serial number ending in digits) and pass the **check digit**. I, O and Q
+   are never in a VIN, so they are read as 1 and 0 and it says so. A read that
+   does not check is **never guessed at**: only where several reads disagree
+   is the combination that checks offered, with those characters highlighted.
+4. **NHTSA** decodes it, so the year, make and model are on screen before
+   **USE THIS VIN**. A scan that differs from the VIN on record asks first; a
+   VIN already in the book finds that vehicle instead of adding a second one.
+
+The readers are part of the program (`vendor/`, see `vendor/LICENSES.md`), so
+scanning works with no internet. 2.9.0 also corrects the check-digit
+calculation, which gave the wrong value for letters J–Z and so warned about
+good VINs.
+
 ## The catalog is your catalog
 
 The 245 jobs are **this shop's own curated seed data**. They are not Mitchell,
@@ -341,6 +391,8 @@ node testdata.cjs      # provider hub: NHTSA, datasets, routing, provenance, san
 node testmpi.cjs       # fast inspection entry: dropdowns, presets, Mark Good, completion, a v2.8.1 book
 node testmaint.cjs     # OEM maintenance: provenance, no-guess, mileage/time, severe/normal, history
 node testsync.cjs      # Shop Sync: two real processes, the real page, pairing to host restart
+node testphone.cjs     # the shop phone: an emulated iPhone, the desktop and the laptop, live both ways
+node testvinscan.cjs   # the VIN scanner on generated photos: barcode, text, plate, QR, no VIN
 cd desktop/shophub && cargo test      # sync engine, hub, crypto, and three computers over real sockets
 node testmotorlive.cjs # LIVE MOTOR sandbox through the page (needs MOTOR_SANDBOX_PUBLIC/PRIVATE)
 cd desktop/src-tauri && cargo test    # the storage layer and the provider hub's native side
@@ -380,5 +432,5 @@ External data is supplemental. With the internet off, NHTSA down, or every
 provider disabled, customers, vehicles, inspections, repair orders, the SHOP SEED
 labor catalog, parts and the floor all keep working from this computer.
 
-Tag a version (`git tag v2.8.4 && git push origin v2.8.4`) and CI runs every
+Tag a version (`git tag v2.9.0 && git push origin v2.9.0`) and CI runs every
 suite and the live MOTOR sandbox check, then builds and publishes the installer.

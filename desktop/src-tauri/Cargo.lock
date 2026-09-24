@@ -1851,7 +1851,7 @@ dependencies = [
 
 [[package]]
 name = "jzd-shop"
-version = "2.8.4"
+version = "2.9.0"
 dependencies = [
  "base64 0.22.1",
  "hmac",
@@ -1865,7 +1865,7 @@ dependencies = [
 
 [[package]]
 name = "jzd-shophub"
-version = "2.8.3"
+version = "2.9.0"
 dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",

@@ -1,6 +1,6 @@
 [package]
 name = "jzd-shophub"
-version = "2.8.3"
+version = "2.9.0"
 description = "JZD Shop Hub — one authoritative shop book on the shop's own network, shared by every JZD Shop Manager in the building"
 authors = ["JZac Designs"]
 edition = "2021"

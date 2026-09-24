@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Emitter;
+use tauri::Manager;
 
 /// Pairing secrets in Windows Credential Manager, under the same prefix as the
 /// provider credentials. The credential's name is a hash of the device and
@@ -61,6 +62,15 @@ impl SyncState {
             }),
             bind_ip: "0.0.0.0".into(),
             discovery: true,
+            // A phone on the shop Wi-Fi is handed the same page this program
+            // shows, straight from the copy built into this program.
+            assets: Some({
+                let app = app.clone();
+                Arc::new(move |name: &str| {
+                    let r = app.asset_resolver();
+                    r.get(name.to_string()).or_else(|| r.get(format!("/{name}"))).map(|a| a.bytes().to_vec())
+                }) as shophub::server::Assets
+            }),
         };
         match Shell::open(o) {
             Ok(s) => SyncState { shell: Some(Arc::new(s)), error: None },

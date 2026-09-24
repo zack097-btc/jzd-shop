@@ -254,6 +254,14 @@
       return call(cmd, args);
     }
     if (cmd === "secret_has") return false;
+    /* public NHTSA data (recalls, decode), fetched by the phone itself; nothing
+       licensed and no credential goes through a phone */
+    if (cmd === "net_fetch"){
+      const req = args.req || {};
+      if ((req.method || "GET") !== "GET" || !/^https:\/\/(vpic\.nhtsa\.dot\.gov|api\.nhtsa\.gov|static\.nhtsa\.gov)\//.test(req.url || "")) throw "only public NHTSA data is fetched on a phone";
+      const r = await fetch(req.url, {headers:{Accept:"application/json"}});
+      return {status:r.status, body:await r.text()};
+    }
     throw cmd + " is not available on a phone";
   }
   function waitOnline(ms){
