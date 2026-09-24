@@ -1,0 +1,3 @@
+# Third-party files are kept byte for byte as published.
+vendor/** -text
+desktop/shophub/src/noble.js -text
