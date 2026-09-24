@@ -44,6 +44,9 @@ pub struct Options {
     /// Normally 0.0.0.0; the test harness uses 127.0.0.1.
     pub bind_ip: String,
     pub discovery: bool,
+    /// The app's own files, so a phone on the shop's network can be handed the
+    /// page by the hub. None means this computer serves sync only.
+    pub assets: Option<crate::server::Assets>,
 }
 
 #[derive(Default, Clone)]
@@ -103,7 +106,7 @@ impl ShopSync {
         let cfg = self.cfg.lock().unwrap().clone();
         match cfg.mode.as_str() {
             "host" => {
-                let hub = Hub::open(&self.hub_dir(), self.o.secrets.clone())?;
+                let hub = Hub::open_with(&self.hub_dir(), self.o.secrets.clone(), self.o.assets.clone())?;
                 let port = if cfg.port == 0 { DEFAULT_PORT } else { cfg.port };
                 let bind: SocketAddr = format!("{}:{}", self.o.bind_ip, port).parse().map_err(e)?;
                 let addr = hub.serve(bind, self.o.discovery)?;
@@ -275,7 +278,7 @@ impl ShopSync {
             let aside = self.o.data_dir.join("shophub").join(format!("hub-unfinished-{stamp}"));
             std::fs::rename(self.hub_dir(), aside).map_err(e)?;
         }
-        let hub = Hub::open(&self.hub_dir(), self.o.secrets.clone())?;
+        let hub = Hub::open_with(&self.hub_dir(), self.o.secrets.clone(), self.o.assets.clone())?;
         let mut report = hub.store().import_book(&book, "host")?;
         // photographs into the hub, each checked
         for (id, ext, bytes) in &local_photos {

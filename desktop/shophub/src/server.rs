@@ -22,6 +22,11 @@ use std::time::{Duration, Instant};
 use tungstenite::protocol::WebSocketConfig;
 use tungstenite::{Message, WebSocket};
 
+/// How the hub hands a phone the app itself: a path ("index.html") to the
+/// bytes the installed program already carries. The hub never reads the disk
+/// for this, so a request has no path to walk out of.
+pub type Assets = Arc<dyn Fn(&str) -> Option<Vec<u8>> + Send + Sync>;
+
 pub const DEFAULT_PORT: u16 = 47811;
 pub const DISCOVERY_PORT: u16 = 47812;
 pub const DISCOVER_PROBE: &[u8] = b"JZD-SHOPHUB-DISCOVER-1";
@@ -70,6 +75,7 @@ struct State {
 pub struct HubInner {
     pub store: HubStore,
     secrets: Arc<dyn SecretStore>,
+    assets: Option<Assets>,
     state: Mutex<State>,
     apply_lock: Mutex<()>,
     stop: AtomicBool,
@@ -88,11 +94,18 @@ fn private_ok(stream: &TcpStream) -> bool {
 
 impl Hub {
     pub fn open(dir: &Path, secrets: Arc<dyn SecretStore>) -> Result<Hub, String> {
+        Hub::open_with(dir, secrets, None)
+    }
+
+    /// `assets` lets the hub serve the app to a phone's browser on the shop's
+    /// network. Without it this port does nothing but sync.
+    pub fn open_with(dir: &Path, secrets: Arc<dyn SecretStore>, assets: Option<Assets>) -> Result<Hub, String> {
         let store = HubStore::open(dir)?;
         Ok(Hub {
             inner: Arc::new(HubInner {
                 store,
                 secrets,
+                assets,
                 state: Mutex::new(State { conns: HashMap::new(), pairing: None, requests: HashMap::new() }),
                 apply_lock: Mutex::new(()),
                 stop: AtomicBool::new(false),
@@ -280,6 +293,15 @@ impl Hub {
         let _ = stream.set_nonblocking(false);
         let _ = stream.set_nodelay(true);
         let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
+        // A phone asks for the app over plain HTTP on this same port; a computer,
+        // and a phone already running the app, hold a WebSocket. The request head
+        // is only looked at here, never taken off the socket, so the WebSocket
+        // handshake still sees the connection exactly as it arrived.
+        let head = peek_head(&stream);
+        if !is_websocket_upgrade(&head) {
+            self.http(stream, &head);
+            return;
+        }
         let Ok(mut ws) = tungstenite::accept_with_config(stream, Some(ws_config())) else { return };
         let first = match ws.read() {
             Ok(Message::Text(t)) => serde_json::from_str::<Value>(&t).unwrap_or(Value::Null),
@@ -634,4 +656,106 @@ pub fn graceful_close(ws: &mut WebSocket<TcpStream>) {
 
 pub fn safe_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+}
+
+// ---------------- the app itself, served to a phone on the shop's network
+
+/// Read the request head without taking it off the socket.
+fn peek_head(stream: &TcpStream) -> Vec<u8> {
+    let start = Instant::now();
+    let mut buf = [0u8; 2048];
+    while start.elapsed() < Duration::from_secs(5) {
+        match stream.peek(&mut buf) {
+            Ok(0) => return Vec::new(),
+            Ok(n) => {
+                let seen = &buf[..n];
+                if seen.windows(4).any(|w| w == b"\r\n\r\n") || n == buf.len() {
+                    return seen.to_vec();
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => return Vec::new(),
+        }
+    }
+    Vec::new()
+}
+
+fn is_websocket_upgrade(head: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(head).to_ascii_lowercase();
+    text.contains("upgrade: websocket") || text.contains("upgrade:websocket")
+}
+
+fn request_line(head: &[u8]) -> (String, String) {
+    let text = String::from_utf8_lossy(head);
+    let first = text.lines().next().unwrap_or("");
+    let mut parts = first.split_whitespace();
+    let method = parts.next().unwrap_or("").to_string();
+    let path = parts.next().unwrap_or("").split(['?', '#']).next().unwrap_or("").to_string();
+    (method, path)
+}
+
+/// The shell the phone's browser loads in front of the app, in place of the
+/// desktop shell. It lives beside this file so it is version-locked to the hub.
+pub const PHONE_SHELL_JS: &str = include_str!("phone_shell.js");
+
+impl Hub {
+    fn http(&self, mut stream: TcpStream, head: &[u8]) {
+        // take the head off the socket now that it is being answered here
+        let mut sink = vec![0u8; head.len()];
+        let _ = stream.read_exact(&mut sink);
+        let (method, path) = request_line(head);
+        if method != "GET" {
+            http_send(&mut stream, 405, "text/plain; charset=utf-8", b"Only GET is served here.".to_vec());
+            return;
+        }
+        match path.as_str() {
+            "/" | "/phone" | "/phone/" => match self.phone_page() {
+                Some(html) => http_send(&mut stream, 200, "text/html; charset=utf-8", html),
+                None => http_send(&mut stream, 503, "text/plain; charset=utf-8", b"This Shop Hub is not serving the app.".to_vec()),
+            },
+            "/phone-shell.js" => http_send(&mut stream, 200, "text/javascript; charset=utf-8", PHONE_SHELL_JS.as_bytes().to_vec()),
+            "/health" => http_send(
+                &mut stream,
+                200,
+                "application/json",
+                json!({"jzdShopHub": 1, "shop": self.inner.store.shop_id(), "name": self.shop_name(), "app": self.inner.assets.is_some()})
+                    .to_string()
+                    .into_bytes(),
+            ),
+            _ => http_send(&mut stream, 404, "text/plain; charset=utf-8", b"Not here.".to_vec()),
+        }
+    }
+
+    /// The shop's own page, with the phone shell put in front of it so the app
+    /// talks to this hub instead of looking for a desktop shell.
+    fn phone_page(&self) -> Option<Vec<u8>> {
+        let assets = self.inner.assets.as_ref()?;
+        let html = String::from_utf8(assets("index.html")?).ok()?;
+        let at = html.find("<script>")?;
+        let mut out = String::with_capacity(html.len() + 200);
+        out.push_str(&html[..at]);
+        out.push_str("<script src=\"/phone-shell.js\"></script>\n");
+        out.push_str(&html[at..]);
+        Some(out.into_bytes())
+    }
+}
+
+fn http_send(stream: &mut TcpStream, status: u16, content_type: &str, body: Vec<u8>) {
+    let reason = match status {
+        200 => "OK",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        503 => "Service Unavailable",
+        _ => "Error",
+    };
+    let head = format!(
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
+    let _ = stream.write_all(head.as_bytes());
+    let _ = stream.write_all(&body);
+    let _ = stream.flush();
 }

@@ -49,6 +49,11 @@ fn main() {
             }),
             bind_ip: arg("--bind").unwrap_or_else(|| "127.0.0.1".into()),
             discovery: false,
+            // the harness serves the page straight from the working copy
+            assets: arg("--page").map(|page| {
+                let page = PathBuf::from(page);
+                Arc::new(move |name: &str| if name == "index.html" { std::fs::read(&page).ok() } else { None }) as shophub::server::Assets
+            }),
         })
         .unwrap(),
     );

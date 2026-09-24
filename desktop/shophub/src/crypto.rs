@@ -21,6 +21,7 @@
 
 use crate::util::rand_bytes;
 use chacha20poly1305::aead::{Aead, KeyInit};
+use aes_gcm::Aes256Gcm;
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use hmac::{Hmac, Mac};
 use p256::ecdh::EphemeralSecret;
@@ -92,9 +93,56 @@ pub fn pair_finish(mine: PairKeys, other_public: &[u8], client_pub: &[u8], host_
     Ok(Paired { verify: format!("{:03} {:03}", n / 1000, n % 1000), device_secret })
 }
 
+/// Both ciphers are AEADs with 12-byte nonces and 16-byte tags, used the same
+/// way; a computer uses ChaCha20-Poly1305, and a phone in a browser asks for
+/// AES-256-GCM because that is what WebCrypto has.
+enum Sealer {
+    Chacha(ChaCha20Poly1305),
+    Aes(Aes256Gcm),
+}
+
+impl Sealer {
+    fn new(cipher: Cipher, key: &[u8; 32]) -> Sealer {
+        match cipher {
+            Cipher::Chacha => Sealer::Chacha(ChaCha20Poly1305::new(Key::from_slice(key))),
+            Cipher::AesGcm => Sealer::Aes(<Aes256Gcm as aes_gcm::KeyInit>::new(key.into())),
+        }
+    }
+    fn encrypt(&self, n: &Nonce, plain: &[u8]) -> Vec<u8> {
+        match self {
+            Sealer::Chacha(c) => c.encrypt(n, plain).expect("encryption does not fail"),
+            Sealer::Aes(c) => aes_gcm::aead::Aead::encrypt(c, aes_gcm::Nonce::from_slice(n.as_slice()), plain).expect("encryption does not fail"),
+        }
+    }
+    fn decrypt(&self, n: &Nonce, ct: &[u8]) -> Result<Vec<u8>, ()> {
+        match self {
+            Sealer::Chacha(c) => c.decrypt(n, ct).map_err(|_| ()),
+            Sealer::Aes(c) => aes_gcm::aead::Aead::decrypt(c, aes_gcm::Nonce::from_slice(n.as_slice()), ct).map_err(|_| ()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Cipher {
+    Chacha,
+    AesGcm,
+}
+
+impl Cipher {
+    /// What the other side asked for. Anything unknown is refused rather than
+    /// quietly downgraded.
+    pub fn parse(name: &str) -> Result<Cipher, String> {
+        match name.trim() {
+            "" | "chacha20-poly1305" => Ok(Cipher::Chacha),
+            "aes-256-gcm" => Ok(Cipher::AesGcm),
+            other => Err(format!("this Shop Hub does not know the cipher {other}")),
+        }
+    }
+}
+
 pub struct Session {
-    send: ChaCha20Poly1305,
-    recv: ChaCha20Poly1305,
+    send: Sealer,
+    recv: Sealer,
     send_ctr: u64,
     recv_ctr: u64,
 }
@@ -108,20 +156,19 @@ fn nonce(ctr: u64) -> Nonce {
 impl Session {
     /// `client` selects which of the two derived keys this side sends with.
     pub fn new(device_secret: &[u8], nonce_c: &[u8], nonce_s: &[u8], client: bool) -> Session {
+        Session::with_cipher(Cipher::Chacha, device_secret, nonce_c, nonce_s, client)
+    }
+
+    pub fn with_cipher(cipher: Cipher, device_secret: &[u8], nonce_c: &[u8], nonce_s: &[u8], client: bool) -> Session {
         let c2s = hmac(device_secret, &[b"jzd-shophub c2s", nonce_c, nonce_s]);
         let s2c = hmac(device_secret, &[b"jzd-shophub s2c", nonce_c, nonce_s]);
         let (send, recv) = if client { (c2s, s2c) } else { (s2c, c2s) };
-        Session {
-            send: ChaCha20Poly1305::new(Key::from_slice(&send)),
-            recv: ChaCha20Poly1305::new(Key::from_slice(&recv)),
-            send_ctr: 0,
-            recv_ctr: 0,
-        }
+        Session { send: Sealer::new(cipher, &send), recv: Sealer::new(cipher, &recv), send_ctr: 0, recv_ctr: 0 }
     }
 
     pub fn seal(&mut self, plain: &[u8]) -> Vec<u8> {
         self.send_ctr += 1;
-        let ct = self.send.encrypt(&nonce(self.send_ctr), plain).expect("encryption does not fail");
+        let ct = self.send.encrypt(&nonce(self.send_ctr), plain);
         let mut out = Vec::with_capacity(8 + ct.len());
         out.extend_from_slice(&self.send_ctr.to_be_bytes());
         out.extend_from_slice(&ct);
@@ -137,6 +184,7 @@ impl Session {
             return Err("message out of order or replayed".into());
         }
         let plain = self.recv.decrypt(&nonce(ctr), &frame[8..]).map_err(|_| "message failed authentication".to_string())?;
+        // the counter only moves on a message that authenticated
         self.recv_ctr = ctr;
         Ok(plain)
     }
@@ -172,6 +220,26 @@ mod tests {
         let _ = m1;
         assert_ne!(client_side.device_secret, host_side.device_secret);
         assert!(pair_finish(pair_keys(), b"not a key", b"x", b"y").is_err());
+    }
+
+    #[test]
+    fn a_phone_and_the_hub_seal_with_aes_gcm_the_same_way() {
+        // a browser has AES-GCM and no ChaCha; the frames must behave identically
+        let secret = [7u8; 32];
+        let (nc, ns) = (new_nonce(), new_nonce());
+        let mut phone = Session::with_cipher(Cipher::AesGcm, &secret, &nc, &ns, true);
+        let mut hub = Session::with_cipher(Cipher::AesGcm, &secret, &nc, &ns, false);
+        let frame = phone.seal(b"{\"t\":\"ops\"}");
+        assert_eq!(hub.open(&frame).unwrap(), b"{\"t\":\"ops\"}");
+        let back = hub.seal(b"{\"t\":\"acks\"}");
+        assert_eq!(phone.open(&back).unwrap(), b"{\"t\":\"acks\"}");
+        assert!(hub.open(&frame).is_err(), "a replayed frame is refused");
+        let mut bad = phone.seal(b"x");
+        let n = bad.len() - 1;
+        bad[n] ^= 1;
+        assert!(hub.open(&bad).is_err(), "a tampered frame is refused");
+        assert_eq!(Cipher::parse("aes-256-gcm").unwrap(), Cipher::AesGcm);
+        assert!(Cipher::parse("rot13").is_err());
     }
 
     #[test]

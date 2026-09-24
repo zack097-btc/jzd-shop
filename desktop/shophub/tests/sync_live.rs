@@ -37,6 +37,7 @@ fn node_at(dir: PathBuf) -> (Arc<ShopSync>, PathBuf, Events) {
         emit: Arc::new(move |name: &str, v: Value| ev.lock().unwrap().push((name.to_string(), v))),
         bind_ip: "127.0.0.1".into(),
         discovery: false,
+        assets: None,
     })
     .unwrap();
     (s, dir, events)
