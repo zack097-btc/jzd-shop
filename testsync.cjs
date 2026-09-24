@@ -318,6 +318,46 @@ function shim(port){
     const audit = await until(() => host.evaluate(() => (db.audit || []).find(a => a.action === 'sync-conflict')), 5000);
     check('4e. the choice is recorded in the shop\'s activity history (seen on the host too)', !!audit && /Shop Laptop/.test(audit.reason) && audit.to === '5/32', JSON.stringify(audit));
 
+    /* ================= 4f. the Note popup (field report, 2.8.3) =================
+       The same RR note typed in the Note popup on both computers: the laptop
+       pressed Done first, then the desktop. The desktop's Done wrote over the
+       laptop's note without asking. It must ask, and hold nothing back. */
+    await idle(laptop); await idle(host);
+    const noteOf = (page, k) => page.evaluate(k => (db.inspections[inspId].items[k] || {}).note || '', k);
+    await host.evaluate(() => openItemDetail('tires.tire.RR'));
+    await host.fill('#d_note', 'RR is cracked wheel');
+    await laptop.evaluate(() => openItemDetail('tires.tire.RR'));
+    await laptop.fill('#d_note', 'RF');
+    await laptop.click('#recSheet button.green');
+    await until(async () => (await ctl(LAPTOP_CTL, 'sync_status')).client.pending === 0, 4000);
+    await wait(1500);
+    const heldText = await host.evaluate(() => { const b = document.querySelector('#recSheet .syncbanner'); return b ? b.textContent : ''; });
+    const hostUnder = await noteOf(host, 'tires.tire.RR');
+    check('4f. with the Note popup open, the other computer\'s change waits and the popup says so', hostUnder === '' && /just changed on Shop Laptop/.test(heldText), JSON.stringify([hostUnder, heldText]));
+    await host.click('#recSheet button.green');
+    const noteDlg = await until(async () => { const el = await host.$('#syncConflict.on'); return el ? await el.textContent() : null; }, 6000);
+    check('4g. Done on the second computer asks: RR TIRE — TECHNICIAN NOTE CHANGED ON ANOTHER DEVICE', !!noteDlg && /RR .*TECHNICIAN NOTE CHANGED ON ANOTHER DEVICE/i.test(noteDlg) &&
+      /USE RR is cracked wheel/.test(noteDlg) && /USE RF/.test(noteDlg), noteDlg);
+    check('4h. nothing was overwritten while it asks (the laptop still has its note)', (await noteOf(laptop, 'tires.tire.RR')) === 'RF');
+    await host.click('#syncKeepTheirs');
+    const noteSettled = await until(async () => (await noteOf(host, 'tires.tire.RR')) === 'RF' && (await noteOf(laptop, 'tires.tire.RR')) === 'RF', 6000);
+    check('4i. USE RF: both computers keep the laptop\'s note', !!noteSettled, JSON.stringify([await noteOf(host, 'tires.tire.RR'), await noteOf(laptop, 'tires.tire.RR')]));
+
+    /* two different tires in two Note popups: both stay, nobody is asked */
+    await idle(laptop); await idle(host);
+    await host.evaluate(() => openItemDetail('tires.tire.LR'));
+    await host.fill('#d_note', 'desktop LR');
+    await laptop.evaluate(() => openItemDetail('tires.tire.RF'));
+    await laptop.fill('#d_note', 'laptop RF');
+    await laptop.click('#recSheet button.green');
+    await wait(1500);
+    await host.click('#recSheet button.green');
+    const bothNotes = await until(async () => (await noteOf(host, 'tires.tire.RF')) === 'laptop RF' && (await noteOf(host, 'tires.tire.LR')) === 'desktop LR' &&
+      (await noteOf(laptop, 'tires.tire.RF')) === 'laptop RF' && (await noteOf(laptop, 'tires.tire.LR')) === 'desktop LR', 6000);
+    const noAsk = !(await host.$('#syncConflict.on')) && !(await laptop.$('#syncConflict.on'));
+    check('4j. notes on two different tires in two popups both stay on both computers, without a question', !!bothNotes && noAsk,
+      JSON.stringify([await noteOf(host, 'tires.tire.RF'), await noteOf(host, 'tires.tire.LR'), await noteOf(laptop, 'tires.tire.RF'), await noteOf(laptop, 'tires.tire.LR'), noAsk]));
+
     /* ================= 5. offline queue ================= */
     await idle(laptop);
     await ctl(LAPTOP_CTL, 'sync_debug_pause', { on: true });

@@ -380,5 +380,5 @@ External data is supplemental. With the internet off, NHTSA down, or every
 provider disabled, customers, vehicles, inspections, repair orders, the SHOP SEED
 labor catalog, parts and the floor all keep working from this computer.
 
-Tag a version (`git tag v2.8.3 && git push origin v2.8.3`) and CI runs every
+Tag a version (`git tag v2.8.4 && git push origin v2.8.4`) and CI runs every
 suite and the live MOTOR sandbox check, then builds and publishes the installer.

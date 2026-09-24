@@ -740,7 +740,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.8.3";
+const JZD_VERSION = "2.8.4";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -7034,11 +7034,43 @@ function syncApplyPatch(p){
   if (p.del || p.value === undefined) delete t[last];
   else t[last] = p.value;
 }
-/* A ticket open in the editor keeps its own copy; changing that copy under
-   someone's hands would lose what they are typing. Its patches wait. */
-function syncDefer(p){
-  return !!(cur && $("#woOverlay").classList.contains("on") && p.path[0] === "orders" && p.path[1] === cur.id);
+/* An editor that is open - the ticket, a Note popup, any form in a popup -
+   holds its own copy of what it shows and writes it back when saved. Changing
+   the book underneath it would let that save write over another computer's
+   change without anyone being asked. So while any popup is open, changes from
+   other computers wait. When it is saved, this computer's base is still what
+   it last saw, so a field both computers changed asks which to keep, and
+   different fields both stay. When it closes, the waiting changes come in. */
+function syncEditorOpen(){
+  return Array.from(document.querySelectorAll(".overlay.on")).some(el => el.id !== "syncConflict");
 }
+function syncDefer(p){
+  return syncEditorOpen();
+}
+let syncHeld = false;
+function syncHeldBanner(deferred){
+  /* the ticket editor has its own wording */
+  if (cur && $("#woOverlay").classList.contains("on") && deferred.some(p => p.path[0] === "orders" && p.path[1] === cur.id)){
+    syncDeferredOrder = {id:cur.id, device:deferred.find(p => p.path[0] === "orders" && p.path[1] === cur.id).device};
+    syncWOBanner();
+  }
+  /* a Note popup on the inspection, when the change is to that same item */
+  const key = window.__itemDetailKey;
+  const sheet = $("#recSheet");
+  if (key && inspId && sheet && $("#recOverlay").classList.contains("on")){
+    const hit = deferred.find(p => p.path[0] === "inspections" && p.path[1] === inspId && (p.path.length < 4 || (p.path[2] === "items" && p.path[3] === key)));
+    if (hit && !sheet.querySelector(".syncbanner")){
+      const b = document.createElement("div");
+      b.className = "verifynote syncbanner";
+      b.innerHTML = `<b>This was just changed on ${esc(syncDeviceName(hit.device))}.</b> What you see here is not changed while it is open. When you press Done, anything you both changed will ask which to keep.`;
+      sheet.insertBefore(b, sheet.firstChild.nextSibling);
+    }
+  }
+}
+/* when the last popup closes, what was held comes in */
+new MutationObserver(() => {
+  if (syncHeld && !syncEditorOpen()){ syncHeld = false; setTimeout(syncPull, 30); }
+}).observe(document.documentElement, {subtree:true, attributes:true, attributeFilter:["class"]});
 async function syncPull(){
   if (!syncOn()) return;
   if (syncPatching || dirty || saving){ syncNeedPull = true; return; }
@@ -7050,7 +7082,7 @@ async function syncPull(){
     const applied = [], deferred = [];
     for (const p of patches){ if (syncDefer(p)) deferred.push(p); else { syncApplyPatch(p); applied.push(p); } }
     if (applied.length) await syncInvoke("sync_confirm_patches", {ids:applied.map(p => p.id)});
-    if (deferred.length){ syncDeferredOrder = {id:cur.id, device:deferred[0].device}; syncWOBanner(); }
+    if (deferred.length){ syncHeld = true; syncHeldBanner(deferred); }
     if (applied.length) syncRedraw(applied);
   } catch(e){
     /* nothing applied is confirmed, so nothing is lost: it is asked for again */
@@ -7130,7 +7162,8 @@ function syncFieldLabel(path){
         }
       })));
     }
-    const field = path[4] === "state" ? "status" : path[4] === "obs" ? (path[5] || "") : path[4] === "meas" ? "" : (path[4] || "");
+    const field = path[4] === "state" ? "status" : path[4] === "obs" ? (path[5] || "") : path[4] === "meas" ? ""
+      : path[4] === "note" ? "technician note" : path[4] === "custNote" ? "customer note" : (path[4] || "");
     return (name + (field ? " — " + field : "")).toUpperCase();
   }
   if (path[0] === "orders"){ const o = db.orders[path[1]]; return ((o ? ticketNo(o) : "Ticket") + " — " + path.slice(2).filter(x => !/^[@#]/.test(x)).join(" ")).toUpperCase(); }
@@ -7146,6 +7179,10 @@ function syncValueText(path, v){
     return measValueText(v, unit);
   }
   return typeof v === "string" ? v : JSON.stringify(v);
+}
+function syncButtonText(value, device){
+  const v = String(value);
+  return v.length <= 24 ? v : device.toUpperCase() + "'S";
 }
 function syncDeviceName(id){
   const d = ((syncStatus && syncStatus.client && syncStatus.client.devices) || []).find(x => x.id === id);
@@ -7180,8 +7217,8 @@ function syncShowConflict(c){
       <tr><td><b>${esc(them)}</b>${c.their_time ? ` <span class="muted">${esc(String(c.their_time).slice(11, 16))}</span>` : ""}</td><td><b>${esc(theirs)}</b></td></tr>
     </tbody></table>
     <div class="toolbar" style="margin-top:14px">
-      <button class="primary" id="syncKeepMine">USE ${esc(mine)}</button>
-      <button class="primary" id="syncKeepTheirs">USE ${esc(theirs)}</button></div></div>`;
+      <button class="primary" id="syncKeepMine">USE ${esc(syncButtonText(mine, me))}</button>
+      <button class="primary" id="syncKeepTheirs">USE ${esc(syncButtonText(theirs, them))}</button></div></div>`;
   const choose = async keepMine => {
     try {
       await syncInvoke("sync_resolve", {opId:c.op_id, keepMine});
@@ -10568,7 +10605,7 @@ function useExistingCustomer(id){
   if(then) then(id); else openCustomer(id);
 }
 function delCustomer(id){if(!confirm("Delete this customer? Their vehicles stay but become unassigned."))return;delete db.customers[id];save();closeRec();render();}
-function closeRec(){$("#recOverlay").classList.remove("on");}
+function closeRec(){$("#recOverlay").classList.remove("on");window.__itemDetailKey=null;}
 
 /* ---------- vehicle editor ---------- */
 /* The VIN is the fastest true thing a service writer has: one field, one
