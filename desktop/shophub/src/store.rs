@@ -85,6 +85,9 @@ pub struct Device {
     pub last_seen: String,
     #[serde(default)]
     pub host: bool,
+    /// "" for a computer, "phone" for a phone whose replica the hub keeps.
+    #[serde(default)]
+    pub kind: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

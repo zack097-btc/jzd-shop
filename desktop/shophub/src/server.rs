@@ -58,6 +58,7 @@ pub struct PairRequest {
     pub created_ms: u64,
     decision: Option<bool>,
     secret: [u8; 32],
+    kind: String,
 }
 
 struct PairWindow {
@@ -76,6 +77,7 @@ pub struct HubInner {
     pub store: HubStore,
     secrets: Arc<dyn SecretStore>,
     assets: Option<Assets>,
+    seats: Mutex<HashMap<String, Arc<crate::phone::Seat>>>,
     state: Mutex<State>,
     apply_lock: Mutex<()>,
     stop: AtomicBool,
@@ -106,6 +108,7 @@ impl Hub {
                 store,
                 secrets,
                 assets,
+                seats: Mutex::new(HashMap::new()),
                 state: Mutex::new(State { conns: HashMap::new(), pairing: None, requests: HashMap::new() }),
                 apply_lock: Mutex::new(()),
                 stop: AtomicBool::new(false),
@@ -152,6 +155,9 @@ impl Hub {
 
     pub fn stop(&self) {
         self.inner.stop.store(true, Ordering::Relaxed);
+        for (_, seat) in self.inner.seats.lock().unwrap().drain() {
+            seat.stop();
+        }
     }
 
     pub fn stopped(&self) -> bool {
@@ -198,7 +204,7 @@ impl Hub {
         st.requests
             .values()
             .filter(|r| r.decision.is_none())
-            .map(|r| json!({"id": r.id, "name": r.name, "verify": r.verify, "peer": r.peer, "created": r.created_ms}))
+            .map(|r| json!({"id": r.id, "name": r.name, "verify": r.verify, "peer": r.peer, "created": r.created_ms, "kind": r.kind}))
             .collect()
     }
 
@@ -215,7 +221,7 @@ impl Hub {
         let id = format!("dev-{}", util::rand_hex(8));
         let secret: [u8; 32] = util::rand_bytes(32).try_into().unwrap();
         self.inner.secrets.put(&format!("device/{id}"), &secret)?;
-        self.inner.store.put_device(&Device { id: id.clone(), name: name.into(), created: now_iso(), revoked: false, last_seen: String::new(), host: true })?;
+        self.inner.store.put_device(&Device { id: id.clone(), name: name.into(), created: now_iso(), revoked: false, last_seen: String::new(), host: true, kind: String::new() })?;
         Ok((id, secret))
     }
 
@@ -227,6 +233,9 @@ impl Hub {
         d.revoked = true;
         self.inner.store.put_device(&d)?;
         self.inner.secrets.delete(&format!("device/{device_id}"))?;
+        if let Some(seat) = self.inner.seats.lock().unwrap().remove(device_id) {
+            seat.stop();
+        }
         let mut st = self.inner.state.lock().unwrap();
         // closing its channel ends its connection thread
         st.conns.retain(|_, c| c.device_id != device_id);
@@ -350,7 +359,8 @@ impl Hub {
         let req_id = util::rand_hex(6);
         self.inner.state.lock().unwrap().requests.insert(
             req_id.clone(),
-            PairRequest { id: req_id.clone(), name: if name.is_empty() { "Unnamed computer".into() } else { name.clone() }, verify: paired.verify.clone(), peer: peer.clone(), created_ms: util::now_ms(), decision: None, secret: paired.device_secret },
+            PairRequest { id: req_id.clone(), name: if name.is_empty() { "Unnamed computer".into() } else { name.clone() }, verify: paired.verify.clone(), peer: peer.clone(), created_ms: util::now_ms(), decision: None, secret: paired.device_secret,
+                kind: if msg["kind"] == "phone" { "phone".into() } else { String::new() } },
         );
         let shop = self.inner.store.shop_id();
         if ws.send(Message::Text(json!({"t": "pair2", "pk": b64(&host_pub), "shop": shop, "shopName": self.shop_name(), "request": req_id}).to_string())).is_err() {
@@ -366,7 +376,7 @@ impl Hub {
                 if approve {
                     let id = format!("dev-{}", util::rand_hex(8));
                     let ok = self.inner.secrets.put(&format!("device/{id}"), &req.secret).is_ok()
-                        && self.inner.store.put_device(&Device { id: id.clone(), name: req.name.clone(), created: now_iso(), revoked: false, last_seen: String::new(), host: false }).is_ok();
+                        && self.inner.store.put_device(&Device { id: id.clone(), name: req.name.clone(), created: now_iso(), revoked: false, last_seen: String::new(), host: false, kind: req.kind.clone() }).is_ok();
                     if ok {
                         let mac = crypto::hmac(&req.secret, &[b"paired", id.as_bytes(), shop.as_bytes()]);
                         let _ = ws.send(Message::Text(json!({"t": "pair-ok", "device": id, "mac": b64(&mac)}).to_string()));
@@ -423,10 +433,21 @@ impl Hub {
         let welcome_mac = crypto::hmac(&secret, &[b"welcome", &nonce_c, &nonce_s, shop.as_bytes()]);
         let welcome = json!({"t": "welcome", "shop": shop, "shopName": self.shop_name(), "epoch": self.inner.store.epoch(),
                              "nonce": b64(&nonce_s), "mac": b64(&welcome_mac), "seq": self.inner.store.seq().unwrap_or(0), "device": device.name});
+        let cipher = match crypto::Cipher::parse(hello["cipher"].as_str().unwrap_or("")) {
+            Ok(c) => c,
+            Err(why) => return deny(&mut ws, &why),
+        };
+        let screen = hello["screen"] == true;
+        if screen && device.kind != "phone" {
+            return deny(&mut ws, "Only a paired phone can open a phone screen.");
+        }
         if ws.send(Message::Text(welcome.to_string())).is_err() {
             return;
         }
-        let mut sess = Session::new(&secret, &nonce_c, &nonce_s, false);
+        let mut sess = Session::with_cipher(cipher, &secret, &nonce_c, &nonce_s, false);
+        if screen {
+            return self.screen(ws, sess, device);
+        }
         let (tx, rx): (Sender<String>, Receiver<String>) = channel();
         let conn_id = self.inner.next_conn.fetch_add(1, Ordering::Relaxed);
         self.inner.state.lock().unwrap().conns.insert(conn_id, Conn { device_id: device_id.clone(), name: device.name.clone(), tx, open: None, addr: peer });
@@ -658,6 +679,103 @@ pub fn safe_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
 }
 
+// ---------------- a phone's screen
+
+impl Hub {
+    /// The seat for a phone, started the first time its screen connects.
+    fn seat(&self, device: &Device) -> Result<Arc<crate::phone::Seat>, String> {
+        let mut seats = self.inner.seats.lock().unwrap();
+        if let Some(s) = seats.get(&device.id) {
+            return Ok(s.clone());
+        }
+        let addr = self.inner.addr.lock().unwrap().ok_or("the Shop Hub is not listening yet")?;
+        let store = &self.inner.store;
+        let hub_dir = store.att_dir().parent().map(|p| p.to_path_buf()).ok_or("the hub folder is missing")?;
+        let link = crate::client::Link {
+            address: format!("127.0.0.1:{}", addr.port()),
+            device_id: device.id.clone(),
+            shop_id: store.shop_id(),
+            shop_name: self.shop_name(),
+            device_name: device.name.clone(),
+        };
+        let seat = crate::phone::Seat::open(hub_dir.join("phones").join(&device.id), store.att_dir(), self.inner.secrets.clone(), device, link)?;
+        seats.insert(device.id.clone(), seat.clone());
+        Ok(seat)
+    }
+
+    fn screen(&self, mut ws: WebSocket<TcpStream>, mut sess: Session, device: Device) {
+        let seat = match self.seat(&device) {
+            Ok(s) => s,
+            Err(why) => {
+                let _ = ws.send(Message::Binary(sess.seal(json!({"t": "error", "why": why}).to_string().as_bytes())));
+                graceful_close(&mut ws);
+                return;
+            }
+        };
+        let (tx, rx): (Sender<String>, Receiver<String>) = channel();
+        seat.listen(tx);
+        let _ = ws.get_ref().set_read_timeout(Some(Duration::from_millis(20)));
+        let mut last_heard = Instant::now();
+        let mut last_check = Instant::now();
+        'outer: loop {
+            if self.inner.stop.load(Ordering::Relaxed) {
+                break;
+            }
+            // a revoked phone loses its screen at once
+            if last_check.elapsed() > Duration::from_secs(1) {
+                last_check = Instant::now();
+                match self.inner.store.device(&device.id) {
+                    Ok(Some(d)) if !d.revoked => {}
+                    _ => {
+                        let _ = ws.send(Message::Binary(sess.seal(json!({"t": "denied", "why": "This phone's access to the Shop Hub has been revoked."}).to_string().as_bytes())));
+                        break;
+                    }
+                }
+            }
+            loop {
+                match rx.try_recv() {
+                    Ok(msg) => {
+                        if ws.send(Message::Binary(sess.seal(msg.as_bytes()))).is_err() {
+                            break 'outer;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            match ws.read() {
+                Ok(Message::Binary(frame)) => {
+                    last_heard = Instant::now();
+                    let Ok(plain) = sess.open(&frame) else { break };
+                    let Ok(msg) = serde_json::from_slice::<Value>(&plain) else { break };
+                    let reply = match msg["t"].as_str().unwrap_or("") {
+                        "rpc" => {
+                            let cmd = msg["cmd"].as_str().unwrap_or("");
+                            match seat.rpc(cmd, &msg["args"]) {
+                                Ok(v) => json!({"t": "rpcr", "id": msg["id"], "ok": v}),
+                                Err(why) => json!({"t": "rpcr", "id": msg["id"], "err": why}),
+                            }
+                        }
+                        "ping" => json!({"t": "pong"}),
+                        _ => continue,
+                    };
+                    if ws.send(Message::Binary(sess.seal(reply.to_string().as_bytes()))).is_err() {
+                        break;
+                    }
+                }
+                Ok(Message::Close(_)) => break,
+                Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => last_heard = Instant::now(),
+                Ok(_) => break,
+                Err(tungstenite::Error::Io(ref e)) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {}
+                Err(_) => break,
+            }
+            if last_heard.elapsed() > Duration::from_secs(25) {
+                break;
+            }
+        }
+        graceful_close(&mut ws);
+    }
+}
+
 // ---------------- the app itself, served to a phone on the shop's network
 
 /// Read the request head without taking it off the socket.
@@ -700,6 +818,8 @@ fn request_line(head: &[u8]) -> (String, String) {
 /// The shell the phone's browser loads in front of the app, in place of the
 /// desktop shell. It lives beside this file so it is version-locked to the hub.
 pub const PHONE_SHELL_JS: &str = include_str!("phone_shell.js");
+/// P-256, HMAC-SHA-256 and ChaCha20-Poly1305 for the phone (MIT, noble), vendored.
+pub const NOBLE_JS: &str = include_str!("noble.js");
 
 impl Hub {
     fn http(&self, mut stream: TcpStream, head: &[u8]) {
@@ -717,6 +837,7 @@ impl Hub {
                 None => http_send(&mut stream, 503, "text/plain; charset=utf-8", b"This Shop Hub is not serving the app.".to_vec()),
             },
             "/phone-shell.js" => http_send(&mut stream, 200, "text/javascript; charset=utf-8", PHONE_SHELL_JS.as_bytes().to_vec()),
+            "/noble.js" => http_send(&mut stream, 200, "text/javascript; charset=utf-8", NOBLE_JS.as_bytes().to_vec()),
             "/health" => http_send(
                 &mut stream,
                 200,
@@ -737,7 +858,7 @@ impl Hub {
         let at = html.find("<script>")?;
         let mut out = String::with_capacity(html.len() + 200);
         out.push_str(&html[..at]);
-        out.push_str("<script src=\"/phone-shell.js\"></script>\n");
+        out.push_str("<script src=\"/noble.js\"></script>\n<script src=\"/phone-shell.js\"></script>\n");
         out.push_str(&html[at..]);
         Some(out.into_bytes())
     }

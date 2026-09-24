@@ -15,3 +15,4 @@ pub mod client;
 pub mod backup;
 pub mod app;
 pub mod shell;
+pub mod phone;
