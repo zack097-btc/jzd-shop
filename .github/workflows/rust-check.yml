@@ -121,7 +121,7 @@ jobs:
             node "$t.cjs" 2>&1 | Tee-Object -FilePath "$t.log"
             $code = $LASTEXITCODE
             Get-Content "$t.log" | Where-Object { $_ -match 'FAIL|measured|ms$|ALL ' } | Select-Object -First 20 | ForEach-Object { Write-Output ("::notice title=$t::" + ($_.Trim() -replace '::', ': :')) }
-            if ($code -ne 0) { exit $code }
+            if ($code -ne 0) { Get-Content "$t.log" | Where-Object { $_ -match 'FAIL|stopped|Error|at ' } | Select-Object -First 9 | ForEach-Object { Write-Output ("::error title=$t::" + ($_.Trim() -replace '::', ': :')) }; exit $code }
           }
           node testmotorlive.cjs 2>&1 | Tee-Object -FilePath motorlive.log
           $code = $LASTEXITCODE
