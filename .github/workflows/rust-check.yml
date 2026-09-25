@@ -117,7 +117,7 @@ jobs:
           Get-Content sync-page.log | Where-Object { $_ -match 'FAIL|measured|ALL SHOP|stopped|Error' } | Select-Object -First 20 | ForEach-Object { Write-Output ("::notice title=Shop Sync page::" + ($_.Trim() -replace '::', ': :')) }
           if ($code -ne 0) { exit $code }
           if (Test-Path testmaint.cjs) { node testmaint.cjs; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
-          foreach ($t in 'testvinscan','testphone','testjobparts','testoffline') {
+          foreach ($t in 'testvinscan','testphone','testjobparts','testoffline','testvinlive') {
             node "$t.cjs" 2>&1 | Tee-Object -FilePath "$t.log"
             $code = $LASTEXITCODE
             Get-Content "$t.log" | Where-Object { $_ -match 'FAIL|measured|ms$|ALL ' } | Select-Object -First 20 | ForEach-Object { Write-Output ("::notice title=$t::" + ($_.Trim() -replace '::', ': :')) }

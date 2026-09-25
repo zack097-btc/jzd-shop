@@ -317,6 +317,10 @@
   body.phone button{min-height:40px}
   .phonehome .search{width:100%;box-sizing:border-box;margin:10px 0}
   .phonebig{display:block;width:100%;min-height:54px;font-size:17px;font-weight:800;margin:6px 0;border-radius:12px}
+  .vinlive{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:16/9}
+  .vinlive{max-height:62vh;margin:0 auto}
+  .vinlive video{width:100%;height:100%;object-fit:contain;display:block}
+  .vinguide{position:absolute;left:4%;right:4%;top:25%;bottom:25%;border:3px solid #22c55e;border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
   .phonecard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:0 0 12px}
   .phonecard-head{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:17px}
   .phonecard-concern{margin:6px 0;font-style:italic}
@@ -7970,12 +7974,14 @@ async function vinScanImage(file, progress){
 
 /* ---------- on screen ---------- */
 let vinScanCtx = null;
-function closeVin(){ $("#vinOverlay").classList.remove("on"); }
+function closeVin(){ vinLiveStop(); $("#vinOverlay").classList.remove("on"); }
 function vinScanOpen(ctx){
   vinScanCtx = ctx || {};
   const v = vinScanCtx.vehicleId ? db.vehicles[vinScanCtx.vehicleId] : null;
+  vinLiveStop();
   $("#vinSheet").innerHTML = `<div class="sheet-head"><h2>Scan VIN${v ? " — " + esc(vehLabel(v.id)) : ""}</h2><div class="grow"></div><button onclick="closeVin()">Close</button></div>
-    <button class="phonebig primary" onclick="vinPick(true)">📷 TAKE A PHOTO OF THE VIN</button>
+    ${vinLiveAvailable() ? `<button class="phonebig primary" onclick="vinLive()">🎥 POINT THE CAMERA AT THE VIN</button>` : ""}
+    <button class="phonebig ${vinLiveAvailable() ? "" : "primary"}" onclick="vinPick(true)">📷 TAKE A PHOTO OF THE VIN</button>
     <button class="phonebig" onclick="vinPick(false)">Choose a photo</button>
     <div class="muted" style="font-size:13px;margin:6px 0 10px">Best: the <b>barcode</b> on the driver's door-jamb sticker, filling the photo, no glare. The windshield plate works too; hold the phone flat to the glass.</div>
     <div id="vinWork"></div>
@@ -8001,6 +8007,137 @@ function vinPick(camera){
     catch(e){ say("Could not read that photo: " + (e.message || e)); }
   };
   inp.click();
+}
+/* ---------- live: the camera pointed at the sticker ----------
+   The same readers on the live picture, several times a second. Live reading
+   is stricter than a photo, never looser: a VIN is only offered once two
+   separate frames have read exactly the same 17 characters (for printed text,
+   only a VIN whose check digit calculates, with no character in doubt). A
+   frame on its own never fills anything in, and the person still looks at
+   the VIN and the NHTSA decode and presses USE THIS VIN. Anything harder -
+   a read that does not check, reads that disagree - goes to READ THIS FRAME,
+   which runs the full photo reader on the picture as it is. */
+let vinLiveState = null;
+function vinLiveAvailable(){
+  return !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+function vinLiveStop(){
+  const st = vinLiveState; vinLiveState = null;
+  if (!st) return;
+  st.stopped = true;
+  clearTimeout(st.timer);
+  try { st.stream.getTracks().forEach(t => t.stop()); } catch(e){}
+}
+/* the part of the picture inside the guide, at a size the readers like */
+function vinLiveFrame(st, whole){
+  const v = st.video, W = v.videoWidth, H = v.videoHeight;
+  if (!W || !H) return null;
+  const c = document.createElement("canvas");
+  if (whole){ c.width = W; c.height = H; c.getContext("2d").drawImage(v, 0, 0); return c; }
+  const cw = Math.round(W * 0.92), ch = Math.round(H * 0.5);
+  const x = Math.round((W - cw) / 2), y = Math.round((H - ch) / 2);
+  const s = Math.min(1, 1400 / cw);
+  c.width = Math.round(cw * s); c.height = Math.round(ch * s);
+  c.getContext("2d").drawImage(v, x, y, cw, ch, 0, 0, c.width, c.height);
+  return c;
+}
+async function vinLive(){
+  vinLiveStop();
+  const box = $("#vinWork"); if (!box) return;
+  box.innerHTML = `<div class="verifynote">Opening the camera…</div>`;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:{ideal:"environment"}, width:{ideal:1920}, height:{ideal:1080}}});
+  } catch(e){
+    box.innerHTML = `<div class="verifynote" style="border-color:#c0392b"><b>The camera did not open.</b> ${esc(e && e.name === "NotAllowedError" ? "Camera access was not allowed. On the iPhone: Settings → Safari → Camera → Allow." : (e.message || String(e)))} You can still take a photo instead.</div>`;
+    return;
+  }
+  if (!$("#vinOverlay").classList.contains("on")){ stream.getTracks().forEach(t => t.stop()); return; }
+  const st = vinLiveState = {stream, stopped:false, frames:0, seen:new Map(), reads:[], ocrBusy:false, bcBusy:false, started:Date.now(), timer:0, torch:false};
+  const track = stream.getVideoTracks()[0];
+  const caps = track && track.getCapabilities ? (() => { try { return track.getCapabilities(); } catch(e){ return {}; } })() : {};
+  box.innerHTML = `<div class="vinlive">
+      <video id="vinVideo" playsinline muted autoplay></video>
+      <div class="vinguide"></div></div>
+    <div id="vinLiveSay" class="verifynote" style="margin-top:8px">Fill the box with the <b>barcode</b> on the door-jamb sticker, or the VIN itself. Hold still.</div>
+    <div class="phonebtns" style="margin-top:6px">
+      <button onclick="vinLiveCapture()">READ THIS FRAME</button>
+      ${caps && caps.torch ? `<button id="vinTorch" onclick="vinLiveTorch()">💡 LIGHT</button>` : ""}
+      <button onclick="vinLiveStop();vinScanOpen(vinScanCtx)">STOP</button></div>`;
+  const video = st.video = $("#vinVideo");
+  /* the box on screen is the part the readers look at: same shape as the picture */
+  video.onloadedmetadata = () => { const w = $(".vinlive"); if (w && video.videoWidth) w.style.aspectRatio = video.videoWidth + " / " + video.videoHeight; };
+  video.srcObject = stream;
+  try { await video.play(); } catch(e){}
+  vinZxing().catch(() => {});
+  vinLiveTick();
+}
+function vinLiveSay(html){ const el = $("#vinLiveSay"); if (el) el.innerHTML = html; }
+async function vinLiveTorch(){
+  const st = vinLiveState; if (!st) return;
+  st.torch = !st.torch;
+  try { await st.stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:st.torch}]}); } catch(e){ st.torch = false; }
+  const b = $("#vinTorch"); if (b) b.classList.toggle("primary", st.torch);
+}
+/* one look at the picture: the barcode every time, the printed text whenever
+   the text reader is free (it is slower) */
+function vinLiveTick(){
+  const st = vinLiveState; if (!st || st.stopped) return;
+  st.timer = setTimeout(vinLiveTick, 220);
+  if (document.hidden || !$("#vinOverlay").classList.contains("on")){ if (!$("#vinOverlay").classList.contains("on")) vinLiveStop(); return; }
+  if (!st.bcBusy){
+    const frame = vinLiveFrame(st); if (!frame) return;
+    const id = ++st.frames;
+    st.bcBusy = true;
+    vinBarcodes(frame).then(list => {
+      for (const b of list) vinLiveRead(st, id, vinCandidatesFromText(b.text, "barcode").map(c => Object.assign(c, {format:b.format})));
+    }).catch(() => {}).finally(() => { st.bcBusy = false; });
+  }
+  if (!st.ocrBusy && Date.now() - st.started > 900){
+    const frame = vinLiveFrame(st); if (!frame) return;
+    const id = ++st.frames;
+    st.ocrBusy = true;
+    (async () => {
+      const w = await vinOcr();
+      const r = await w.recognize(vinVariants(frame)[0], {}, {text:true});
+      if (st.stopped) return;
+      vinLiveRead(st, id, vinCandidatesFromText(r.data.text, "text"));
+    })().catch(() => {}).finally(() => { st.ocrBusy = false; });
+  }
+  const secs = (Date.now() - st.started) / 1000;
+  if (secs > 12 && !st.hinted){ st.hinted = true;
+    vinLiveSay("Still looking. Get closer so the barcode or VIN fills the box, tilt a little to lose glare" + (st.torch ? "" : ", or turn on the light") + " — or press <b>READ THIS FRAME</b>."); }
+}
+/* A frame's reads. Two separate frames must agree exactly before anything is
+   offered. */
+function vinLiveRead(st, frameId, cands){
+  if (!vinLiveState || vinLiveState !== st || st.stopped) return;
+  for (const c of cands){
+    const clean = !c.fixed.some(f => !f.certain);
+    if (c.source === "text" && !(c.checkOk && clean)) continue;   /* a live text read must check, with nothing in doubt */
+    const key = c.source + ":" + c.vin;
+    const frames = st.seen.get(key) || new Set();
+    frames.add(frameId); st.seen.set(key, frames);
+    st.reads.push(c);
+    if (frames.size >= 2){
+      const reads = st.reads.filter(x => x.vin === c.vin);
+      const n = frames.size;
+      vinLiveStop();
+      vinShow({candidates:vinRank(reads), notes:["Read live from the " + (c.source === "barcode" ? "barcode" : "printed VIN") + ": the same 17 characters in " + n + " separate camera frames."]});
+      return;
+    }
+    vinLiveSay("Reading… hold still.");
+  }
+}
+/* the full photo reader, on the picture as it is now */
+async function vinLiveCapture(){
+  const st = vinLiveState; if (!st) return;
+  const frame = vinLiveFrame(st, true); if (!frame) return;
+  vinLiveStop();
+  const blob = await new Promise(r => frame.toBlob(r, "image/jpeg", 0.95));
+  const say = m => { const b = $("#vinWork"); if (b) b.innerHTML = `<div class="verifynote">${esc(m)}</div>`; };
+  try { vinShow(await vinScanImage(new File([blob], "camera.jpg", {type:"image/jpeg"}), say)); }
+  catch(e){ say("Could not read that frame: " + (e.message || e)); }
 }
 function vinGroups(v){ return esc(v.slice(0, 3)) + " " + esc(v.slice(3, 8)) + " <b>" + esc(v[8]) + "</b> " + esc(v[9]) + " " + esc(v.slice(10, 11)) + " " + esc(v.slice(11)); }
 function vinMarked(c){
