@@ -55,7 +55,7 @@ jobs:
           cargo test 2>&1 | Tee-Object -FilePath sync.log
           $code = $LASTEXITCODE
           Get-Content sync.log | Where-Object { $_ -match '^test |^test result:|panicked|MEASURED|^error' } | ForEach-Object { Write-Output ("::notice title=Shop Sync::" + ($_ -replace '::', ': :')) }
-          if ($code -ne 0) { exit $code }
+          if ($code -ne 0) { Get-Content sync.log | Where-Object { $_ -match 'FAILED|panicked|^error|Running ' } | Select-Object -First 10 | ForEach-Object { Write-Output ("::error title=Shop Sync::" + ($_.Trim() -replace '::', ': :')) }; exit $code }
           cargo build --bin shophub-sim
           exit $LASTEXITCODE
 
