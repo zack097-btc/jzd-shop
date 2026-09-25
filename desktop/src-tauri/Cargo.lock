@@ -1851,7 +1851,7 @@ dependencies = [
 
 [[package]]
 name = "jzd-shop"
-version = "2.9.0"
+version = "2.9.1"
 dependencies = [
  "base64 0.22.1",
  "hmac",
