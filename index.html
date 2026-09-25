@@ -783,7 +783,7 @@ let db = JSON.parse(JSON.stringify(DEFAULT));  /* replaced by loadDb() in boot()
      * every write is read back, and a write that did not land says so loudly
        instead of pretending.
 */
-const JZD_VERSION = "2.9.1";
+const JZD_VERSION = "2.9.2";
 const DESKTOP = !!(window.__TAURI__ && window.__TAURI__.core);
 const LS_KEY = "jzd.shop.db";
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
@@ -7530,7 +7530,26 @@ function shopSyncPhoneCard(s){
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
       <div id="ss_phoneqr" style="width:168px;height:168px;background:#fff"></div>
       <div>${urls.length ? urls.map(u => `<div style="font-family:Consolas,monospace;font-size:17px;font-weight:700">${esc(u)}</div>`).join("") : `<div class="muted">No private network address found — is this computer on the shop Wi-Fi?</div>`}
-        <div class="muted" style="font-size:12px;margin-top:4px">Only phones on this network can reach it, and only after they are paired here.</div></div></div></div>`;
+        <div class="muted" style="font-size:12px;margin-top:4px">Only phones on this network can reach it, and only after they are paired here.</div></div></div>
+    ${shopSyncOfflineCard(s)}</div>`;
+}
+/* For mobile jobs: over HTTPS the phone keeps the app, so it opens with no
+   signal and everything done away goes up when it is back on the shop Wi-Fi.
+   The phone walks through this itself from the address above; this is the
+   same, for the person at the desk. */
+function shopSyncOfflineCard(s){
+  const t = (s && s.hub && s.hub.https) || null;
+  if (!t) return "";
+  if (t.error) return `<div class="muted" style="margin-top:10px;font-size:12.5px"><b>Phone offline use is not available:</b> ${esc(t.error)}</div>`;
+  const fp = String(t.caSha256 || "").slice(0, 16).replace(/(..)/g, "$1 ").trim();
+  const addrs = ((s.hub && s.hub.addresses) || []).map(a => "https://" + a + ":" + t.port + "/");
+  return `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
+    <b>Mobile jobs — the phone works with no signal</b>
+    <ol style="margin:6px 0 6px 18px;padding:0;font-size:13px">
+      <li>Open the address above on the phone. Its home screen shows <b>SET UP FOR MOBILE JOBS</b>; follow it (about a minute, once).</li>
+      <li>It installs this shop's certificate on the phone, then opens the secure address ${addrs.length ? `<b style="font-family:Consolas,monospace">${esc(addrs[0])}</b>` : ""} — pair it once more and Add to Home Screen.</li>
+      <li>From then on the phone opens with no signal; inspections, notes and photos wait on the phone and go up by themselves back on the shop Wi-Fi.</li></ol>
+    <div class="muted" style="font-size:12px">The certificate is named <b>JZD Shop Hub — ${esc(s.hub.shopName || "")}</b>; its SHA-256 fingerprint starts <b style="font-family:Consolas,monospace">${esc(fp)}</b> (on the iPhone: the profile → More Details). It can only vouch for addresses on private networks, never a real website, and its key never leaves this computer.</div></div>`;
 }
 let shopSyncQrReady = null;
 async function shopSyncPhoneQr(){
@@ -7599,9 +7618,31 @@ function phoneOrders(){
     return [vehLabel(o.vehicleId), v.vin, v.plate, v.unit, custName(o.customerId), ticketNo(o), o.complaint].join(" ").toLowerCase().indexOf(q) >= 0;
   }).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(ticketNo(b)).localeCompare(String(ticketNo(a))));
 }
+/* On the plain address the phone needs the shop's Wi-Fi to open the app. The
+   secure address (HTTPS) lets it keep the app for mobile jobs; getting there
+   takes the shop's certificate, installed and trusted once. */
+let phoneHttps = null;
+function phoneOfflineSetup(){
+  if (!window.JZD_PHONE || location.protocol === "https:") return "";
+  if (phoneHttps === null){
+    phoneHttps = false;
+    fetch("/health", {cache:"no-store"}).then(r => r.json()).then(h => { if (h && h.https){ phoneHttps = h.https; if (view === "phone") renderPhoneHome(); } }).catch(() => {});
+    return "";
+  }
+  if (!phoneHttps) return "";
+  const secure = "https://" + location.hostname + ":" + phoneHttps + "/";
+  return `<details class="phonecard" id="phoneOffline"><summary style="font-weight:800;font-size:16px">📶 SET UP FOR MOBILE JOBS <span class="muted" style="font-weight:400;font-size:13px">— works with no signal</span></summary>
+    <ol style="margin:10px 0 0 18px;padding:0;line-height:1.45">
+      <li><a class="phonebig" style="display:block;text-align:center;text-decoration:none;padding:15px 8px;box-sizing:border-box;border:1px solid #cbd5e1;background:#fff;color:#1f2937" href="/ca.cer">1. GET THE SHOP CERTIFICATE</a> Tap <b>Allow</b>, then <b>Close</b>.</li>
+      <li>Open <b>Settings</b> → <b>General</b> → <b>VPN &amp; Device Management</b> → <b>JZD Shop Hub</b> → <b>Install</b>.</li>
+      <li><b>Settings</b> → <b>General</b> → <b>About</b> → <b>Certificate Trust Settings</b> → turn on <b>JZD Shop Hub</b>.</li>
+      <li><a class="phonebig" id="phoneSecureLink" style="display:block;text-align:center;text-decoration:none;padding:15px 8px;box-sizing:border-box;background:#2563eb;color:#fff" href="${esc(secure)}">4. OPEN THE SECURE APP</a> Pair it once more (PAIR DEVICE on the office computer), then Share → <b>Add to Home Screen</b> and use that icon from now on. Delete the old icon.</li></ol>
+    <div class="muted" style="font-size:12.5px;margin-top:8px">Do this at the shop, on the shop's Wi-Fi. Anything this phone has not sent yet should go up first: it shows as waiting at the top of the screen.</div></details>`;
+}
 function renderPhoneHome(){
   const list = phoneOrders();
   $("#app").innerHTML = `<div class="phonehome">
+    ${phoneOfflineSetup()}
     <button class="phonebig primary" onclick="vinScanOpen({purpose:'new'})">📷 SCAN VIN — NEW VEHICLE</button>
     <input class="search" id="phq" placeholder="Search vehicle, plate, VIN, customer, ticket" value="${esc(phoneQ)}">
     ${list.length ? list.map(o => {

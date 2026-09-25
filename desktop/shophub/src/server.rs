@@ -28,11 +28,82 @@ use tungstenite::{Message, WebSocket};
 pub type Assets = Arc<dyn Fn(&str) -> Option<Vec<u8>> + Send + Sync>;
 
 pub const DEFAULT_PORT: u16 = 47811;
+/// The same hub over HTTPS, for a phone that keeps the app for use with no
+/// signal (a browser only keeps a web app that came over HTTPS).
+pub const HTTPS_PORT: u16 = 47814;
 pub const DISCOVERY_PORT: u16 = 47812;
 pub const DISCOVER_PROBE: &[u8] = b"JZD-SHOPHUB-DISCOVER-1";
 const CHUNK_LEAVES: usize = 4000;
 pub const ATT_CHUNK: usize = 256 * 1024;
 pub const MAX_ATT_BYTES: u64 = 25 * 1024 * 1024;
+
+/// A connection the hub talks over: a plain socket, or the same socket inside
+/// TLS. Either way the socket underneath carries the timeouts.
+pub trait HubStream: Read + Write + Send + 'static {
+    fn tcp(&self) -> &TcpStream;
+}
+
+impl HubStream for TcpStream {
+    fn tcp(&self) -> &TcpStream {
+        self
+    }
+}
+
+#[cfg(windows)]
+impl HubStream for schannel::tls_stream::TlsStream<TcpStream> {
+    fn tcp(&self) -> &TcpStream {
+        self.get_ref()
+    }
+}
+
+/// A stream with bytes already read off it put back in front, so a request
+/// head read to decide what the connection is still reaches the WebSocket
+/// handshake. (Inside TLS the head cannot be peeked, only read.)
+pub struct Prefixed<S> {
+    pre: Vec<u8>,
+    at: usize,
+    inner: S,
+}
+
+impl<S> Prefixed<S> {
+    pub fn new(pre: Vec<u8>, inner: S) -> Prefixed<S> {
+        Prefixed { pre, at: 0, inner }
+    }
+}
+
+impl<S: Read> Read for Prefixed<S> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if self.at < self.pre.len() {
+            let n = (self.pre.len() - self.at).min(buf.len());
+            buf[..n].copy_from_slice(&self.pre[self.at..self.at + n]);
+            self.at += n;
+            return Ok(n);
+        }
+        self.inner.read(buf)
+    }
+}
+
+impl<S: Write> Write for Prefixed<S> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.inner.write(buf)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl<S: HubStream> HubStream for Prefixed<S> {
+    fn tcp(&self) -> &TcpStream {
+        self.inner.tcp()
+    }
+}
+
+/// What a phone needs to trust this hub over HTTPS.
+#[derive(Clone)]
+pub struct TlsInfo {
+    pub ca_der: Vec<u8>,
+    pub port: u16,
+}
 
 pub fn ws_config() -> WebSocketConfig {
     let mut c = WebSocketConfig::default();
@@ -78,6 +149,7 @@ pub struct HubInner {
     secrets: Arc<dyn SecretStore>,
     assets: Option<Assets>,
     seats: Mutex<HashMap<String, Arc<crate::phone::Seat>>>,
+    pub tls: Mutex<Option<TlsInfo>>,
     state: Mutex<State>,
     apply_lock: Mutex<()>,
     stop: AtomicBool,
@@ -109,6 +181,7 @@ impl Hub {
                 secrets,
                 assets,
                 seats: Mutex::new(HashMap::new()),
+                tls: Mutex::new(None),
                 state: Mutex::new(State { conns: HashMap::new(), pairing: None, requests: HashMap::new() }),
                 apply_lock: Mutex::new(()),
                 stop: AtomicBool::new(false),
@@ -151,6 +224,47 @@ impl Hub {
             let _ = std::thread::Builder::new().name("shophub-discovery".into()).spawn(move || me.discovery(port));
         }
         Ok(addr)
+    }
+
+    /// The same hub over HTTPS for phones, with a certificate from the shop's
+    /// own authority for `ips` (this computer's addresses on the shop network).
+    #[cfg(windows)]
+    pub fn serve_tls(&self, bind: SocketAddr, ips: &[std::net::IpAddr]) -> Result<SocketAddr, String> {
+        let dir = self.inner.store.att_dir().parent().map(|p| p.to_path_buf()).ok_or("the hub folder is missing")?;
+        let ca = crate::tls::authority(&*self.inner.secrets, &dir, &self.shop_name())?;
+        let mut ips = ips.to_vec();
+        let lo: std::net::IpAddr = "127.0.0.1".parse().unwrap();
+        if !ips.contains(&lo) {
+            ips.push(lo);
+        }
+        let acceptor = Arc::new(crate::tls::win::Acceptor::persistent(&ca, &ips, &dir)?);
+        let listener = TcpListener::bind(bind).map_err(|e| format!("the Shop Hub could not open port {}: {e}", bind.port()))?;
+        let addr = listener.local_addr().map_err(|e| e.to_string())?;
+        listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+        *self.inner.tls.lock().unwrap() = Some(TlsInfo { ca_der: ca.cert_der.clone(), port: addr.port() });
+        let me = self.clone();
+        std::thread::Builder::new()
+            .name("shophub-accept-tls".into())
+            .spawn(move || {
+                while !me.inner.stop.load(Ordering::Relaxed) {
+                    match listener.accept() {
+                        Ok((stream, _)) => {
+                            let me2 = me.clone();
+                            let acc = acceptor.clone();
+                            let _ = std::thread::Builder::new().name("shophub-conn-tls".into()).spawn(move || me2.handle_tls(stream, &acc));
+                        }
+                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(Duration::from_millis(30)),
+                        Err(_) => std::thread::sleep(Duration::from_millis(200)),
+                    }
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(addr)
+    }
+
+    #[cfg(not(windows))]
+    pub fn serve_tls(&self, _bind: SocketAddr, _ips: &[std::net::IpAddr]) -> Result<SocketAddr, String> {
+        Err("HTTPS for phones is only built for Windows".into())
     }
 
     pub fn stop(&self) {
@@ -293,11 +407,10 @@ impl Hub {
 
     // ---------------- a connection
 
-    fn handle(&self, stream: TcpStream) {
+    fn handle(&self, mut stream: TcpStream) {
         if !private_ok(&stream) {
             return;
         }
-        let peer = stream.peer_addr().map(|a| a.to_string()).unwrap_or_default();
         // a socket accepted from a non-blocking listener is non-blocking on Windows
         let _ = stream.set_nonblocking(false);
         let _ = stream.set_nodelay(true);
@@ -308,9 +421,38 @@ impl Hub {
         // handshake still sees the connection exactly as it arrived.
         let head = peek_head(&stream);
         if !is_websocket_upgrade(&head) {
-            self.http(stream, &head);
+            // take the head off the socket now that it is being answered here
+            let mut sink = vec![0u8; head.len()];
+            let _ = stream.read_exact(&mut sink);
+            self.http(stream, &head, false);
             return;
         }
+        self.upgrade(stream);
+    }
+
+    /// A connection on the HTTPS port: TLS first, then the same as above.
+    #[cfg(windows)]
+    fn handle_tls(&self, stream: TcpStream, acceptor: &crate::tls::win::Acceptor) {
+        if !private_ok(&stream) {
+            return;
+        }
+        let _ = stream.set_nonblocking(false);
+        let _ = stream.set_nodelay(true);
+        let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
+        let Ok(mut tls) = acceptor.accept(stream) else { return };
+        let head = read_head(&mut tls);
+        if head.is_empty() {
+            return;
+        }
+        if !is_websocket_upgrade(&head) {
+            self.http(tls, &head, true);
+            return;
+        }
+        self.upgrade(Prefixed::new(head, tls));
+    }
+
+    fn upgrade<S: HubStream>(&self, stream: S) {
+        let peer = stream.tcp().peer_addr().map(|a| a.to_string()).unwrap_or_default();
         let Ok(mut ws) = tungstenite::accept_with_config(stream, Some(ws_config())) else { return };
         let first = match ws.read() {
             Ok(Message::Text(t)) => serde_json::from_str::<Value>(&t).unwrap_or(Value::Null),
@@ -323,8 +465,8 @@ impl Hub {
         }
     }
 
-    fn pairing(&self, mut ws: WebSocket<TcpStream>, msg: Value, peer: String) {
-        let refuse = |ws: &mut WebSocket<TcpStream>, why: &str| {
+    fn pairing<S: HubStream>(&self, mut ws: WebSocket<S>, msg: Value, peer: String) {
+        let refuse = |ws: &mut WebSocket<S>, why: &str| {
             let _ = ws.send(Message::Text(json!({"t": "pair-refused", "why": why}).to_string()));
             graceful_close(ws);
         };
@@ -367,7 +509,7 @@ impl Hub {
             self.inner.state.lock().unwrap().requests.remove(&req_id);
             return;
         }
-        let _ = ws.get_ref().set_read_timeout(Some(Duration::from_millis(200)));
+        let _ = ws.get_ref().tcp().set_read_timeout(Some(Duration::from_millis(200)));
         let started = Instant::now();
         loop {
             let decision = self.inner.state.lock().unwrap().requests.get(&req_id).and_then(|r| r.decision);
@@ -409,11 +551,11 @@ impl Hub {
         }
     }
 
-    fn session(&self, mut ws: WebSocket<TcpStream>, hello: Value, peer: String) {
+    fn session<S: HubStream>(&self, mut ws: WebSocket<S>, hello: Value, peer: String) {
         let device_id = hello["device"].as_str().unwrap_or("").to_string();
         let nonce_c = unb64(hello["nonce"].as_str().unwrap_or("")).unwrap_or_default();
         let mac = unb64(hello["mac"].as_str().unwrap_or("")).unwrap_or_default();
-        let deny = |ws: &mut WebSocket<TcpStream>, why: &str| {
+        let deny = |ws: &mut WebSocket<S>, why: &str| {
             let _ = ws.send(Message::Text(json!({"t": "denied", "why": why}).to_string()));
             graceful_close(ws);
         };
@@ -452,7 +594,7 @@ impl Hub {
         let conn_id = self.inner.next_conn.fetch_add(1, Ordering::Relaxed);
         self.inner.state.lock().unwrap().conns.insert(conn_id, Conn { device_id: device_id.clone(), name: device.name.clone(), tx, open: None, addr: peer });
         self.broadcast_presence();
-        let _ = ws.get_ref().set_read_timeout(Some(Duration::from_millis(20)));
+        let _ = ws.get_ref().tcp().set_read_timeout(Some(Duration::from_millis(20)));
         let mut last_heard = Instant::now();
         let mut uploads: HashMap<String, (std::fs::File, u64)> = HashMap::new();
         'outer: loop {
@@ -661,9 +803,9 @@ impl Hub {
 
 /// Close so that a last message is actually delivered. Dropping a socket with
 /// unread data makes Windows send a reset, which throws that message away.
-pub fn graceful_close(ws: &mut WebSocket<TcpStream>) {
+pub fn graceful_close<S: HubStream>(ws: &mut WebSocket<S>) {
     let _ = ws.close(None);
-    let _ = ws.get_ref().set_read_timeout(Some(Duration::from_millis(100)));
+    let _ = ws.get_ref().tcp().set_read_timeout(Some(Duration::from_millis(100)));
     let until = Instant::now() + Duration::from_secs(2);
     while Instant::now() < until {
         match ws.read() {
@@ -672,7 +814,7 @@ pub fn graceful_close(ws: &mut WebSocket<TcpStream>) {
             Err(_) => break,
         }
     }
-    let _ = ws.get_ref().shutdown(std::net::Shutdown::Both);
+    let _ = ws.get_ref().tcp().shutdown(std::net::Shutdown::Both);
 }
 
 pub fn safe_id(id: &str) -> bool {
@@ -703,7 +845,7 @@ impl Hub {
         Ok(seat)
     }
 
-    fn screen(&self, mut ws: WebSocket<TcpStream>, mut sess: Session, device: Device) {
+    fn screen<S: HubStream>(&self, mut ws: WebSocket<S>, mut sess: Session, device: Device) {
         let seat = match self.seat(&device) {
             Ok(s) => s,
             Err(why) => {
@@ -714,7 +856,7 @@ impl Hub {
         };
         let (tx, rx): (Sender<String>, Receiver<String>) = channel();
         seat.listen(tx);
-        let _ = ws.get_ref().set_read_timeout(Some(Duration::from_millis(20)));
+        let _ = ws.get_ref().tcp().set_read_timeout(Some(Duration::from_millis(20)));
         let mut last_heard = Instant::now();
         let mut last_check = Instant::now();
         'outer: loop {
@@ -801,6 +943,29 @@ fn peek_head(stream: &TcpStream) -> Vec<u8> {
     Vec::new()
 }
 
+/// Read the request head off a stream that cannot be peeked (TLS).
+#[cfg_attr(not(windows), allow(dead_code))]
+fn read_head<S: Read>(stream: &mut S) -> Vec<u8> {
+    let start = Instant::now();
+    let mut out = Vec::new();
+    let mut buf = [0u8; 2048];
+    let done = |b: &[u8]| b.windows(4).any(|w| w == b"\r\n\r\n");
+    while start.elapsed() < Duration::from_secs(10) && out.len() < 16 * 1024 {
+        match stream.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                out.extend_from_slice(&buf[..n]);
+                if done(&out) {
+                    return out;
+                }
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {}
+            Err(_) => break,
+        }
+    }
+    if done(&out) { out } else { Vec::new() }
+}
+
 fn is_websocket_upgrade(head: &[u8]) -> bool {
     let text = String::from_utf8_lossy(head).to_ascii_lowercase();
     text.contains("upgrade: websocket") || text.contains("upgrade:websocket")
@@ -820,12 +985,11 @@ fn request_line(head: &[u8]) -> (String, String) {
 pub const PHONE_SHELL_JS: &str = include_str!("phone_shell.js");
 /// P-256, HMAC-SHA-256 and ChaCha20-Poly1305 for the phone (MIT, noble), vendored.
 pub const NOBLE_JS: &str = include_str!("noble.js");
+/// The phone's service worker: keeps the app so it opens with no signal.
+pub const SW_JS: &str = include_str!("phone_sw.js");
 
 impl Hub {
-    fn http(&self, mut stream: TcpStream, head: &[u8]) {
-        // take the head off the socket now that it is being answered here
-        let mut sink = vec![0u8; head.len()];
-        let _ = stream.read_exact(&mut sink);
+    fn http<S: HubStream>(&self, mut stream: S, head: &[u8], secure: bool) {
         let (method, path) = request_line(head);
         if method != "GET" {
             http_send(&mut stream, 405, "text/plain; charset=utf-8", b"Only GET is served here.".to_vec());
@@ -838,6 +1002,22 @@ impl Hub {
             },
             "/phone-shell.js" => http_send(&mut stream, 200, "text/javascript; charset=utf-8", PHONE_SHELL_JS.as_bytes().to_vec()),
             "/noble.js" => http_send(&mut stream, 200, "text/javascript; charset=utf-8", NOBLE_JS.as_bytes().to_vec()),
+            // the service worker that keeps the app on the phone; a browser only
+            // runs one that came over HTTPS
+            "/sw.js" if secure => {
+                let page = self.phone_page().unwrap_or_default();
+                let mut all = page;
+                all.extend_from_slice(PHONE_SHELL_JS.as_bytes());
+                all.extend_from_slice(NOBLE_JS.as_bytes());
+                let app = &crate::flat::sha256_hex(&all)[..16];
+                http_send(&mut stream, 200, "text/javascript; charset=utf-8", SW_JS.replace("__JZD_APP__", app).into_bytes())
+            }
+            // the shop's certificate authority, for the phone to install and trust
+            // once. Only the certificate: its key never leaves this computer.
+            "/ca.cer" => match self.inner.tls.lock().unwrap().clone() {
+                Some(t) => http_send(&mut stream, 200, "application/x-x509-ca-cert", t.ca_der),
+                None => http_send(&mut stream, 404, "text/plain; charset=utf-8", b"This Shop Hub is not serving HTTPS.".to_vec()),
+            },
             p if p.starts_with("/vendor/") => {
                 // the scanner's libraries, by exact name only: one path segment,
                 // nothing that could climb out of the folder
@@ -856,7 +1036,8 @@ impl Hub {
                 &mut stream,
                 200,
                 "application/json",
-                json!({"jzdShopHub": 1, "shop": self.inner.store.shop_id(), "name": self.shop_name(), "app": self.inner.assets.is_some()})
+                json!({"jzdShopHub": 1, "shop": self.inner.store.shop_id(), "name": self.shop_name(), "app": self.inner.assets.is_some(),
+                    "https": self.inner.tls.lock().unwrap().as_ref().map(|t| t.port), "secure": secure})
                     .to_string()
                     .into_bytes(),
             ),
@@ -878,7 +1059,7 @@ impl Hub {
     }
 }
 
-fn http_send(stream: &mut TcpStream, status: u16, content_type: &str, body: Vec<u8>) {
+fn http_send<S: Write>(stream: &mut S, status: u16, content_type: &str, body: Vec<u8>) {
     let reason = match status {
         200 => "OK",
         404 => "Not Found",

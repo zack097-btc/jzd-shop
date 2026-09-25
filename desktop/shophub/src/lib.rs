@@ -16,3 +16,4 @@ pub mod backup;
 pub mod app;
 pub mod shell;
 pub mod phone;
+pub mod tls;

@@ -38,6 +38,7 @@ fn node_at(dir: PathBuf) -> (Arc<ShopSync>, PathBuf, Events) {
         bind_ip: "127.0.0.1".into(),
         discovery: false,
         assets: None,
+        https_port: None,
     })
     .unwrap();
     (s, dir, events)

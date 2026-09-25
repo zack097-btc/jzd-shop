@@ -50,6 +50,7 @@ fn main() {
             bind_ip: arg("--bind").unwrap_or_else(|| "127.0.0.1".into()),
             discovery: false,
             // the harness serves the page straight from the working copy
+            https_port: arg("--https-port").and_then(|p| p.parse().ok()),
             assets: arg("--page").map(|page| {
                 let page = PathBuf::from(page);
                 Arc::new(move |name: &str| {
@@ -130,6 +131,12 @@ fn serve(mut stream: TcpStream, shell: &Shell, events: &Events) -> Result<(), St
 }
 
 fn invoke(shell: &Shell, cmd: &str, a: &Value) -> Result<Value, String> {
+    // the harness's own clean-up: take the hub's certificate back out of this
+    // Windows user's certificate store
+    if cmd == "sync_https_forget" {
+        shell.sync.https_forget();
+        return Ok(json!(true));
+    }
     if cmd == "sync_debug_pause" {
         shell.sync.debug_pause(a["on"].as_bool().unwrap_or(false));
         return Ok(json!(true));

@@ -1,6 +1,6 @@
 [package]
 name = "jzd-shophub"
-version = "2.9.0"
+version = "2.9.2"
 description = "JZD Shop Hub — one authoritative shop book on the shop's own network, shared by every JZD Shop Manager in the building"
 authors = ["JZac Designs"]
 edition = "2021"
@@ -26,13 +26,22 @@ redb = "2"
 tungstenite = "0.24"
 # Established primitives from the RustCrypto project for pairing and for
 # encrypting and authenticating everything on the wire.
-p256 = { version = "0.13", features = ["ecdh"] }
+p256 = { version = "0.13", features = ["ecdh", "ecdsa", "pkcs8"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 chacha20poly1305 = "0.10"
 # The same sealed frames for a phone in a browser: WebCrypto has AES-GCM and
 # no ChaCha, so a browser client negotiates this one instead.
 aes-gcm = "0.10"
+# HTTPS for a phone on the shop Wi-Fi (so the app can be saved on the phone
+# and open with no signal). The hub makes its own certificate authority and
+# certificate with RustCrypto; the TLS itself is Windows' own (SChannel).
+der = { version = "0.7", features = ["oid"] }
+x509-cert = { version = "0.2.5", features = ["builder"] }
+p12 = "0.6.3"
 hmac = "0.12"
-sha2 = "0.10"
+sha2 = { version = "0.10", features = ["oid"] }
 base64 = "0.22"
 getrandom = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+schannel = "=0.1.27"

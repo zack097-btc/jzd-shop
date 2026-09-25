@@ -47,6 +47,9 @@ pub struct Options {
     /// The app's own files, so a phone on the shop's network can be handed the
     /// page by the hub. None means this computer serves sync only.
     pub assets: Option<crate::server::Assets>,
+    /// The port a phone reaches the hub on over HTTPS, so it can keep the app
+    /// for use with no signal. None: no HTTPS (the test harnesses).
+    pub https_port: Option<u16>,
 }
 
 #[derive(Default, Clone)]
@@ -63,6 +66,7 @@ pub struct ShopSync {
     hub: Mutex<Option<Hub>>,
     client: Mutex<Option<Client>>,
     join: Arc<Mutex<JoinState>>,
+    https: Mutex<Value>,
 }
 
 fn e<E: std::fmt::Display>(x: E) -> String {
@@ -73,7 +77,7 @@ impl ShopSync {
     pub fn open(o: Options) -> Result<Arc<ShopSync>, String> {
         std::fs::create_dir_all(o.data_dir.join("shophub")).map_err(e)?;
         let cfg: Config = std::fs::read_to_string(o.data_dir.join("shophub").join("sync.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
-        let me = Arc::new(ShopSync { o, cfg: Mutex::new(cfg), hub: Mutex::new(None), client: Mutex::new(None), join: Arc::new(Mutex::new(JoinState::default())) });
+        let me = Arc::new(ShopSync { o, cfg: Mutex::new(cfg), hub: Mutex::new(None), client: Mutex::new(None), join: Arc::new(Mutex::new(JoinState::default())), https: Mutex::new(Value::Null) });
         me.start()?;
         Ok(me)
     }
@@ -110,6 +114,7 @@ impl ShopSync {
                 let port = if cfg.port == 0 { DEFAULT_PORT } else { cfg.port };
                 let bind: SocketAddr = format!("{}:{}", self.o.bind_ip, port).parse().map_err(e)?;
                 let addr = hub.serve(bind, self.o.discovery)?;
+                self.start_https(&hub);
                 self.spawn_daily_backups(hub.clone());
                 *self.hub.lock().unwrap() = Some(hub);
                 let mut link = cfg.link.clone().ok_or("the host's own link is missing")?;
@@ -122,6 +127,33 @@ impl ShopSync {
             _ => {}
         }
         Ok(())
+    }
+
+    /// HTTPS for phones. It never stops the hub from running: a problem here
+    /// only shows on the Shop Sync page, and phones keep the plain address.
+    fn start_https(&self, hub: &Hub) {
+        let Some(port) = self.o.https_port else { return };
+        if self.o.assets.is_none() {
+            return;
+        }
+        let ips: Vec<std::net::IpAddr> = local_addresses().iter().filter_map(|a| a.parse().ok()).collect();
+        let out = format!("{}:{}", self.o.bind_ip, port)
+            .parse::<SocketAddr>()
+            .map_err(e)
+            .and_then(|bind| hub.serve_tls(bind, &ips));
+        *self.https.lock().unwrap() = match out {
+            Ok(a) => {
+                let ca = hub.inner.tls.lock().unwrap().as_ref().map(|t| crate::flat::sha256_hex(&t.ca_der)).unwrap_or_default();
+                json!({"port": a.port(), "caSha256": ca.to_uppercase(), "ips": ips.iter().map(|i| i.to_string()).collect::<Vec<_>>()})
+            }
+            Err(why) => json!({"error": why}),
+        };
+    }
+
+    /// Take this hub's HTTPS certificate out of the Windows certificate store.
+    pub fn https_forget(&self) {
+        #[cfg(windows)]
+        crate::tls::win::Acceptor::forget(&self.hub_dir());
     }
 
     fn start_client(&self, link: Option<Link>) -> Result<(), String> {
@@ -231,7 +263,8 @@ impl ShopSync {
                 "fields": store.leaves().map(|l| l.len()).unwrap_or(0), "devices": hub.devices(), "connected": hub.connected_count(),
                 "photosStored": atts.iter().filter(|a| a["state"] == "stored").count(), "lastBackup": backups.first().cloned(),
                 "pairing": hub.pairing_code().map(|(c, exp)| json!({"code": format!("{} {}", &c[..3], &c[3..]), "expiresMs": exp})),
-                "pairRequests": hub.pair_requests(), "backupsDir": backup::backups_dir(store).display().to_string()
+                "pairRequests": hub.pair_requests(), "backupsDir": backup::backups_dir(store).display().to_string(),
+                "https": self.https.lock().unwrap().clone()
             });
         }
         let j = self.join.lock().unwrap().clone();

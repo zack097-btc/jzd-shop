@@ -1,6 +1,6 @@
 [package]
 name = "jzd-shop"
-version = "2.9.1"
+version = "2.9.2"
 description = "JZD Shop Manager — customers, vehicles, work orders"
 authors = ["JZac Designs"]
 edition = "2021"

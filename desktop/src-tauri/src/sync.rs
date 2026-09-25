@@ -61,6 +61,7 @@ impl SyncState {
                 let _ = handle.emit("shopsync", json!({"kind": kind, "data": data}));
             }),
             bind_ip: "0.0.0.0".into(),
+            https_port: Some(shophub::server::HTTPS_PORT),
             discovery: true,
             // A phone on the shop Wi-Fi is handed the same page this program
             // shows, straight from the copy built into this program.
@@ -185,11 +186,13 @@ fn hub_port(state: &SyncState) -> u16 {
     state.shell.as_ref().and_then(|s| s.sync.status()["port"].as_u64()).unwrap_or(shophub::server::DEFAULT_PORT as u64) as u16
 }
 
+/// Whether a rule exists, and (with `port`) whether it covers that port. The
+/// HTTPS port for phones was added in 2.9.2, so an older rule lacks it.
 #[cfg(windows)]
-fn rule_present(name: &str) -> bool {
+fn rule_present(name: &str, port: Option<u16>) -> bool {
     hidden(std::process::Command::new("netsh").args(["advfirewall", "firewall", "show", "rule", &format!("name={name}")]))
         .output()
-        .map(|o| o.status.success())
+        .map(|o| o.status.success() && port.map(|p| String::from_utf8_lossy(&o.stdout).contains(&p.to_string())).unwrap_or(true))
         .unwrap_or(false)
 }
 
@@ -199,8 +202,8 @@ pub async fn sync_firewall_status(state: tauri::State<'_, SyncState>) -> Result<
     let port = hub_port(&state);
     #[cfg(windows)]
     {
-        let present = tauri::async_runtime::spawn_blocking(|| rule_present(FW_TCP) && rule_present(FW_UDP)).await.map_err(|e| e.to_string())?;
-        Ok(json!({"present": present, "port": port, "discoveryPort": shophub::server::DISCOVERY_PORT, "tcpRule": FW_TCP, "udpRule": FW_UDP}))
+        let present = tauri::async_runtime::spawn_blocking(|| rule_present(FW_TCP, Some(shophub::server::HTTPS_PORT)) && rule_present(FW_UDP, None)).await.map_err(|e| e.to_string())?;
+        Ok(json!({"present": present, "port": port, "httpsPort": shophub::server::HTTPS_PORT, "discoveryPort": shophub::server::DISCOVERY_PORT, "tcpRule": FW_TCP, "udpRule": FW_UDP}))
     }
     #[cfg(not(windows))]
     {
@@ -208,8 +211,8 @@ pub async fn sync_firewall_status(state: tauri::State<'_, SyncState>) -> Result<
     }
 }
 
-/// Two inbound rules, for this program's own executable only, on its two
-/// ports only, from the local subnet only, on Private networks only. Windows
+/// Two inbound rules, for this program's own executable only, on its own
+/// ports only (sync, HTTPS for phones, discovery), from the local subnet only, on Private networks only. Windows
 /// asks the person for permission (UAC); nothing else about the firewall is
 /// touched.
 #[tauri::command]
@@ -226,9 +229,10 @@ pub async fn sync_firewall_enable(state: tauri::State<'_, SyncState>) -> Result<
             "@echo off\r\n\
              netsh advfirewall firewall delete rule name=\"{FW_TCP}\" >nul 2>&1\r\n\
              netsh advfirewall firewall delete rule name=\"{FW_UDP}\" >nul 2>&1\r\n\
-             netsh advfirewall firewall add rule name=\"{FW_TCP}\" dir=in action=allow protocol=TCP localport={port} program=\"{exe}\" profile=private remoteip=localsubnet\r\n\
+             netsh advfirewall firewall add rule name=\"{FW_TCP}\" dir=in action=allow protocol=TCP localport={port},{https} program=\"{exe}\" profile=private remoteip=localsubnet\r\n\
              netsh advfirewall firewall add rule name=\"{FW_UDP}\" dir=in action=allow protocol=UDP localport={dp} program=\"{exe}\" profile=private remoteip=localsubnet\r\n",
-            dp = shophub::server::DISCOVERY_PORT
+            dp = shophub::server::DISCOVERY_PORT,
+            https = shophub::server::HTTPS_PORT
         );
         let path = std::env::temp_dir().join(format!("jzd-shophub-firewall-{}.cmd", shophub::util::rand_hex(4)));
         std::fs::write(&path, script).map_err(|e| e.to_string())?;
@@ -248,7 +252,7 @@ pub async fn sync_firewall_enable(state: tauri::State<'_, SyncState>) -> Result<
         .map_err(|e| e.to_string())?;
         let _ = std::fs::remove_file(&path);
         let declined = result.map(|o| !o.status.success()).unwrap_or(true);
-        let present = tauri::async_runtime::spawn_blocking(|| rule_present(FW_TCP) && rule_present(FW_UDP)).await.map_err(|e| e.to_string())?;
+        let present = tauri::async_runtime::spawn_blocking(|| rule_present(FW_TCP, Some(shophub::server::HTTPS_PORT)) && rule_present(FW_UDP, None)).await.map_err(|e| e.to_string())?;
         Ok(json!({"present": present, "declined": declined && !present, "port": port, "discoveryPort": shophub::server::DISCOVERY_PORT}))
     }
     #[cfg(not(windows))]

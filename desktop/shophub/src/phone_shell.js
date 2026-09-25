@@ -202,7 +202,10 @@
     args = args || {};
     if (!link){ await paired; }
     if (cmd === "db_load"){
-      await waitOnline(20000);
+      /* with the shop's book already on this phone, a mobile job does not wait
+         long for a Wi-Fi that is not there */
+      const have = await store.get("lastBook").catch(() => null);
+      await waitOnline(have ? 3500 : 20000);
       if (!online){
         const cached = await store.get("lastBook");
         if (cached) return {text:cached, existed:true, error:null, path:"This phone (Shop Hub offline)", sync:"client"};
@@ -342,4 +345,9 @@
   }
 
   if (link) connect(); else showPairing("");
+
+  /* over HTTPS the phone keeps the app itself, so it opens with no signal */
+  if (location.protocol === "https:" && "serviceWorker" in navigator){
+    window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  }
 })();
