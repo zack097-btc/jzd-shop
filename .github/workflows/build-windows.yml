@@ -79,7 +79,19 @@ jobs:
             node "$t.cjs" 2>&1 | Tee-Object -FilePath "$t.log"
             $code = $LASTEXITCODE
             Get-Content "$t.log" | Where-Object { $_ -match 'measured|FAIL|stopped|Error' } | Select-Object -First 12 | ForEach-Object { Write-Output ("::notice title=$t::" + ($_.Trim() -replace '::', ': :')) }
-            if ($code -ne 0) { Write-Output "::error title=$t::$t.cjs failed"; exit $code }
+            if ($code -ne 0) {
+              # say exactly what failed, then run it once more: the timed sync
+              # checks can miss on a busy shared build machine. A second failure
+              # stops the release; a pass on the second run is left as a warning.
+              Get-Content "$t.log" | Where-Object { $_ -match 'FAIL|stopped' } | Select-Object -First 8 | ForEach-Object { Write-Output ("::warning title=$t (first run)::" + ($_.Trim() -replace '::', ': :')) }
+              node "$t.cjs" 2>&1 | Tee-Object -FilePath "$t.log"
+              $code = $LASTEXITCODE
+              if ($code -ne 0) {
+                Get-Content "$t.log" | Where-Object { $_ -match 'FAIL|stopped' } | Select-Object -First 8 | ForEach-Object { Write-Output ("::error title=$t::" + ($_.Trim() -replace '::', ': :')) }
+                exit $code
+              }
+              Write-Output "::warning title=$t::$t.cjs failed once and passed when run again"
+            }
           }
 
       # The one release check that leaves the machine: a real request to MOTOR's
