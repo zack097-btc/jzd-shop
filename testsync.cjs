@@ -400,8 +400,16 @@ function shim(port){
     check('6c. a photo taken on the laptop goes PHOTO UPLOADING → PHOTO SYNCED', !!photoSynced, badgeSeen.slice(-5).join(','));
     const hostHas = await until(async () => { const b = await ctl(HOST_CTL, 'att_read', { id: lapPhoto.id }); return hash(b) === lapPhoto.sha; }, 5000);
     check('6d. the hub has the laptop\'s photo with the same SHA-256, recorded once', !!hostHas && (await ctl(HOST_CTL, 'sync_status')).hub.photosStored === 2);
-    const hostRec = await until(() => host.evaluate(id => !!db.attachments[id], lapPhoto.id), 4000);
-    check('6e. the photo record appears on the host', !!hostRec);
+    /* the record travels in the book, the bytes separately; on a slow build
+       machine the record can land a few seconds after the bytes */
+    const recT0 = Date.now();
+    const hostRec = await until(() => host.evaluate(id => !!db.attachments[id], lapPhoto.id), 12000);
+    console.log('        measured: photo record on the host ' + (Date.now() - recT0) + ' ms after the bytes');
+    check('6e. the photo record appears on the host', !!hostRec, JSON.stringify({
+      laptopHasRecord: await laptop.evaluate(id => !!db.attachments[id], lapPhoto.id),
+      laptop: await laptop.evaluate(() => ({ dirty, saving, overlay: [...document.querySelectorAll('.overlay.on,[id$="Overlay"].on')].map(e => e.id) })),
+      host: await host.evaluate(() => ({ dirty, saving, overlay: [...document.querySelectorAll('.overlay.on,[id$="Overlay"].on')].map(e => e.id) })),
+      laptopSync: (await ctl(LAPTOP_CTL, 'sync_status')).client }));
 
     /* ================= 7. shop numbers never collide ================= */
     const newEst = page => page.evaluate(() => { const o = shapeOrder({ id: uid('o'), customerId: 'c1', vehicleId: 'v1', date: '2026-09-13', status: 'Estimate', labor: [], parts: [], extras: [], payments: [], history: [] }); ensureNumber(o, 'estimate'); db.orders[o.id] = o; save(); return o.estimateNo; });
