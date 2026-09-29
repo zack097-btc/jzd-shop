@@ -145,7 +145,7 @@ const EURO = 'WVWZZZ1JZ3W386752';          /* built for Europe: position 9 is no
     await page.evaluate(() => {
       saveCustomer({ id: 'c1', first: 'Dana', last: 'Reyes', phone: '5095550100' });
       db.vehicles.v1 = { id: 'v1', customerId: 'c1', year: '', make: '', model: '', vin: '', mileage: '90000' };
-      db.orders.o1 = shapeOrder({ id: 'o1', customerId: 'c1', vehicleId: 'v1', date: '2026-09-24', status: 'In Progress', estimateNo: 5, labor: [], parts: [], extras: [], payments: [], history: [] });
+      db.orders.o1 = shapeOrder({ id: 'o1', customerId: 'c1', vehicleId: 'v1', date: '2026-09-24', status: 'In Progress', estimateNo: 5, complaint: 'Check engine light', labor: [], parts: [], extras: [], payments: [], history: [] });
       save(); render();
       vinScanOpen({ purpose: 'vehicle', vehicleId: 'v1' });
     });
