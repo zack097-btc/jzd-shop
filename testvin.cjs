@@ -153,8 +153,8 @@ async function stubFetch(page, mode, payload) {
              byIdResolves: SEED.every(r => SEED_BY_ID[r.id] === r) };
   });
   check('5. every catalog row is present, unique and priced',
-    results.catalogImport.rows === 245 && results.catalogImport.unique === 245 &&
-    results.catalogImport.priced === 245 && results.catalogImport.twice === 245 &&
+    results.catalogImport.rows === 264 && results.catalogImport.unique === 264 &&
+    results.catalogImport.priced === 264 && results.catalogImport.twice === 264 &&
     results.catalogImport.byIdResolves, JSON.stringify(results.catalogImport));
 
   /* ---- 6 + 8. the pricing rule that costs real money ---- */
@@ -272,7 +272,7 @@ async function stubFetch(page, mode, payload) {
              badgeShown: /VERIFY/.test(meta) };
   });
   check('12. a job flagged for verification warns before it can be quoted',
-    results.verify.flaggedCount === 37 && results.verify.lineVerify === true &&
+    results.verify.flaggedCount === 56 && results.verify.lineVerify === true &&
     results.verify.bannerShown && results.verify.bannerNamesJob && results.verify.badgeShown,
     JSON.stringify(results.verify));
 

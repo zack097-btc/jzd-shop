@@ -328,7 +328,7 @@ const r2 = n => Math.round(Number(n) * 100) / 100;   /* the page has its own; th
   });
   const S = results.stillWorks;
   check('20. the v2.2.0 catalog, matching and provider behaviour is untouched',
-    S.catalog === 245 && S.m3Gen === 'F80' && S.m3Rows > 0 && S.m3AllF80 && S.truckRows > 0 &&
+    S.catalog === 264 && S.m3Gen === 'F80' && S.m3Rows > 0 && S.m3AllF80 && S.truckRows > 0 &&
     S.searchLof > 0 && S.motorStillOff && S.seedSource === 'SHOP SEED', JSON.stringify(S));
 
   check('21. nothing threw during any of it', pageErrors.length === 0, pageErrors.join(' | '));
