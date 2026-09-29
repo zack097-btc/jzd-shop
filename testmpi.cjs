@@ -45,7 +45,7 @@ const F = f => '[data-f="' + f.replace(/"/g, '\\"') + '"]';
     const got = await op.evaluate(() => {
       saveCustomer({ id: 'c1', first: 'Old', last: 'Book', phone: '509-555-0100' });
       db.vehicles.v1 = { id: 'v1', customerId: 'c1', year: '2016', make: 'BMW', model: '328i', vin: 'WBA8E9G50GNT12345', mileage: '98000' };
-      const mk = (id, status) => shapeOrder({ id, customerId: 'c1', vehicleId: 'v1', date: '2026-09-01', status, estimateNo: id === 'o1' ? 1 : 2, labor: [], parts: [], extras: [], payments: [], history: [] });
+      const mk = (id, status) => shapeOrder({ id, customerId: 'c1', vehicleId: 'v1', date: '2026-09-01', status, estimateNo: id === 'o1' ? 1 : 2, complaint: 'Multi-point inspection', labor: [], parts: [], extras: [], payments: [], history: [] });
       db.orders.o1 = mk('o1', 'In Progress'); db.orders.o2 = mk('o2', 'In Progress');
       /* in progress, typed the 2.8.1 way */
       const a = newInspection('o1', 'v1'); a.tech = 'Zack';
@@ -103,7 +103,7 @@ const F = f => '[data-f="' + f.replace(/"/g, '\\"') + '"]';
   /* ---- a new inspection on a new vehicle starts empty ---- */
   await page.evaluate(() => {
     db.vehicles.v2 = { id: 'v2', customerId: 'c1', year: '2019', make: 'Honda', model: 'Accord', vin: '1HGCV1F30KA000001', mileage: '64000' };
-    db.orders.o3 = shapeOrder({ id: 'o3', customerId: 'c1', vehicleId: 'v2', date: '2026-09-13', status: 'In Progress', estimateNo: 3, labor: [], parts: [], extras: [], payments: [], history: [] });
+    db.orders.o3 = shapeOrder({ id: 'o3', customerId: 'c1', vehicleId: 'v2', date: '2026-09-13', status: 'In Progress', estimateNo: 3, complaint: 'Multi-point inspection', labor: [], parts: [], extras: [], payments: [], history: [] });
     save(); openInspection('o3');
   });
   await wait(200);

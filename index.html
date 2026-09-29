@@ -317,6 +317,10 @@
   body.phone button{min-height:40px}
   .phonehome .search{width:100%;box-sizing:border-box;margin:10px 0}
   .phonebig{display:block;width:100%;min-height:54px;font-size:17px;font-weight:800;margin:6px 0;border-radius:12px}
+  .intakeblock{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0}
+  .intakeblock h3{margin:0 0 6px;font-size:16px}
+  .intakepick{display:block;width:100%;text-align:left;margin:4px 0;padding:10px}
+  .intakechosen{font-size:16px;margin-bottom:6px}
   .vinlive{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:16/9}
   .vinlive{max-height:62vh;margin:0 auto}
   .vinlive video{width:100%;height:100%;object-fit:contain;display:block}
@@ -2133,10 +2137,113 @@ function openInspection(orderId){
   if(cur && cur.id === orderId){ pullWO(); db.orders[o.id] = JSON.parse(JSON.stringify(cur)); closeWO(); }
   const ord = db.orders[orderId];
   let insp = inspectionFor(ord);
-  if(!insp){ insp = newInspection(orderId, ord.vehicleId); save(); }
+  if(!insp){
+    /* the shop's rule: no inspection starts until the ticket says whose car it
+       is, how to reach them, what the car is, and why it came in */
+    if (intakeMissing(ord).length){ inspIntake(orderId); return; }
+    insp = newInspection(orderId, ord.vehicleId); save();
+  }
   inspId = insp.id; inspFilter = "";
   if (inspSessionId !== insp.id){ inspSessionId = insp.id; inspLastState = ""; Object.keys(inspOpenCustom).forEach(k => delete inspOpenCustom[k]); }
   go("insp");
+}
+/* ---------- before an inspection: who, what, and why ----------
+   A new inspection needs the customer's name and a way to reach them (phone
+   or email), the vehicle's year, make and model, and the reason the customer
+   brought it in. Whatever the ticket is missing is asked for here, on one
+   screen that works on the phone, and the inspection starts when it is all in.
+   An inspection already started always opens. */
+function intakeMissing(o){
+  const miss = [];
+  const c = o && db.customers[o.customerId];
+  if (!c || !customerName(c)) miss.push("customer");
+  else if (!String(c.phone || c.phone2 || "").trim() && !String(c.email || "").trim()) miss.push("contact");
+  const v = o && db.vehicles[o.vehicleId];
+  if (!v || !String(v.year || "").trim() || !String(v.make || "").trim() || !String(v.model || "").trim()) miss.push("vehicle");
+  if (!String((o && o.complaint) || "").trim()) miss.push("reason");
+  return miss;
+}
+function inspIntake(orderId){
+  const o = db.orders[orderId]; if (!o) return;
+  const c0 = db.customers[o.customerId];
+  const v0 = db.vehicles[o.vehicleId] || {};
+  const st = {custId: c0 ? c0.id : "", q: ""};
+  const inp = (id, label, val, extra) => `<div><label>${label}</label><input id="${id}" value="${esc(val || "")}" ${extra || ""}></div>`;
+  const draw = () => {
+    const c = st.custId ? db.customers[st.custId] : null;
+    const matches = !c && st.q.trim().length >= 2 ? vals(db.customers).filter(x => [customerName(x), x.phone, x.phone2, x.email].join(" ").toLowerCase().indexOf(st.q.trim().toLowerCase()) >= 0 ||
+      (digits(st.q).length >= 3 && [x.phone, x.phone2].some(ph => digits(ph).indexOf(digits(st.q)) >= 0))).slice(0, 6) : [];
+    $("#recSheet").innerHTML = `<div class="sheet-head"><h2>Before the inspection</h2><div class="grow"></div><button onclick="closeRec()">Close</button></div>
+      <p class="muted" style="margin-top:0">Fill in the customer, the vehicle and why it is here. The inspection starts when these are in.</p>
+      <div class="intakeblock"><h3>1. Customer</h3>
+        ${c ? `<div class="intakechosen"><b>${esc(customerLabel(c) || customerName(c))}</b> <button class="sm" onclick="window.__ikCust('')">Change</button></div>` : `
+          <input id="ik_q" placeholder="Search customers — name or phone" value="${esc(st.q)}" autocomplete="off">
+          ${matches.map(x => `<button class="intakepick" onclick="window.__ikCust('${x.id}')"><b>${esc(customerLabel(x) || customerName(x))}</b> <span class="muted">${esc([x.phone, x.email].filter(Boolean).join(" · "))}</span></button>`).join("")}
+          <div class="muted" style="font-size:12.5px;margin:6px 0 2px">${matches.length ? "Or a new customer:" : "New customer:"}</div>`}
+        <div class="row">
+          ${c ? "" : inp("ik_first", "First name", "") + inp("ik_last", "Last name", "") + inp("ik_company", "Business / fleet (optional)", "")}
+          ${inp("ik_phone", "Phone", c ? c.phone : "", 'inputmode="tel" autocomplete="off"')}
+          ${inp("ik_email", "Email", c ? c.email : "", 'inputmode="email" autocomplete="off"')}
+        </div>
+        <div class="muted" style="font-size:12px">A phone number or an email is needed.</div></div>
+      <div class="intakeblock"><h3>2. Vehicle</h3>
+        <div class="row">${inp("ik_year", "Year", v0.year, 'inputmode="numeric"')}${inp("ik_make", "Make", v0.make)}${inp("ik_model", "Model", v0.model)}</div>
+        <div class="row">${inp("ik_vin", "VIN (optional)", v0.vin, 'autocomplete="off" spellcheck="false" style="font-family:Consolas,monospace"')}
+          ${inp("ik_miles", "Mileage in", o.mileageIn || v0.mileage, 'inputmode="numeric"')}${inp("ik_plate", "Plate", v0.plate)}</div>
+        <button class="sm" onclick="window.__ikScan()">📷 Scan VIN</button></div>
+      <div class="intakeblock"><h3>3. Why is it here?</h3>
+        <textarea id="ik_reason" placeholder="What the customer says — the noise, the light, the service they asked for">${esc(o.complaint || "")}</textarea></div>
+      <div id="ik_msg"></div>
+      <button class="phonebig primary" onclick="window.__ikGo()">SAVE AND START THE INSPECTION</button>`;
+    const q = $("#ik_q");
+    if (q) q.oninput = () => { st.q = q.value; const at = q.selectionStart; keep(() => draw()); const n = $("#ik_q"); if (n){ n.focus(); try { n.setSelectionRange(at, at); } catch(e){} } };
+  };
+  /* what has been typed survives a redraw */
+  const keep = fn => {
+    const saved = {};
+    $("#recSheet").querySelectorAll("input[id^=ik_],textarea[id^=ik_]").forEach(el => saved[el.id] = el.value);
+    fn();
+    Object.keys(saved).forEach(id => { const el = $("#" + id); if (el && id !== "ik_q") el.value = saved[id]; });
+  };
+  window.__ikCust = id => {
+    const sv = {}; $("#recSheet").querySelectorAll("input[id^=ik_],textarea[id^=ik_]").forEach(el => sv[el.id] = el.value);
+    st.custId = id; st.q = ""; draw();
+    Object.keys(sv).forEach(k => { const el = $("#" + k); if (el && !/^ik_(phone|email|q|first|last|company)$/.test(k)) el.value = sv[k]; });
+  };
+  window.__ikScan = () => vinScanOpen({onVin: vin => { const f = $("#ik_vin"); if (f) f.value = vin; const d = db.vinCache[vin];
+    if (d){ [["ik_year", d.year], ["ik_make", d.make], ["ik_model", d.model]].forEach(([id, val]) => { const el = $("#" + id); if (el && !el.value && val) el.value = val; }); } }});
+  window.__ikGo = () => {
+    const val = id => { const el = $("#" + id); return el ? el.value.trim() : ""; };
+    const say = m => { $("#ik_msg").innerHTML = `<div class="verifynote" style="border-color:#c0392b">${m}</div>`; };
+    let c = st.custId ? JSON.parse(JSON.stringify(db.customers[st.custId])) : {id:uid("c"), name:"", phone:"", email:"", address:"", notes:""};
+    if (!st.custId){ c.first = val("ik_first"); c.last = val("ik_last"); c.company = val("ik_company"); }
+    c.phone = val("ik_phone"); c.email = val("ik_email");
+    const need = [];
+    if (!customerName(shapeCustomer(c))) need.push("the customer's name");
+    if (!c.phone && !c.phone2 && !c.email) need.push("a phone number or email");
+    if (!val("ik_year") || !val("ik_make") || !val("ik_model")) need.push("the vehicle's year, make and model");
+    if (!val("ik_reason")) need.push("why the vehicle is here");
+    if (need.length){ say("<b>Still needed:</b> " + need.map(esc).join(", ") + "."); return; }
+    if (!st.custId){
+      const dupes = findDuplicateCustomers(c);
+      if (dupes.length && !confirm(customerLabel(dupes[0].customer) + " is already in the book (" + dupes[0].reasons.join(", ") + ").\n\nOK = add a new customer anyway\nCancel = go back and pick that one")) return;
+    }
+    saveCustomer(c);
+    let v = db.vehicles[o.vehicleId];
+    if (!v){ v = {id:uid("v"), customerId:c.id, year:"", make:"", model:"", vin:"", plate:"", color:"", mileage:"", notes:""}; db.vehicles[v.id] = v; o.vehicleId = v.id; }
+    v.year = val("ik_year"); v.make = val("ik_make"); v.model = val("ik_model");
+    const vin = val("ik_vin").toUpperCase(); if (vin) v.vin = vin;
+    if (val("ik_plate")) v.plate = val("ik_plate");
+    if (val("ik_miles")){ v.mileage = val("ik_miles"); o.mileageIn = val("ik_miles"); }
+    if (!v.customerId) v.customerId = c.id;
+    o.customerId = c.id;
+    o.complaint = val("ik_reason");
+    audit("intake", o.id, "", c.id, db.settings.lastTech || "", "checked in for inspection");
+    save(); closeRec();
+    openInspection(o.id);
+  };
+  draw();
+  $("#recOverlay").classList.add("on");
 }
 /* Reading an item for the screen never adds it to the record, so opening a
    completed inspection leaves it byte-for-byte as it was. */
